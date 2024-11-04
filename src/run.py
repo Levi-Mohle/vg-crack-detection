@@ -7,9 +7,11 @@ mode = "train" # ["train", "eval"]
 
 logger      = "mlflow"
 experiment  = "mnist_realnvp"
-max_epochs  = 2
+max_epochs  = 1
 data = "mnist_ad"
-debug = 'fdr'
+debug = 'default'
+
+data_perc = 0.1
 
 ckpt_path = None
 
@@ -17,7 +19,8 @@ if mode == "train":
     subprocess.run(["python", "train.py", 
                     f"experiment={experiment}",
                     f"trainer.max_epochs={max_epochs}",
-                    f"debug={debug}",
+                    f"+trainer.limit_train_batches={data_perc}",
+                    # f"debug={debug}",
                     f"logger={logger}"], 
                     cwd=src_path)
 elif mode == "eval":

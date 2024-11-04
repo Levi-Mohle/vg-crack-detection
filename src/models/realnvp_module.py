@@ -137,6 +137,13 @@ class RealNVPLitModule(LightningModule):
         self.val_loss(nll)
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
+        # Sampling a new instance
+        # if batch_idx == 0:
+        #     z = torch.randn((1, self.channels, self.img_size, self.img_size), 
+        #                     dtype=torch.float32)
+        #     image_path = ""
+        #     save_image(self.net(z, reverse=True))
+        #     self.logger.log_artifact(image_path)
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."

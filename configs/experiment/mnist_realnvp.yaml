@@ -23,14 +23,16 @@ trainer:
 
 model:
   optimizer:
-    lr: 0.002
-  net:
+    lr: 0.001
 
   compile: false
 
 data:
   batch_size: 32
   ID_number: 3
+
+extras:
+  print_config: false
 
 logger:
   wandb:
