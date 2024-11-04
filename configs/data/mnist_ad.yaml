@@ -1,0 +1,9 @@
+_target_: src.data.mnist_ad_datamodule.MNIST_AD_DataModule
+data_dir: ${paths.data_dir}
+batch_size: 128 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
+ID_number: 0
+val_size: 100
+test_size: 100
+train_val_test_split: [55_000, 5_000, 10_000]
+num_workers: 0
+pin_memory: False
