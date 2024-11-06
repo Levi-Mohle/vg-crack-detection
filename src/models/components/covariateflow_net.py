@@ -16,7 +16,7 @@ class CovariateFlow(torch.nn.Module):
     def __init__(
         self, 
         num_coupling_layers: int =6,
-        img_size: list = [3,28,28],
+        img_size: list = [1,28,28],
         import_samples: int =8, 
         train_set = None,
         ):
@@ -57,20 +57,20 @@ class CovariateFlow(torch.nn.Module):
 
     def forward(self, imgs):
         # The forward function is only used for visualizing the graph
-        return self.flows._get_likelihood(imgs)
+        return self._get_likelihood(imgs)
 
     def encode(self, imgs):
         # Given a batch of images, return the latent representation z and ldj of the transformations
-        z, ldj = imgs[:, 1, ...], torch.zeros(imgs.shape[0])
+        z, ldj = imgs, torch.zeros(imgs.shape[0])
         for flow in self.flows:
     
             if type(flow).__name__ == 'CouplingLayer':
                 if flow.is_conditioned == True:
-                    z, ldj = flow(z, ldj, orig_img = imgs[:, 0, ...], reverse=False)
+                    z, ldj = flow(z, ldj, orig_img = imgs, reverse=False)
                 else:
                     z, ldj = flow(z, ldj, reverse=False)
             elif type(flow).__name__ == 'AffineCouplingSdl':
-                z, ldj = flow(z, ldj, imgs = imgs[:, 0, ...], reverse=False)
+                z, ldj = flow(z, ldj, imgs = imgs, reverse=False)
             else:
                 z, ldj = flow(z, ldj, reverse=False)
         return z, ldj

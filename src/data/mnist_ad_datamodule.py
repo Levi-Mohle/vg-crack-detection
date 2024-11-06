@@ -80,7 +80,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         # data transformations
         self.transforms = transforms.Compose(
             [transforms.ToTensor(),
-             transforms.Lambda(lambda x: x.repeat(3, 1, 1)),
+            #  transforms.Lambda(lambda x: x.repeat(3, 1, 1)),
              ])
 
         self.data_train: Optional[Dataset] = None

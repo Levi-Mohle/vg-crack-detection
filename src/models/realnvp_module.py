@@ -3,7 +3,7 @@ from typing import Any, Dict, Tuple
 import torch
 from lightning import LightningModule
 from torchmetrics import MeanMetric
-from models.components.loss_functions.realnvp_loss import RealNVPLoss
+# from models.components.loss_functions.realnvp_loss import RealNVPLoss
 
 
 class RealNVPLitModule(LightningModule):
@@ -44,6 +44,7 @@ class RealNVPLitModule(LightningModule):
         net: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
+        criterion: torch.nn.Module,
         compile: bool,
     ) -> None:
         """Initialize a `MNISTLitModule`.
@@ -61,7 +62,7 @@ class RealNVPLitModule(LightningModule):
         self.net = net
 
         # loss function
-        self.criterion = RealNVPLoss()
+        self.criterion = criterion
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -96,8 +97,10 @@ class RealNVPLitModule(LightningModule):
             - A tensor of target labels.
         """
         x, _ = batch
-        z, sldj = self.forward(x)
-        return z, sldj
+        x.requires_grad_(True)
+
+        x, z, sldj = self.forward(x)
+        return x, z, sldj
 
     def training_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
@@ -109,15 +112,15 @@ class RealNVPLitModule(LightningModule):
         :param batch_idx: The index of the current batch.
         :return: A tensor of losses between model predictions and targets.
         """
-        z, sldj = self.model_step(batch)
+        x, z, sldj = self.model_step(batch)
 
         # update and log metrics
-        nll = self.criterion(z, sldj)
-        self.train_loss(nll)
+        loss = self.criterion(x, z, sldj)
+        self.train_loss(loss)
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
-        return nll
+        return loss
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
@@ -130,12 +133,13 @@ class RealNVPLitModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
-        z, sldj = self.model_step(batch)
+        with torch.enable_grad():
+            x, z, sldj = self.model_step(batch)
 
-        # update and log metrics
-        nll = self.criterion(z, sldj)
-        self.val_loss(nll)
-        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
+            # update and log metrics
+            loss = self.criterion(x, z, sldj)
+            self.val_loss(loss)
+            self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # Sampling a new instance
         # if batch_idx == 0:
@@ -148,7 +152,7 @@ class RealNVPLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
         pass
-
+    
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
 
@@ -156,12 +160,13 @@ class RealNVPLitModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
-        z, sldj = self.model_step(batch)
+        with torch.enable_grad():
+            x, z, sldj = self.model_step(batch)
 
-        # update and log metrics
-        nll = self.criterion(z, sldj)
-        self.test_loss(nll)
-        self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
+            # update and log metrics
+            loss = self.criterion(x, z, sldj)
+            self.test_loss(loss)
+            self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""

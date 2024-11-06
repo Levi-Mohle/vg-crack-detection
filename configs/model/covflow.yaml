@@ -11,12 +11,11 @@ scheduler:
   _partial_: true
   mode: min
   factor: 0.1
-  patience: 10
 
 net:
   _target_: src.models.components.covariateflow_net.CovariateFlow
   num_coupling_layers: 6
-  img_size: [3,28,28]
+  img_size: [1,28,28]
   import_samples: 8 
   train_set: null
 

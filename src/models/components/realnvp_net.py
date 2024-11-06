@@ -315,28 +315,28 @@ class ResNet(nn.Module):
 
         return x
     
-class RealNVPLoss(nn.Module):
-    """Get the NLL loss for a RealNVP model.
+# class RealNVPLoss(nn.Module):
+#     """Get the NLL loss for a RealNVP model.
 
-    Args:
-        k (int or float): Number of discrete values in each input dimension.
-            E.g., `k` is 256 for natural images.
+#     Args:
+#         k (int or float): Number of discrete values in each input dimension.
+#             E.g., `k` is 256 for natural images.
 
-    See Also:
-        Equation (3) in the RealNVP paper: https://arxiv.org/abs/1605.08803
-    """
-    def __init__(self, k=256):
-        super(RealNVPLoss, self).__init__()
-        self.k = k
+#     See Also:
+#         Equation (3) in the RealNVP paper: https://arxiv.org/abs/1605.08803
+#     """
+#     def __init__(self, k=256):
+#         super(RealNVPLoss, self).__init__()
+#         self.k = k
 
-    def forward(self, z, sldj):
-        prior_ll = -0.5 * (z ** 2 + np.log(2 * np.pi))
-        prior_ll = prior_ll.reshape(z.size(0), -1).sum(-1) \
-            - np.log(self.k) * np.prod(z.size()[1:])
-        ll = prior_ll + sldj
-        nll = -ll.mean()
+#     def forward(self, z, sldj):
+#         prior_ll = -0.5 * (z ** 2 + np.log(2 * np.pi))
+#         prior_ll = prior_ll.reshape(z.size(0), -1).sum(-1) \
+#             - np.log(self.k) * np.prod(z.size()[1:])
+#         ll = prior_ll + sldj
+#         nll = -ll.mean()
 
-        return nll
+#         return nll
     
 class MaskType(IntEnum):
     CHECKERBOARD = 0
@@ -577,9 +577,9 @@ class RealNVP(nn.Module):
             # De-quantize and convert to logits
             x, sldj = self._pre_process(x)
 
-        x, sldj = self.model(x, sldj, reverse)
+        z, sldj = self.model(x, sldj, reverse)
 
-        return x, sldj
+        return x, z, sldj
 
     def _pre_process(self, x):
         """Dequantize the input image `x` and convert to logits.
@@ -606,177 +606,177 @@ class RealNVP(nn.Module):
 
         return y, sldj
     
-    def train_model(self, dataloader, args, models_dir = None, verbose=True):
-        """Train the RealNVP model.
+    # def train_model(self, dataloader, args, models_dir = None, verbose=True):
+    #     """Train the RealNVP model.
 
-        Args:
-            dataloader (DataLoader): DataLoader for the training set.
-            args (argparse.Namespace): Command-line arguments.
-        """
-        if models_dir!= None:
-            create_checkpoint_dir(models_dir)
+    #     Args:
+    #         dataloader (DataLoader): DataLoader for the training set.
+    #         args (argparse.Namespace): Command-line arguments.
+    #     """
+    #     if models_dir!= None:
+    #         create_checkpoint_dir(models_dir)
 
-        loss = RealNVPLoss()
-        optimizer = torch.optim.Adam(self.parameters(), lr=args.lr)
+    #     loss = RealNVPLoss()
+    #     optimizer = torch.optim.Adam(self.parameters(), lr=args.lr)
 
-        epoch_bar = trange(args.n_epochs, desc='Epochs', leave=True)
+    #     epoch_bar = trange(args.n_epochs, desc='Epochs', leave=True)
 
-        best_loss = np.inf
+    #     best_loss = np.inf
 
-        for epoch in epoch_bar:
-            self.train()
-            loss_epoch = 0.
-            avg_loss = 0
-            ep_grad = []
-            ep_likelihood = []
-            for x,_ in tqdm(dataloader, desc='Batches', leave=True, position=0):
+    #     for epoch in epoch_bar:
+    #         self.train()
+    #         loss_epoch = 0.
+    #         avg_loss = 0
+    #         ep_grad = []
+    #         ep_likelihood = []
+    #         for x,_ in tqdm(dataloader, desc='Batches', leave=True, position=0):
 
-                # x = x.clone()
-                x = x.to(self.device)
-                x.requires_grad_()
+    #             # x = x.clone()
+    #             x = x.to(self.device)
+    #             x.requires_grad_()
 
-                optimizer.zero_grad()
-                z, sldj = self.forward(x, reverse=False)
-                nll = loss(z, sldj)
+    #             optimizer.zero_grad()
+    #             z, sldj = self.forward(x, reverse=False)
+    #             nll = loss(z, sldj)
 
-                nll.backward(retain_graph=True)
-                clip_grad_norm(optimizer, args.max_grad_norm)
+    #             nll.backward(retain_graph=True)
+    #             clip_grad_norm(optimizer, args.max_grad_norm)
 
-                if self.typicality:
-                    grad_loss = x.grad.clone() # gradient of log-likelihood wrt x
-                    grad_loss = grad_loss.flatten(start_dim=1) # flatten the gradient
-                    grad_loss = torch.linalg.norm(grad_loss, dim=1, ord=2) # l2 norm of the gradient
+    #             if self.typicality:
+    #                 grad_loss = x.grad.clone() # gradient of log-likelihood wrt x
+    #                 grad_loss = grad_loss.flatten(start_dim=1) # flatten the gradient
+    #                 grad_loss = torch.linalg.norm(grad_loss, dim=1, ord=2) # l2 norm of the gradient
 
-                    optimizer.step()
+    #                 optimizer.step()
                     
-                    if x.shape[0] == args.batch_size: # Temporary work around for unequal batch sizes
-                        ep_grad.append(grad_loss.detach())
-                        ep_likelihood.append(nll.detach())
+    #                 if x.shape[0] == args.batch_size: # Temporary work around for unequal batch sizes
+    #                     ep_grad.append(grad_loss.detach())
+    #                     ep_likelihood.append(nll.detach())
 
-                    avg_grad = torch.mean(torch.stack(ep_grad).requires_grad_()) # average the gradient over the batch
-                    avg_likelihood = torch.mean(torch.stack(ep_likelihood))
+    #                 avg_grad = torch.mean(torch.stack(ep_grad).requires_grad_()) # average the gradient over the batch
+    #                 avg_likelihood = torch.mean(torch.stack(ep_likelihood))
 
-                    # print(f"avg_grad:{avg_grad}, avg_likelihood:{avg_likelihood}")
+    #                 # print(f"avg_grad:{avg_grad}, avg_likelihood:{avg_likelihood}")
 
-                    avg_loss = avg_likelihood - self.alpha * avg_grad
-                    # avg_loss = avg_grad
+    #                 avg_loss = avg_likelihood - self.alpha * avg_grad
+    #                 # avg_loss = avg_grad
                     
-                    optimizer.zero_grad()
-                    avg_loss.backward(retain_graph=True)      
-                else:
-                    optimizer.step()
-                    avg_loss += nll.item()*x.size(0)
+    #                 optimizer.zero_grad()
+    #                 avg_loss.backward(retain_graph=True)      
+    #             else:
+    #                 optimizer.step()
+    #                 avg_loss += nll.item()*x.size(0)
                   
-            avg_loss /= len(dataloader.dataset)
-            epoch_bar.set_postfix(loss=loss_epoch)
-            if not self.no_wandb:
-                # wandb.log({"train_loss": loss_epoch})
-                pass
+    #         avg_loss /= len(dataloader.dataset)
+    #         epoch_bar.set_postfix(loss=loss_epoch)
+    #         if not self.no_wandb:
+    #             # wandb.log({"train_loss": loss_epoch})
+    #             pass
 
-            if loss_epoch < best_loss:
-                best_loss = loss_epoch
-                if models_dir != None:
-                    torch.save(self.state_dict(), os.path.join(models_dir, 'RealNVP', f'RealNVP_{args.dataset}.pt'))
+    #         if loss_epoch < best_loss:
+    #             best_loss = loss_epoch
+    #             if models_dir != None:
+    #                 torch.save(self.state_dict(), os.path.join(models_dir, 'RealNVP', f'RealNVP_{args.dataset}.pt'))
             
-            if (epoch + 1) % args.sample_and_save_freq == 0 or epoch == 0:
-                self.sample(16, train=True)
+    #         if (epoch + 1) % args.sample_and_save_freq == 0 or epoch == 0:
+    #             self.sample(16, train=True)
     
-    def sample(self, n_samples, train=False):
-        """Sample from RealNVP model.
+    # def sample(self, n_samples, train=False):
+    #     """Sample from RealNVP model.
 
-        Args:
-            net (torch.nn.DataParallel): The RealNVP model wrapped in DataParallel.
-            batch_size (int): Number of samples to generate.
-            train (bool): Whether to log samples as training samples.
-        """
-        self.eval()
-        z = torch.randn((n_samples, self.channels, self.img_size, self.img_size), dtype=torch.float32, device=self.device)
-        x, _ = self.forward(z, reverse=True)
-        x = torch.sigmoid(x)
+    #     Args:
+    #         net (torch.nn.DataParallel): The RealNVP model wrapped in DataParallel.
+    #         batch_size (int): Number of samples to generate.
+    #         train (bool): Whether to log samples as training samples.
+    #     """
+    #     self.eval()
+    #     z = torch.randn((n_samples, self.channels, self.img_size, self.img_size), dtype=torch.float32, device=self.device)
+    #     x, _ = self.forward(z, reverse=True)
+    #     x = torch.sigmoid(x)
 
-        x = x.clamp(0, 1).cpu().detach()
-        # grid = make_grid(x, nrow=int(n_samples ** 0.5), padding=0)
-        # fig = plt.figure(figsize=(10, 10))
-        # plt.imshow(grid.permute(1, 2, 0))
-        # plt.axis('off')
-        # if train:
-        #     if not self.no_wandb:
-        #         # wandb.log({"train_samples": fig})
-        #         pass
-        # else:
-        #     plt.show()
-        # plt.close(fig)
+    #     x = x.clamp(0, 1).cpu().detach()
+    #     # grid = make_grid(x, nrow=int(n_samples ** 0.5), padding=0)
+    #     # fig = plt.figure(figsize=(10, 10))
+    #     # plt.imshow(grid.permute(1, 2, 0))
+    #     # plt.axis('off')
+    #     # if train:
+    #     #     if not self.no_wandb:
+    #     #         # wandb.log({"train_samples": fig})
+    #     #         pass
+    #     # else:
+    #     #     plt.show()
+    #     # plt.close(fig)
 
-        return x
+    #     return x
 
-    def outlier_detection(self, in_loader, out_loader):
-        """Detect outliers using RealNVP model.
+    # def outlier_detection(self, in_loader, out_loader):
+    #     """Detect outliers using RealNVP model.
 
-        Args:
-            net (torch.nn.DataParallel): The RealNVP model wrapped in DataParallel.
-            in_loader (DataLoader): DataLoader for the in-distribution dataset.
-            out_loader (DataLoader): DataLoader for the out-of-distribution dataset.
-        """
-        self.eval()
+    #     Args:
+    #         net (torch.nn.DataParallel): The RealNVP model wrapped in DataParallel.
+    #         in_loader (DataLoader): DataLoader for the in-distribution dataset.
+    #         out_loader (DataLoader): DataLoader for the out-of-distribution dataset.
+    #     """
+    #     self.eval()
 
-        in_scores = []
-        out_scores = []
-        targets = []
+    #     in_scores = []
+    #     out_scores = []
+    #     targets = []
 
-        for x, _ in tqdm(in_loader, desc='In-distribution', leave=False):
-            x = x.to(self.device)
-            z, sldj = self.forward(x, reverse=False)
-            nll = self.nll_score(z, sldj)
-            in_scores.append(nll.cpu().detach().numpy())
+    #     for x, _ in tqdm(in_loader, desc='In-distribution', leave=False):
+    #         x = x.to(self.device)
+    #         z, sldj = self.forward(x, reverse=False)
+    #         nll = self.nll_score(z, sldj)
+    #         in_scores.append(nll.cpu().detach().numpy())
 
-        for x, target in tqdm(out_loader, desc='Out-of-distribution', leave=False):
-            x = x.to(self.device)
-            z, sldj = self.forward(x, reverse=False)
-            nll = self.nll_score(z, sldj)
-            out_scores.append(nll.cpu().detach().numpy())
-            targets.append(target.cpu().detach().numpy())
+    #     for x, target in tqdm(out_loader, desc='Out-of-distribution', leave=False):
+    #         x = x.to(self.device)
+    #         z, sldj = self.forward(x, reverse=False)
+    #         nll = self.nll_score(z, sldj)
+    #         out_scores.append(nll.cpu().detach().numpy())
+    #         targets.append(target.cpu().detach().numpy())
         
-        in_scores = np.concatenate(in_scores)
-        out_scores = np.concatenate(out_scores)
-        targets = np.concatenate(targets)
+    #     in_scores = np.concatenate(in_scores)
+    #     out_scores = np.concatenate(out_scores)
+    #     targets = np.concatenate(targets)
 
-        # Calculate ROC AUC
-        scores = np.concatenate([in_scores, out_scores])
+    #     # Calculate ROC AUC
+    #     scores = np.concatenate([in_scores, out_scores])
         
-        labels = np.concatenate([np.zeros_like(in_scores), np.ones_like(out_scores)])
-        auc = roc_auc_score(labels, scores)
-        fpr, tpr, _ = roc_curve(labels, scores)
-        fpr95 = fpr[np.argmax(tpr >= 0.95)]
+    #     labels = np.concatenate([np.zeros_like(in_scores), np.ones_like(out_scores)])
+    #     auc = roc_auc_score(labels, scores)
+    #     fpr, tpr, _ = roc_curve(labels, scores)
+    #     fpr95 = fpr[np.argmax(tpr >= 0.95)]
 
-        print(f"ROC AUC: {auc:.4f}, FPR at 95% TPR: {fpr95:.4f}")
+    #     print(f"ROC AUC: {auc:.4f}, FPR at 95% TPR: {fpr95:.4f}")
         
-        fig = plt.figure(figsize=(10, 10))
-        axes = fig.subplots(2,1)
+    #     fig = plt.figure(figsize=(10, 10))
+    #     axes = fig.subplots(2,1)
         
-        axes[0].hist(in_scores, bins=50, alpha=0.5, label='In-distribution', density=True)
-        axes[0].hist(out_scores, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
-        axes[0].legend()
-        axes[0].set_title('RealNVP Outlier Detection')
-        axes[0].set_xlabel('NLL Score')
-        axes[0].set_ylabel('Counts')
+    #     axes[0].hist(in_scores, bins=50, alpha=0.5, label='In-distribution', density=True)
+    #     axes[0].hist(out_scores, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
+    #     axes[0].legend()
+    #     axes[0].set_title('RealNVP Outlier Detection')
+    #     axes[0].set_xlabel('NLL Score')
+    #     axes[0].set_ylabel('Counts')
 
-        disp_roc = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=auc,
-                                      estimator_name='RealNVP')
-        disp_roc.plot(ax=axes[1])
-        axes[1].set_title('ROC')
+    #     disp_roc = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=auc,
+    #                                   estimator_name='RealNVP')
+    #     disp_roc.plot(ax=axes[1])
+    #     axes[1].set_title('ROC')
 
-        plt.show()
+    #     plt.show()
 
-        return scores, labels
+    #     return scores, labels
     
-    def nll_score(self, z, sldj):
-        k = 256
-        prior_ll = -0.5 * (z ** 2 + np.log(2 * np.pi))
-        prior_ll = prior_ll.reshape(z.size(0), -1).sum(-1) \
-            - np.log(k) * np.prod(z.size()[1:])
-        ll = prior_ll + sldj
-        nll = -ll
-        return nll
+    # def nll_score(self, z, sldj):
+    #     k = 256
+    #     prior_ll = -0.5 * (z ** 2 + np.log(2 * np.pi))
+    #     prior_ll = prior_ll.reshape(z.size(0), -1).sum(-1) \
+    #         - np.log(k) * np.prod(z.size()[1:])
+    #     ll = prior_ll + sldj
+    #     nll = -ll
+    #     return nll
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ src_path  = Path.cwd() / "src"
 mode = "train" # ["train", "eval"]
 
 logger      = "mlflow"
-experiment  = "mnist_covflow"
+experiment  = "mnist_realnvp"
 max_epochs  = 1
 data = "mnist_ad"
 debug = 'fdr'

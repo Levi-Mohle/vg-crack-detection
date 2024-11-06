@@ -1,11 +1,13 @@
 import torch
 from torch import nn
+import sys
 from torch.nn import functional as F
-from math import log, pi, exp
+# from math import log, pi, exp
 import numpy as np
 from models.components.utils.covflow_utils import squeeze2d, create_quadrent_cycle_mask
-import scipy
+# import scipy
 # from models.components.utils import covflow_thops
+
 
 
 class CouplingLayer(nn.Module):
@@ -78,6 +80,7 @@ class CouplingLayer(nn.Module):
             ldj -= s.sum(dim=[1,2,3])
 
         return z, ldj
+    
     def is_conditioned(self):
         return self.is_conditioned  
 
@@ -473,11 +476,15 @@ class InvConv2d(nn.Module):
 
     def forward(self, input, logdet, reverse=False):
         
-        _,_, height, width = input.shape
-
+        _,channels, height, width = input.shape
+        # torch.det does not work on scalar 
+        if self.weight.shape[0] == 1:
+            det  = self.weight.squeeze()
+        else:
+            det = torch.det(self.weight.squeeze())
         # You can also use torch.slogdet(self.weight)[1] to summarize the operations below\n",
         dlogdet = (
-            height * width * torch.log(torch.abs(torch.det(self.weight.squeeze())))
+            height * width * torch.log(torch.abs(det))
         )
 
         if not reverse:
