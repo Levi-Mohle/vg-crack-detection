@@ -11,7 +11,7 @@ max_epochs  = 1
 data = "mnist_ad"
 debug = 'fdr'
 
-data_perc = 0.1
+data_perc = 0.05
 
 ckpt_path = None
 
@@ -19,9 +19,9 @@ if mode == "train":
     subprocess.run(["python", "train.py", 
                     f"experiment={experiment}",
                     f"trainer.max_epochs={max_epochs}",
-                    # f"+trainer.limit_train_batches={data_perc}",
-                    f"debug={debug}",
-                    # f"logger={logger}",
+                    f"+trainer.limit_train_batches={data_perc}",
+                    # f"debug={debug}",
+                    f"logger={logger}",
                     ],
                     cwd=src_path)
 elif mode == "eval":

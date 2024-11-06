@@ -8,5 +8,5 @@ mlflow:
   tags: null
   # save_dir: "./mlruns"
   prefix: ""
-  artifact_location: null
+  artifact_location: C:/Users/lmohle/Documents/2_Coding/lightning-hydra-template/data/generated_samples
   # run_id: ""

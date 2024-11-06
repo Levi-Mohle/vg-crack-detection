@@ -2,6 +2,7 @@ from typing import Any, Dict, Tuple
 
 import torch
 from lightning import LightningModule
+from torchvision.utils import save_image
 from torchmetrics import MeanMetric
 # from models.components.loss_functions.realnvp_loss import RealNVPLoss
 
@@ -142,12 +143,14 @@ class RealNVPLitModule(LightningModule):
             self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # Sampling a new instance
-        # if batch_idx == 0:
-        #     z = torch.randn((1, self.channels, self.img_size, self.img_size), 
-        #                     dtype=torch.float32)
-        #     image_path = ""
-        #     save_image(self.net(z, reverse=True))
-        #     self.logger.log_artifact(image_path)
+        # TODO create different naming when sampling after each epoch
+        if batch_idx == 0:
+            noise = torch.randn((1, z.shape[1], z.shape[2], z.shape[3]), 
+                            dtype=torch.float32)
+            image_path = self.logger._artifact_location + "/sample_0.png"
+            _, x_hat, _ = self.net(noise, reverse=True)
+            save_image(x_hat, image_path)
+            self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
