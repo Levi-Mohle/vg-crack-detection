@@ -17,8 +17,8 @@ tags: ["mnist_ad", "real_nvp"]
 seed: 12345
 
 trainer:
-  min_epochs: 1
-  max_epochs: 2
+  min_epochs: 5
+  max_epochs: 20
   gradient_clip_val: 0.5
   inference_mode: true
 
@@ -27,13 +27,15 @@ model:
     lr: 0.001
   compile: false
   criterion:
-    _target_: src.models.components.loss_functions.losses.RealNVPLoss
+    _target_: src.models.components.loss_functions.losses.NLL_Typicality_Loss
   net:
     num_blocks: 4
+    mid_channels: 32
 
 data:
   batch_size: 32
   ID_number: 3
+  val_size: 300
 
 extras:
   print_config: false
@@ -46,3 +48,4 @@ logger:
     experiment: "mnist"
   mlflow:
     experiment_name: "mnist realnvp test"
+

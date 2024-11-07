@@ -1,8 +1,11 @@
 from typing import Any, Dict, Tuple
 
 import torch
+import numpy as np
 from lightning import LightningModule
 from torchvision.utils import save_image
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_auc_score, roc_curve, RocCurveDisplay
 from torchmetrics import MeanMetric
 # from models.components.loss_functions.realnvp_loss import RealNVPLoss
 
@@ -66,10 +69,12 @@ class RealNVPLitModule(LightningModule):
         self.criterion = criterion
 
         # for averaging loss across batches
-        self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
-        self.test_loss = MeanMetric()
+        self.train_loss     = MeanMetric()
+        self.val_loss       = MeanMetric()
+        self.test_loss      = MeanMetric()
 
+        self.val_losses = []
+        self.test_losses = []
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
@@ -140,6 +145,7 @@ class RealNVPLitModule(LightningModule):
             # update and log metrics
             loss = self.criterion(x, z, sldj)
             self.val_loss(loss)
+            self.val_losses.append(loss)
             self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # Sampling a new instance
@@ -154,7 +160,9 @@ class RealNVPLitModule(LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
-        pass
+        last_losses = self.val_losses
+        self.last_val_losses = last_losses
+        self.val_losses = []
     
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
@@ -169,11 +177,13 @@ class RealNVPLitModule(LightningModule):
             # update and log metrics
             loss = self.criterion(x, z, sldj)
             self.test_loss(loss)
+            self.test_losses.append(loss)
             self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
-        pass
+        self._log_histogram()
+        self.test_losses.clear()
 
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
@@ -186,6 +196,46 @@ class RealNVPLitModule(LightningModule):
         """
         if self.hparams.compile and stage == "fit":
             self.net = torch.compile(self.net)
+
+    def _log_histogram(self):
+
+        # TODO issue when running eval.py: does not run validation step and therefore does not have val_scores
+        val_scores = np.array(self.last_val_losses)
+        test_scores = np.array(self.test_losses)
+
+        y_true = np.concatenate([np.zeros_like(val_scores), np.ones_like(test_scores)], axis=0)
+        y_score = np.concatenate([val_scores, test_scores], axis=0)
+        auc_score = roc_auc_score(y_true, y_score)
+        if auc_score < 0.2:
+            auc_score = 1. - auc_score
+        fpr, tpr, _ = roc_curve(y_true, y_score)
+        fpr95 = fpr[np.argmax(tpr >= 0.95)]
+            
+        # print with 4 decimal places
+        # print(f"ROC AUC: {auc_score:.4f}, FPR at 95% TPR: {fpr95:.4f}")
+        
+        fig = plt.figure(figsize=(10, 10))
+        axes = fig.subplots(2,1)
+
+        # plot histograms of scores in same plot
+        axes[0].hist(val_scores, bins=50, alpha=0.5, label='In-distribution', density=True)
+        axes[0].hist(test_scores, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
+        axes[0].legend()
+        axes[0].set_title('Outlier Detection')
+        axes[0].set_ylabel('Counts')
+        axes[0].set_xlabel('Loss')
+
+        disp_roc = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=auc_score,
+                                      estimator_name='Model')
+        disp_roc.plot(ax=axes[1])
+        axes[1].set_title('ROC')
+        
+        # Logging plot as figure to mlflow
+        image_path = self.logger._artifact_location + "/hist_ROC.png"
+        fig.savefig(image_path)
+        self.logger.experiment.log_artifact(local_path = image_path,
+                                            run_id=self.logger.run_id)
+
 
     def configure_optimizers(self) -> Dict[str, Any]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.

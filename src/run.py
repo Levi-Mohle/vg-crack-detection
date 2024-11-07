@@ -7,7 +7,7 @@ mode = "train" # ["train", "eval"]
 
 logger      = "mlflow"
 experiment  = "mnist_realnvp"
-max_epochs  = 1
+max_epochs  = 2
 data = "mnist_ad"
 debug = 'fdr'
 
