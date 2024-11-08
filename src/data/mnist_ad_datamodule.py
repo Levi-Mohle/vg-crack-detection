@@ -99,7 +99,15 @@ class MNIST_AD_DataModule(LightningDataModule):
         :return: The number of MNIST classes (10).
         """
         return 10
-
+    
+    def _convert_label(self, x):
+        '''
+        convert anomaly label. 0: normal; 1: anomaly.
+        :param x (int): class label
+        :return: 0 or 1
+        '''
+        return 0 if x == self.ID_number else 1
+    
     def prepare_data(self) -> None:
         """Download data if needed. Lightning ensures that `self.prepare_data()` is called only
         within a single process on CPU, so you can safely add your downloading logic within. In
@@ -129,10 +137,12 @@ class MNIST_AD_DataModule(LightningDataModule):
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
+        # Transform classification labels to ood labels (0=id 1=ood)
+        target_transform = transforms.Lambda(lambda y: 0 if y == self.ID_number else 1)
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            self.data_train = MNIST(self.hparams.data_dir, train=True, transform=self.transforms)
-            self.data_test = MNIST(self.hparams.data_dir, train=False, transform=self.transforms)
+            self.data_train = MNIST(self.hparams.data_dir, train=True, transform=self.transforms, target_transform=target_transform)
+            self.data_test = MNIST(self.hparams.data_dir, train=False, transform=self.transforms, target_transform=target_transform)
             # dataset = ConcatDataset(datasets=[trainset, testset])
             # self.data_train, self.data_val, self.data_test = random_split(
             #     dataset=dataset,
@@ -187,9 +197,9 @@ class MNIST_AD_DataModule(LightningDataModule):
 
         test_indices = []
         for class_number in range(10):
-            if class_number != self.ID_number:
-                class_indices = torch.where(targets_test == class_number)[0][0:self.test_size]
-                test_indices.extend(class_indices.tolist())
+            # if class_number != self.ID_number:
+            class_indices = torch.where(targets_test == class_number)[0][0:self.test_size]
+            test_indices.extend(class_indices.tolist())
                 
         test_indices = torch.tensor(test_indices)
         OOD_dataset = Subset(self.data_test, test_indices)
