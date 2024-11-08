@@ -48,6 +48,5 @@ class NormFlowNet(nn.Module):
 
         return self.model(x)
 
-
 if __name__ == "__main__":
     _ = NormFlowNet()

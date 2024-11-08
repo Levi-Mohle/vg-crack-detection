@@ -5,7 +5,7 @@ src_path  = Path.cwd() / "src"
 
 mode = "train" # ["train", "eval"]
 
-model = "normflow"
+model = "normflow_multiscale"
 logger      = "mlflow"
 experiment  = "mnist_realnvp"
 max_epochs  = 1
