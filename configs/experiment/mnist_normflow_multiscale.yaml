@@ -26,8 +26,6 @@ model:
   optimizer:
     lr: 0.001
   compile: false
-  criterion:
-    _target_: src.models.components.loss_functions.losses.RealNVPLoss
   net:
     num_blocks: 4
     c_hidden_1: 16
