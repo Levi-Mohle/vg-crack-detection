@@ -142,8 +142,8 @@ class NormalizingFlowLitModule(LightningModule):
 
     def _log_histogram(self):
 
-        y_score = np.concatenate(self.test_losses)
-        y_true = np.concatenate(self.test_labels)
+        y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses])
+        y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels])
 
         auc_score = roc_auc_score(y_true, y_score)
         if auc_score < 0.2:
