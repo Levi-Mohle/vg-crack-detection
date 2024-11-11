@@ -6,5 +6,6 @@ tensorboard:
   name: null
   log_graph: False
   default_hp_metric: True
+  artifact_location: C:/Users/lmohle/Documents/2_Coding/lightning-hydra-template/data/generated_samples
   prefix: ""
   # version: ""
