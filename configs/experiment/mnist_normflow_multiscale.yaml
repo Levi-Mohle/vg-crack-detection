@@ -1,0 +1,56 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: mnist_ad
+  - override /model: normflow_multiscale
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["mnist_ad", "normalizing flow", "multiscale"]
+
+seed: 12345
+
+trainer:
+  min_epochs: 5
+  max_epochs: 20
+  gradient_clip_val: 0.5
+  inference_mode: true
+
+model:
+  optimizer:
+    lr: 0.001
+  compile: false
+  criterion:
+    _target_: src.models.components.loss_functions.losses.RealNVPLoss
+  net:
+    num_blocks: 4
+    c_hidden_1: 16
+    c_hidden_2: 32
+    c_hidden_3: 48
+    c_hidden_4: 64
+
+data:
+  batch_size: 32
+  ID_number: 3
+  val_size: 300
+
+extras:
+  print_config: false
+
+logger:
+  wandb:
+    tags: ${tags}
+    group: "mnist"
+  aim:
+    experiment: "mnist"
+  mlflow:
+    experiment_name: "mnist realnvp test"
+  tensorboard:
+    name: "mnist realnvp test"
+
