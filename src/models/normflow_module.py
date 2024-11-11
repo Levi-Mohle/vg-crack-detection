@@ -50,6 +50,7 @@ class NormalizingFlowLitModule(LightningModule):
         z, ldj = imgs, torch.zeros(imgs.shape[0], device=self.device)
         for flow in self.flows:
             z, ldj = flow(z, ldj, reverse=False)
+        self.img_size_after_flow = torch.tensor(z.shape[1:])
         return z, ldj
 
     def _get_likelihood(self, imgs, return_ll=False):
@@ -72,7 +73,7 @@ class NormalizingFlowLitModule(LightningModule):
         """Sample a batch of images from the flow."""
         # Sample latent representation from prior
         if z_init is None:
-            z = self.prior.sample(sample_shape=img_shape) #.to(self.device)
+            z = self.prior.sample(sample_shape=torch.cat((torch.tensor([16]), self.img_size_after_flow))) #.to(self.device)
         else:
             z = z_init #.to(self.device)
 
@@ -108,7 +109,7 @@ class NormalizingFlowLitModule(LightningModule):
             plt.close()
             # Send figure as artifact to logger
             self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
-        os.remove(image_path)
+            os.remove(image_path)
 
     def test_step(self, batch, batch_idx):
         # Perform importance sampling during testing => estimate likelihood M times for each image
