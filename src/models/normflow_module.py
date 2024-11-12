@@ -27,7 +27,7 @@ class NormalizingFlowLitModule(LightningModule):
         """
         super().__init__()
 
-        self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(logger=False, ignore=['net'])
 
         self.net = net
         self.flows = net.flows
@@ -35,20 +35,12 @@ class NormalizingFlowLitModule(LightningModule):
         # Create prior distribution for final latent space
         self.prior = torch.distributions.normal.Normal(loc=0.0, scale=1.0)
 
-
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
         self.test_loss = MeanMetric()
 
         self.test_losses = []
         self.test_labels = []
-
-        # Create folder for figures
-        # model_name = self.net.__class__.__name__
-        self.folder_path =  sample_dir + "/" + \
-                            time.strftime("%Y-%m-%d_%H-%M-%S")
-        os.makedirs(self.folder_path, exist_ok=True)
-        print("check!")
 
     def forward(self, imgs):
         # The forward function is only used for visualizing the graph
@@ -82,14 +74,15 @@ class NormalizingFlowLitModule(LightningModule):
         """Sample a batch of images from the flow."""
         # Sample latent representation from prior
         if z_init is None:
-            z = self.prior.sample(sample_shape=torch.cat((torch.tensor([16]), self.img_size_after_flow))) #.to(self.device)
+            z = self.prior.sample(sample_shape=torch.cat((torch.tensor([16]), self.img_size_after_flow))).to(self.device)
         else:
-            z = z_init #.to(self.device)
-
+            z = z_init.to(self.device)
+        # print(f"After sampling: min: {torch.min(z)}, max: {torch.max(z)}")
         # Transform z to x by inverting the flows
-        ldj = torch.zeros(img_shape[0]) #, device=self.device
+        ldj = torch.zeros(img_shape[0], device=self.device) 
         for flow in reversed(self.flows):
             z, ldj = flow(z, ldj, reverse=True)
+        # print(f"After reconstructing: min: {torch.min(z)}, max: {torch.max(z)}")
         return z
 
     def training_step(self, batch, batch_idx):
@@ -104,22 +97,27 @@ class NormalizingFlowLitModule(LightningModule):
         self.val_loss(loss)
         self.log("val/loss", self.val_loss)
 
-        if batch_idx == 0: # Only sample once per validation step (not every batch)
-            # Generate samples
-            z = self.sample(img_shape=(16,1,28,28))
-            # Define image path
-            image_path= self.folder_path + '/' + time.strftime("%H_%M_%S", time.localtime()) + '_sample.png'
-            # Create figure
-            grid = make_grid(z, nrow=int(np.sqrt(z.shape[0])))
-            plt.figure(figsize=(12,12))
-            plt.imshow(grid.permute(1,2,0).squeeze(), cmap='gray')
-            plt.axis('off')
-            plt.savefig(image_path)
-            plt.close()
-            # Send figure as artifact to logger
-            if self.logger != None:
-                self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
-            # os.remove(image_path)
+    def on_validation_epoch_end(self):
+        
+        if self.current_epoch % 5 == 0: # Only sample once per validation step (not every batch)
+            self.generate_samples()
+
+    def generate_samples(self):
+        # Generate samples
+        z = self.sample(img_shape=(16,1,28,28))
+
+        # Create figure
+        grid = make_grid(z, nrow=int(np.sqrt(z.shape[0])))
+        plt.figure(figsize=(12,12))
+        plt.imshow(grid.permute(1,2,0).cpu().squeeze(), cmap='gray')
+        plt.axis('off')
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_epoch_sample.png")
+        plt.savefig(plt_dir)
+        plt.close()
+        # Send figure as artifact to logger
+        if self.logger.__class__.__name__ == "MLFlowLogger":
+            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+        # os.remove(image_path)
 
     def test_step(self, batch, batch_idx):
         # Perform importance sampling during testing => estimate likelihood M times for each image
@@ -146,6 +144,7 @@ class NormalizingFlowLitModule(LightningModule):
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
+        self.generate_samples()
         self._log_histogram()
         self.test_losses.clear()
         self.test_labels.clear()
@@ -161,8 +160,6 @@ class NormalizingFlowLitModule(LightningModule):
         fpr, tpr, _ = roc_curve(y_true, y_score)
         fpr95 = fpr[np.argmax(tpr >= 0.95)]
             
-        # print with 4 decimal places
-        # print(f"ROC AUC: {auc_score:.4f}, FPR at 95% TPR: {fpr95:.4f}")
         y_id = y_score[np.where(y_true == 0)]
         y_ood = y_score[np.where(y_true != 0)]
 
@@ -181,15 +178,14 @@ class NormalizingFlowLitModule(LightningModule):
                                       estimator_name='Model')
         disp_roc.plot(ax=axes[1])
         axes[1].set_title('ROC')
+         
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
+        fig.savefig(plt_dir)
         
         # Logging plot as figure to mlflow
-        image_path = self.folder_path + '/' \
-                    + time.strftime("%H_%M_%S", time.localtime()) \
-                    + '_hist_ROC.png'
-        fig.savefig(image_path)
-        if self.logger != None:
-            self.logger.experiment.log_artifact(local_path = image_path,
-                                            run_id=self.logger.run_id)
+        if self.logger.__class__.__name__ == "MLFlowLogger":
+            self.logger.experiment.log_artifact(local_path = self.image_dir,
+                                                run_id=self.logger.run_id)
         # Remove image from folder (saved to logger)
         # os.remove(image_path)
         
@@ -204,6 +200,9 @@ class NormalizingFlowLitModule(LightningModule):
         """
         if self.hparams.compile and stage == "fit":
             self.net = torch.compile(self.net)
+
+        self.image_dir = os.path.join(self.logger.save_dir, "images")
+        os.makedirs(self.image_dir, exist_ok=True)
 
     def configure_optimizers(self):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())

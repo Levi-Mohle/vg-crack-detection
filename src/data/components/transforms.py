@@ -11,7 +11,7 @@ import skimage
 
 # Convert images from 0-1 to 0-255 (integers)
 def discretize_255(sample):
-    return (sample * 255).astype(int)
+    return (sample * 255).to(torch.int32)
 
 def custom_reshape(img):
     og_img = img[0]

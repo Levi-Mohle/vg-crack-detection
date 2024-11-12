@@ -5,6 +5,7 @@ from lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split, Subset
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
+from src.data.components.transforms import discretize_255
 
 
 class MNIST_AD_DataModule(LightningDataModule):
@@ -76,11 +77,10 @@ class MNIST_AD_DataModule(LightningDataModule):
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
-
+        
         # data transformations
-        self.transforms = transforms.Compose(
-            [transforms.ToTensor(),
-            #  transforms.Lambda(lambda x: x.repeat(3, 1, 1)),
+        self.transforms = transforms.Compose([transforms.ToTensor(),
+                                              discretize_255,
              ])
 
         self.data_train: Optional[Dataset] = None
