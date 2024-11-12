@@ -16,7 +16,9 @@ class NormalizingFlowLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
-        import_samples: int=8):
+        import_samples: int,
+        sample_dir: str,
+        ) -> None:
         """ImageFlow.
 
         Args:
@@ -40,6 +42,13 @@ class NormalizingFlowLitModule(LightningModule):
 
         self.test_losses = []
         self.test_labels = []
+
+        # Create folder for figures
+        # model_name = self.net.__class__.__name__
+        self.folder_path =  sample_dir + "/" + \
+                            time.strftime("%Y-%m-%d_%H-%M-%S")
+        os.makedirs(self.folder_path, exist_ok=True)
+        print("check!")
 
     def forward(self, imgs):
         # The forward function is only used for visualizing the graph
@@ -99,7 +108,7 @@ class NormalizingFlowLitModule(LightningModule):
             # Generate samples
             z = self.sample(img_shape=(16,1,28,28))
             # Define image path
-            image_path= self.logger._artifact_location + '/' + time.strftime("%H_%M_%S", time.localtime()) + '_sample.png'
+            image_path= self.folder_path + '/' + time.strftime("%H_%M_%S", time.localtime()) + '_sample.png'
             # Create figure
             grid = make_grid(z, nrow=int(np.sqrt(z.shape[0])))
             plt.figure(figsize=(12,12))
@@ -108,8 +117,9 @@ class NormalizingFlowLitModule(LightningModule):
             plt.savefig(image_path)
             plt.close()
             # Send figure as artifact to logger
-            self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
-            os.remove(image_path)
+            if self.logger != None:
+                self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
+            # os.remove(image_path)
 
     def test_step(self, batch, batch_idx):
         # Perform importance sampling during testing => estimate likelihood M times for each image
@@ -173,14 +183,15 @@ class NormalizingFlowLitModule(LightningModule):
         axes[1].set_title('ROC')
         
         # Logging plot as figure to mlflow
-        image_path = self.logger._artifact_location + '/' \
-                                                    + time.strftime("%H_%M_%S", time.localtime()) \
-                                                    + '_hist_ROC.png'
+        image_path = self.folder_path + '/' \
+                    + time.strftime("%H_%M_%S", time.localtime()) \
+                    + '_hist_ROC.png'
         fig.savefig(image_path)
-        self.logger.experiment.log_artifact(local_path = image_path,
+        if self.logger != None:
+            self.logger.experiment.log_artifact(local_path = image_path,
                                             run_id=self.logger.run_id)
         # Remove image from folder (saved to logger)
-        os.remove(image_path)
+        # os.remove(image_path)
         
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
