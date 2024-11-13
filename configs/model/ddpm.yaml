@@ -73,8 +73,11 @@ unet:
   num_train_timesteps: null
   out_channels: 1
   resnet_time_scale_shift: default
-  sample_size: 28
+  sample_size: 32
   time_embedding_type: positional
   upsample_type: conv
 
 compile: false
+
+paths: 
+  log_dir: ${paths.output_dir}
