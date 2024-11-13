@@ -44,7 +44,7 @@ class DenoisingDiffusionLitModule(LightningModule):
 
     def model_step(self, batch, batch_idx):
         x = batch[0]
-        noise = torch.randn(x.shape)
+        noise = torch.randn(x.shape, device=self.device)
         steps = torch.randint(self.noise_scheduler.config.num_train_timesteps, (x.size(0),), device=self.device)
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
         residual = self.model(noisy_images, steps).sample
@@ -65,10 +65,10 @@ class DenoisingDiffusionLitModule(LightningModule):
     def sample(self, num_samples, num_inference_steps=50):
         img_size = self.model.config.sample_size
         channels = self.model.config.in_channels
-        x = torch.randn(num_samples, channels, img_size, img_size) #.to(self.device)
+        x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
 
         for timestep in range(num_inference_steps, 0, -1):
-            t = torch.tensor([timestep] * num_samples)
+            t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)
             x = x - noise_pred[0] / num_inference_steps
         return x

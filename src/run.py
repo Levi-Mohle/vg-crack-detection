@@ -22,11 +22,11 @@ if mode == "train":
                     # f"data={data}",
                     # f"model={model}", 
                     f"experiment={experiment}",
-                    # f"trainer.max_epochs={max_epochs}",
+                    f"trainer.max_epochs={max_epochs}",
                     # f"+trainer.limit_train_batches={train_size}",
                     # f"+trainer.limit_test_batches={test_size}",
-                    f"debug={debug}",
-                    # f"logger={logger}",
+                    # f"debug={debug}",
+                    f"logger={logger}",
                     ],
                     cwd=src_path)
 elif mode == "eval":
