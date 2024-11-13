@@ -79,8 +79,9 @@ class MNIST_AD_DataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
         
         # data transformations
-        self.transforms = transforms.Compose([transforms.ToTensor(),
-                                              discretize_255,
+        self.transforms = transforms.Compose([transforms.Resize(32),
+                                            transforms.ToTensor(),
+                                            # discretize_255,
              ])
 
         self.data_train: Optional[Dataset] = None

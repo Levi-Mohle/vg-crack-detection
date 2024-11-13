@@ -1,0 +1,54 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: mnist_ad
+  - override /model: ddpm
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["mnist_ad", "denoising diffusion"]
+
+seed: 12345
+
+callbacks:
+    early_stopping:
+        monitor: "val/loss"
+        patience: 3
+        mode: "min"
+    model_summary:
+      max_depth: 1
+    
+trainer:
+  min_epochs: 5
+  max_epochs: 20
+  enable_model_summary: false
+  gradient_clip_val: 0.5
+  inference_mode: true
+
+data:
+  batch_size: 32
+  ID_number: 3
+  val_size: 300
+
+extras:
+  print_config: false
+
+logger:
+  csv:
+      prefix: "mnist_ddpm"
+  wandb:
+    tags: ${tags}
+    group: "mnist"
+  aim:
+    experiment: "mnist"
+  mlflow:
+    experiment_name: "mnist ddpm"
+  tensorboard:
+    name: "mnist ddpm"
+

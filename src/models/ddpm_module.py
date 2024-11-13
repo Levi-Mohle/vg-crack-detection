@@ -43,12 +43,12 @@ class DenoisingDiffusionLitModule(LightningModule):
 
     def training_step(self, batch, batch_idx):
         x = batch[0]
-        noise = torch.randn_like(x)
+        noise = torch.randn(x.shape)
         steps = torch.randint(self.noise_scheduler.config.num_train_timesteps, (x.size(0),), device=self.device)
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
         residual = self.model(noisy_images, steps).sample
         loss = torch.nn.functional.mse_loss(residual, noise)
-        self.log("train_loss", loss, prog_bar=True)
+        self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -130,7 +130,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
         """
         if self.hparams.compile and stage == "fit":
-            self.net = torch.compile(self.net)
+            self.unet = torch.compile(self.unet)
 
     def configure_optimizers(self):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())

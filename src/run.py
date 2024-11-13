@@ -5,9 +5,9 @@ src_path  = Path.cwd() / "src"
 
 mode = "train" # ["train", "eval"]
 
-model = "normflow"
+model = "ddpm"
 logger      = "mlflow"
-experiment  = "mnist_realnvp"
+experiment  = "mnist_ddpm"
 max_epochs  = 1
 data = "mnist_ad"
 debug = 'fdr'
@@ -19,13 +19,13 @@ ckpt_path = None
 
 if mode == "train":
     subprocess.run(["python", "train.py",
-                    f"data={data}",
-                    f"model={model}", 
-                    # f"experiment={experiment}",
-                    f"trainer.max_epochs={max_epochs}",
-                    f"+trainer.limit_train_batches={train_size}",
-                    f"+trainer.limit_test_batches={test_size}",
-                    # f"debug={debug}",
+                    # f"data={data}",
+                    # f"model={model}", 
+                    f"experiment={experiment}",
+                    # f"trainer.max_epochs={max_epochs}",
+                    # f"+trainer.limit_train_batches={train_size}",
+                    # f"+trainer.limit_test_batches={test_size}",
+                    f"debug={debug}",
                     # f"logger={logger}",
                     ],
                     cwd=src_path)
