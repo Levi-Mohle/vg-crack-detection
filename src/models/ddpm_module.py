@@ -10,7 +10,6 @@ from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
 import matplotlib
-# matplotlib.use('Qt5Agg')
 
 class DenoisingDiffusionLitModule(LightningModule):
     def __init__(
@@ -25,8 +24,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         """ImageFlow.
 
         Args:
-            flows: A list of flows (each a nn.Module) that should be applied on the images.
-            import_samples: Number of importance samples to use during testing (see explanation below). Can be changed at any time
+
         """
         super().__init__()
 
@@ -61,20 +59,24 @@ class DenoisingDiffusionLitModule(LightningModule):
     def validation_step(self, batch, batch_idx):
         loss = self.model_step(batch, batch_idx)
         self.log("val/loss", loss, prog_bar=True)
-        
         return loss   
 
-    def sample(self, num_samples, num_inference_steps=50):
+    @torch.no_grad()
+    def sample(self, num_samples):
         img_size = self.model.config.sample_size
         channels = self.model.config.in_channels
+        num_inference_steps = self.noise_scheduler.config.num_train_timesteps
         x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
 
         for timestep in range(num_inference_steps, 0, -1):
             t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)
             x = x - (noise_pred[0] / num_inference_steps)
-        return (x+1) / 2
-    
+            torch.clamp(x, min=-1, max=1)
+        x = (x+1.) / 2.
+        return x
+
+    @torch.no_grad()
     def visualize_samples(self):
         # Sample
         x = self.sample(num_samples=16)

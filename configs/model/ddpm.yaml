@@ -14,7 +14,7 @@ scheduler:
 
 noise_scheduler:
   _target_: diffusers.schedulers.DDPMScheduler
-  num_train_timesteps: 1000
+  num_train_timesteps: 500
   beta_start: 0.0001
   beta_end: 0.02
   beta_schedule: linear
