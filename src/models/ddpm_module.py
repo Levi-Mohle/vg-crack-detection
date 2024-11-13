@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-import matplotlib
 
 class DenoisingDiffusionLitModule(LightningModule):
     def __init__(
@@ -29,6 +28,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         super().__init__()
 
         self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(ignore=['unet'])
 
         self.model              = unet
         self.noise_scheduler    = noise_scheduler
@@ -49,6 +49,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
         residual = self.model(noisy_images, steps).sample
         loss = torch.nn.functional.mse_loss(residual, noise)
+
         return loss
     
     def training_step(self, batch, batch_idx):
@@ -59,7 +60,6 @@ class DenoisingDiffusionLitModule(LightningModule):
     def validation_step(self, batch, batch_idx):
         loss = self.model_step(batch, batch_idx)
         self.log("val/loss", loss, prog_bar=True)
-        return loss   
 
     @torch.no_grad()
     def sample(self, num_samples):
@@ -72,9 +72,9 @@ class DenoisingDiffusionLitModule(LightningModule):
             t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)
             x = x - (noise_pred[0] / num_inference_steps)
-            torch.clamp(x, min=-1, max=1)
-        x = (x+1.) / 2.
-        return x
+            
+        x = (x + 1.) / 2.
+        return torch.clamp(x, min=0, max=1)
 
     @torch.no_grad()
     def visualize_samples(self):
@@ -101,7 +101,7 @@ class DenoisingDiffusionLitModule(LightningModule):
     
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
-        if self.current_epoch % 5 == 0: # Only sample once per 5 epochs
+        if self.current_epoch % 2 == 0: # Only sample once per 5 epochs
             self.visualize_samples()
 
     def on_test_epoch_end(self) -> None:

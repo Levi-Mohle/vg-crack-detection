@@ -26,4 +26,5 @@ compile: false
 
 import_samples: 8
 
-sample_dir: ${paths.sample_dir}/NormFlowMultiScaleNet
+paths: 
+  log_dir: ${paths.output_dir}

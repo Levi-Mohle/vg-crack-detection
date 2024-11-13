@@ -8,6 +8,7 @@ from sklearn.metrics import roc_auc_score, roc_curve, RocCurveDisplay
 import matplotlib.pyplot as plt
 from torchmetrics import MeanMetric
 from lightning import LightningModule
+from omegaconf import DictConfig
 
 class NormalizingFlowLitModule(LightningModule):
     def __init__(
@@ -17,7 +18,7 @@ class NormalizingFlowLitModule(LightningModule):
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
         import_samples: int,
-        sample_dir: str,
+        paths: DictConfig,
         ) -> None:
         """ImageFlow.
 
@@ -34,6 +35,8 @@ class NormalizingFlowLitModule(LightningModule):
         self.import_samples = import_samples
         # Create prior distribution for final latent space
         self.prior = torch.distributions.normal.Normal(loc=0.0, scale=1.0)
+
+        self.log_dir = paths.log_dir
 
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
@@ -201,7 +204,7 @@ class NormalizingFlowLitModule(LightningModule):
         if self.hparams.compile and stage == "fit":
             self.net = torch.compile(self.net)
 
-        self.image_dir = os.path.join(self.logger.save_dir, "images")
+        self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
 
     def configure_optimizers(self):

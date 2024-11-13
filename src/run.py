@@ -8,11 +8,11 @@ mode = "train" # ["train", "eval"]
 model = "ddpm"
 logger      = "csv"
 experiment  = "mnist_ddpm"
-max_epochs  = 2
+max_epochs  = 4
 data = "mnist_ad"
 debug = 'fdr'
 
-train_size = 0.05
+train_size = 0.1
 test_size = 0.2
 
 ckpt_path = None
