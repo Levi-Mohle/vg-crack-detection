@@ -5,7 +5,7 @@ from lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split, Subset
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
-from src.data.components.transforms import discretize_255
+from src.data.components.transforms import discretize_255, rescale_diffuser
 
 
 class MNIST_AD_DataModule(LightningDataModule):
@@ -81,6 +81,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         # data transformations
         self.transforms = transforms.Compose([transforms.Resize(32),
                                             transforms.ToTensor(),
+                                            rescale_diffuser,
                                             # discretize_255,
              ])
 

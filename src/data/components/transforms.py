@@ -13,6 +13,9 @@ import skimage
 def discretize_255(sample):
     return (sample * 255).to(torch.int32)
 
+def rescale_diffuser(sample):
+    return sample * 2 - 1
+
 def custom_reshape(img):
     og_img = img[0]
     img = img[1]

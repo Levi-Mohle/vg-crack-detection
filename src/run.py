@@ -8,7 +8,7 @@ mode = "train" # ["train", "eval"]
 model = "ddpm"
 logger      = "csv"
 experiment  = "mnist_ddpm"
-max_epochs  = 1
+max_epochs  = 2
 data = "mnist_ad"
 debug = 'fdr'
 
@@ -23,10 +23,10 @@ if mode == "train":
                     # f"model={model}", 
                     f"experiment={experiment}",
                     f"trainer.max_epochs={max_epochs}",
-                    # f"+trainer.limit_train_batches={train_size}",
-                    # f"+trainer.limit_test_batches={test_size}",
+                    f"+trainer.limit_train_batches={train_size}",
+                    f"+trainer.limit_test_batches={test_size}",
                     # f"debug={debug}",
-                    f"logger={logger}",
+                    # f"logger={logger}",
                     ],
                     cwd=src_path)
 elif mode == "eval":

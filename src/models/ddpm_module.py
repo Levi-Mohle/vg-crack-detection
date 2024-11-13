@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
+import matplotlib
+# matplotlib.use('Qt5Agg')
 
 class DenoisingDiffusionLitModule(LightningModule):
     def __init__(
@@ -70,8 +72,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         for timestep in range(num_inference_steps, 0, -1):
             t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)
-            x = x - noise_pred[0] / num_inference_steps
-        return x
+            x = x - (noise_pred[0] / num_inference_steps)
+        return (x+1) / 2
     
     def visualize_samples(self):
         # Sample
