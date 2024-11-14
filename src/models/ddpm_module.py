@@ -34,7 +34,9 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.noise_scheduler    = noise_scheduler
 
         self.log_dir = paths.log_dir
-
+        self.image_dir = os.path.join(self.log_dir, "images")
+        os.makedirs(self.image_dir, exist_ok=True)
+        
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
         self.test_loss = MeanMetric()
@@ -42,39 +44,51 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.test_losses = []
         self.test_labels = []
 
-    def forward(self, x):
+    def forward(self, x, steps=None):
         noise = torch.randn(x.shape, device=self.device)
-        steps = torch.randint(self.noise_scheduler.config.num_train_timesteps, (x.size(0),), device=self.device)
+        if steps == None:
+            steps = torch.randint(self.noise_scheduler.config.num_train_timesteps, (x.size(0),), device=self.device)
+        else:
+            steps = torch.tensor([steps] * x.shape[0], device=self.device)
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
         residual = self.model(noisy_images, steps).sample
-        loss = torch.nn.functional.mse_loss(residual, noise)
         
-        return loss
+        return residual, noise
     
     def training_step(self, batch, batch_idx):
-        loss = self(batch[0])
+        residual, noise = self(batch[0])
+        loss = torch.nn.functional.mse_loss(residual, noise)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss = self(batch[0])
+        residual, noise = self(batch[0])
+        loss = torch.nn.functional.mse_loss(residual, noise)
         self.log("val/loss", loss, prog_bar=True)
 
     @torch.no_grad()
-    def sample(self, num_samples):
+    def sample(self, num_samples, x=None, steps=None):
         img_size = self.model.config.sample_size
         channels = self.model.config.in_channels
-        num_inference_steps = self.noise_scheduler.config.num_train_timesteps
-        x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
+        if steps == None:
+            steps = self.noise_scheduler.config.num_train_timesteps
+            x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
 
-        for timestep in range(num_inference_steps, 0, -1):
+        for timestep in range(steps, 0, -1):
             t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)
-            x = x - (noise_pred[0] / num_inference_steps)
+            x = x - noise_pred[0] / (steps*0.1)
             
         x = (x + 1.) / 2.
         return torch.clamp(x, min=0, max=1)
 
+    def partial_diffusion(self, x, coef):
+        steps = int(coef * self.noise_scheduler.config.num_train_timesteps)
+        residual, _ = self(x, steps)
+        reconstruct = self.sample(x.shape[0], residual, steps)
+
+        return x, reconstruct
+        
     @torch.no_grad()
     def visualize_samples(self):
         # Sample
@@ -91,13 +105,57 @@ class DenoisingDiffusionLitModule(LightningModule):
         if self.logger.__class__.__name__ == "MLFlowLogger":
             self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
         # os.remove(image_path)
+
+    def _log_histogram(self):
+
+        y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses])
+        y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels])
+
+        auc_score = roc_auc_score(y_true, y_score)
+        if auc_score < 0.2:
+            auc_score = 1. - auc_score
+        fpr, tpr, _ = roc_curve(y_true, y_score)
+        fpr95 = fpr[np.argmax(tpr >= 0.95)]
+            
+        y_id = y_score[np.where(y_true == 0)]
+        y_ood = y_score[np.where(y_true != 0)]
+
+        fig = plt.figure(figsize=(10, 10))
+        axes = fig.subplots(2,1)
+
+        # plot histograms of scores in same plot
+        axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
+        axes[0].hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
+        axes[0].legend()
+        axes[0].set_title('Outlier Detection')
+        axes[0].set_ylabel('Counts')
+        axes[0].set_xlabel('Loss')
+
+        disp_roc = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=auc_score,
+                                      estimator_name='Model')
+        disp_roc.plot(ax=axes[1])
+        axes[1].set_title('ROC')
+         
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
+        fig.savefig(plt_dir)
+        
+        # Logging plot as figure to mlflow
+        if self.logger.__class__.__name__ == "MLFlowLogger":
+            self.logger.experiment.log_artifact(local_path = self.image_dir,
+                                                run_id=self.logger.run_id)
+        # Remove image from folder (saved to logger)
+        # os.remove(image_path)
     
     def test_step(self, batch, batch_idx):
-        loss = self(batch[0])
+        residual, noise = self(batch[0])
+        loss = torch.nn.functional.mse_loss(residual, noise)
         self.log("test/loss", loss, prog_bar=True)
+
+        x, reconstruct = self.partial_diffusion(batch[0], 0.25)
+        losses = torch.nn.functional.mse_loss(x,reconstruct, reduction='none').mean(dim=(1,2,3))
+        self.test_losses.append(losses)
+        self.test_labels.append(batch[1])
         
-        return loss
-    
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
@@ -106,6 +164,9 @@ class DenoisingDiffusionLitModule(LightningModule):
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         self.visualize_samples()
+        self._log_histogram()
+        self.test_losses.clear()
+        self.test_labels.clear()
         
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
@@ -118,9 +179,6 @@ class DenoisingDiffusionLitModule(LightningModule):
         """
         if self.hparams.compile and stage == "fit":
             self.unet = torch.compile(self.unet)
-        
-        self.image_dir = os.path.join(self.log_dir, "images")
-        os.makedirs(self.image_dir, exist_ok=True)
 
     def configure_optimizers(self):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())

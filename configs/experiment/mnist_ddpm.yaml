@@ -19,7 +19,7 @@ seed: 12345
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 3
+        patience: 15
         mode: "min"
     model_summary:
       max_depth: 1
