@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-src_path  = Path.cwd() / "src"
+src_path  = Path.cwd() #/ "src"
 
 mode = "train" # ["train", "eval"]
 
@@ -11,16 +11,18 @@ experiment  = "mnist_ddpm"
 max_epochs  = 4
 data = "mnist_ad"
 debug = 'fdr'
+device = "gpu" 
 
-train_size = 0.1
-test_size = 0.2
+train_size = 1
+test_size = 1
 
 ckpt_path = None
 
 if mode == "train":
     subprocess.run(["python", "train.py",
                     # f"data={data}",
-                    # f"model={model}", 
+                    # f"model={model}",
+                    f"trainer={device}",
                     f"experiment={experiment}",
                     f"trainer.max_epochs={max_epochs}",
                     f"+trainer.limit_train_batches={train_size}",

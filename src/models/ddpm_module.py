@@ -42,23 +42,22 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.test_losses = []
         self.test_labels = []
 
-    def model_step(self, batch, batch_idx):
-        x = batch[0]
+    def forward(self, x):
         noise = torch.randn(x.shape, device=self.device)
         steps = torch.randint(self.noise_scheduler.config.num_train_timesteps, (x.size(0),), device=self.device)
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
         residual = self.model(noisy_images, steps).sample
         loss = torch.nn.functional.mse_loss(residual, noise)
-
+        
         return loss
     
     def training_step(self, batch, batch_idx):
-        loss = self.model_step(batch, batch_idx)
+        loss = self(batch[0])
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        loss = self.model_step(batch, batch_idx)
+        loss = self(batch[0])
         self.log("val/loss", loss, prog_bar=True)
 
     @torch.no_grad()
@@ -94,14 +93,14 @@ class DenoisingDiffusionLitModule(LightningModule):
         # os.remove(image_path)
     
     def test_step(self, batch, batch_idx):
-        loss = self.model_step(batch, batch_idx)
+        loss = self(batch[0])
         self.log("test/loss", loss, prog_bar=True)
         
         return loss
     
     def on_validation_epoch_end(self) -> None:
-        """Lightning hook that is called when a test epoch ends."""
-        if self.current_epoch % 2 == 0: # Only sample once per 5 epochs
+        """Lightning hook that is called when a validation epoch ends."""
+        if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
             self.visualize_samples()
 
     def on_test_epoch_end(self) -> None:
