@@ -33,6 +33,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.model              = unet
         self.noise_scheduler    = noise_scheduler
 
+        self.reconstruct_coef = 0.7
+
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
@@ -65,7 +67,46 @@ class DenoisingDiffusionLitModule(LightningModule):
         residual, noise = self(batch[0])
         loss = torch.nn.functional.mse_loss(residual, noise)
         self.log("val/loss", loss, prog_bar=True)
+        
+    def on_validation_epoch_end(self) -> None:
+        """Lightning hook that is called when a validation epoch ends."""
+        if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
+            x_hat = self.sample(num_samples=16)
+            self.visualize_samples(x_hat)
+            
+    def test_step(self, batch, batch_idx):
+        residual, noise = self(batch[0])
+        loss = torch.nn.functional.mse_loss(residual, noise)
+        self.log("test/loss", loss, prog_bar=True)
 
+        x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
+        losses = torch.nn.functional.mse_loss(x,reconstruct, reduction='none').mean(dim=(1,2,3))
+        self.last_test_batch = [x, reconstruct]
+        
+        self.test_losses.append(losses)
+        self.test_labels.append(batch[1])
+        
+    def on_test_epoch_end(self) -> None:
+        """Lightning hook that is called when a test epoch ends."""
+        # Sample from gaussian nosie
+        x_hat = self.sample(num_samples=16)
+        
+        # Visualizations
+        self.visualize_samples(x_hat)
+        self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1])
+        self._log_histogram()
+
+        # Clear variables
+        self.test_losses.clear()
+        self.test_labels.clear()
+
+    def partial_diffusion(self, x, coef):
+        steps = int(coef * self.noise_scheduler.config.num_train_timesteps)
+        residual, _ = self(x, steps)
+        reconstruct = self.sample(x.shape[0], residual, steps)
+
+        return x, reconstruct
+        
     @torch.no_grad()
     def sample(self, num_samples, x=None, steps=None):
         img_size = self.model.config.sample_size
@@ -77,22 +118,13 @@ class DenoisingDiffusionLitModule(LightningModule):
         for timestep in range(steps, 0, -1):
             t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)
-            x = x - noise_pred[0] / (steps*0.1)
+            x = x - noise_pred[0] / (steps*0.2)
             
         x = (x + 1.) / 2.
         return torch.clamp(x, min=0, max=1)
-
-    def partial_diffusion(self, x, coef):
-        steps = int(coef * self.noise_scheduler.config.num_train_timesteps)
-        residual, _ = self(x, steps)
-        reconstruct = self.sample(x.shape[0], residual, steps)
-
-        return x, reconstruct
         
     @torch.no_grad()
-    def visualize_samples(self):
-        # Sample
-        x = self.sample(num_samples=16)
+    def visualize_samples(self, x):
         # Create figure
         grid = make_grid(x, nrow=int(np.sqrt(x.shape[0])))
         plt.figure(figsize=(12,12))
@@ -106,6 +138,36 @@ class DenoisingDiffusionLitModule(LightningModule):
             self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
         # os.remove(image_path)
 
+    def visualize_reconstructs(self, x, reconstruct):
+        x = x[:8].permute(0,2,3,1).cpu()
+        reconstruct = reconstruct[:8].permute(0,2,3,1).cpu()
+        
+        fig, axes = plt.subplots(4, 4, figsize=(12,12))
+        for i in range(8):
+            if i > 3:
+                axes[i-4,2].imshow(x[i], cmap='grey')
+                axes[i-4,2].axis("off")
+                axes[i-4,3].imshow(reconstruct[i], cmap='grey')
+                axes[i-4,3].axis("off")
+            else:
+                axes[i,0].imshow(x[i], cmap='grey')
+                axes[i,0].axis("off")
+                axes[i,1].imshow(reconstruct[i], cmap='grey')
+                axes[i,1].axis("off")
+                
+        axes[0,0].set_title("Original Sample")
+        axes[0,1].set_title("Reconstructed Sample")
+        axes[0,2].set_title("Original Sample")
+        axes[0,3].set_title("Reconstructed Sample")
+                
+        plt.tight_layout()          
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
+        plt.savefig(plt_dir)
+        plt.close()
+        # Send figure as artifact to logger
+        if self.logger.__class__.__name__ == "MLFlowLogger":
+            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+            
     def _log_histogram(self):
 
         y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses])
@@ -145,28 +207,6 @@ class DenoisingDiffusionLitModule(LightningModule):
                                                 run_id=self.logger.run_id)
         # Remove image from folder (saved to logger)
         # os.remove(image_path)
-    
-    def test_step(self, batch, batch_idx):
-        residual, noise = self(batch[0])
-        loss = torch.nn.functional.mse_loss(residual, noise)
-        self.log("test/loss", loss, prog_bar=True)
-
-        x, reconstruct = self.partial_diffusion(batch[0], 0.25)
-        losses = torch.nn.functional.mse_loss(x,reconstruct, reduction='none').mean(dim=(1,2,3))
-        self.test_losses.append(losses)
-        self.test_labels.append(batch[1])
-        
-    def on_validation_epoch_end(self) -> None:
-        """Lightning hook that is called when a validation epoch ends."""
-        if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
-            self.visualize_samples()
-
-    def on_test_epoch_end(self) -> None:
-        """Lightning hook that is called when a test epoch ends."""
-        self.visualize_samples()
-        self._log_histogram()
-        self.test_losses.clear()
-        self.test_labels.clear()
         
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
