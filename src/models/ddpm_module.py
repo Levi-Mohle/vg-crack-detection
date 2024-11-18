@@ -13,9 +13,10 @@ from omegaconf import DictConfig
 class DenoisingDiffusionLitModule(LightningModule):
     def __init__(
         self, 
-        unet,
+        unet: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
+        criterion: torch.nn.Module,
         noise_scheduler,
         compile,
         paths: DictConfig,
@@ -28,12 +29,17 @@ class DenoisingDiffusionLitModule(LightningModule):
         super().__init__()
 
         self.save_hyperparameters(logger=False)
-        self.save_hyperparameters(ignore=['unet'])
+        self.save_hyperparameters(ignore=['unet', 'criterion'])
 
         self.model              = unet
         self.noise_scheduler    = noise_scheduler
+        self.criterion          = criterion
 
-        self.reconstruct_coef = 0.7
+        # Fraction of forward diffusion for reconstructing test images
+        self.reconstruct_coef = 0.8
+
+        # Specify fontsize for plots
+        self.fs = 16
 
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
@@ -59,13 +65,13 @@ class DenoisingDiffusionLitModule(LightningModule):
     
     def training_step(self, batch, batch_idx):
         residual, noise = self(batch[0])
-        loss = torch.nn.functional.mse_loss(residual, noise)
+        loss = self.criterion(residual, noise, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         residual, noise = self(batch[0])
-        loss = torch.nn.functional.mse_loss(residual, noise)
+        loss = self.criterion(residual, noise, self.device)
         self.log("val/loss", loss, prog_bar=True)
         
     def on_validation_epoch_end(self) -> None:
@@ -76,11 +82,11 @@ class DenoisingDiffusionLitModule(LightningModule):
             
     def test_step(self, batch, batch_idx):
         residual, noise = self(batch[0])
-        loss = torch.nn.functional.mse_loss(residual, noise)
+        loss = self.criterion(residual, noise, self.device)
         self.log("test/loss", loss, prog_bar=True)
 
         x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
-        losses = torch.nn.functional.mse_loss(x,reconstruct, reduction='none').mean(dim=(1,2,3))
+        losses = self.criterion(x,reconstruct, self.device, reduction='none')
         self.last_test_batch = [x, reconstruct]
         
         self.test_losses.append(losses)
@@ -101,9 +107,15 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.test_labels.clear()
 
     def partial_diffusion(self, x, coef):
+        # Define noise
+        noise = torch.randn(x.shape, device=self.device)
+        # Take fraction of steps for forward diffusion process
         steps = int(coef * self.noise_scheduler.config.num_train_timesteps)
-        residual, _ = self(x, steps)
-        reconstruct = self.sample(x.shape[0], residual, steps)
+        steps_tensor = torch.tensor([steps] * x.shape[0], device=self.device)
+        # Noise the samples
+        noisy_images = self.noise_scheduler.add_noise(x, noise, steps_tensor)
+        # Reconstruct the samples
+        reconstruct = self.sample(x.shape[0], noisy_images, steps)
 
         return x, reconstruct
         
@@ -115,10 +127,11 @@ class DenoisingDiffusionLitModule(LightningModule):
             steps = self.noise_scheduler.config.num_train_timesteps
             x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
 
-        for timestep in range(steps, 0, -1):
+        # TO DO check the sampling process, it is not correctly implemented
+        for timestep in range(steps-1, 0, -1):
             t = torch.tensor([timestep] * num_samples, device=self.device)
-            noise_pred = self.model(x, t)
-            x = x - noise_pred[0] / (steps*0.2)
+            noise_pred = self.model(x, t)['sample']
+            x = self.noise_scheduler.step(noise_pred, timestep , x, generator=None)['prev_sample']
             
         x = (x + 1.) / 2.
         return torch.clamp(x, min=0, max=1)
@@ -143,6 +156,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         reconstruct = reconstruct[:8].permute(0,2,3,1).cpu()
         
         fig, axes = plt.subplots(4, 4, figsize=(12,12))
+        
         for i in range(8):
             if i > 3:
                 axes[i-4,2].imshow(x[i], cmap='grey')
@@ -155,10 +169,10 @@ class DenoisingDiffusionLitModule(LightningModule):
                 axes[i,1].imshow(reconstruct[i], cmap='grey')
                 axes[i,1].axis("off")
                 
-        axes[0,0].set_title("Original Sample")
-        axes[0,1].set_title("Reconstructed Sample")
-        axes[0,2].set_title("Original Sample")
-        axes[0,3].set_title("Reconstructed Sample")
+        axes[0,0].set_title("Original Sample", fontsize = self.fs)
+        axes[0,1].set_title("Reconstructed Sample", fontsize = self.fs)
+        axes[0,2].set_title("Original Sample", fontsize = self.fs)
+        axes[0,3].set_title("Reconstructed Sample", fontsize = self.fs)
                 
         plt.tight_layout()          
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
@@ -184,20 +198,28 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         fig = plt.figure(figsize=(10, 10))
         axes = fig.subplots(2,1)
-
+        fig.subplots_adjust(hspace=0.2)
+        
         # plot histograms of scores in same plot
         axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
         axes[0].hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
         axes[0].legend()
-        axes[0].set_title('Outlier Detection')
-        axes[0].set_ylabel('Counts')
-        axes[0].set_xlabel('Loss')
+        axes[0].set_title('Outlier Detection', fontsize = self.fs)
+        axes[0].set_ylabel('Counts', fontsize = self.fs)
+        axes[0].set_xlabel('Loss', fontsize = self.fs)
 
         disp_roc = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=auc_score,
                                       estimator_name='Model')
         disp_roc.plot(ax=axes[1])
-        axes[1].set_title('ROC')
-         
+        
+        plt.rcParams.update({
+            "font.size": self.fs,
+            "axes.titlesize": self.fs,
+            "axes.labelsize": self.fs,
+            "legend.fontsize": 14,
+        })
+        
+        axes[1].set_title('ROC', fontsize = self.fs)
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
         fig.savefig(plt_dir)
         

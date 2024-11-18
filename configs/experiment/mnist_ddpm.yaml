@@ -23,10 +23,14 @@ callbacks:
         mode: "min"
     model_summary:
       max_depth: 1
+
+model:
+    criterion:
+      _target_: src.models.components.loss_functions.losses.MSE_loss
     
 trainer:
   min_epochs: 5
-  max_epochs: 20
+  max_epochs: 30
   enable_model_summary: false
   gradient_clip_val: 0.5
 

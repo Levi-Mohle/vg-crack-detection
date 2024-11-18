@@ -1,7 +1,34 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 
+class MSE_loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x_hat, x, device, reduction ='mean'):
+        if reduction == 'none':
+            loss = nn.functional.mse_loss(input=x_hat, target=x, reduction = reduction).mean(dim=(1,2,3))
+        else:
+            loss = nn.functional.mse_loss(input=x_hat, target=x, reduction = reduction)
+        return loss
+
+class SSIM_loss(nn.Module):
+    def __init__(self):
+
+        super().__init__()
+        self.kernel_size = 11
+        self.sigma = 1.5
+
+    def forward(self, x, x_hat, device, reduction = 'elementwise_mean'): 
+        ssim = SSIM(kernel_size= self.kernel_size,
+                    sigma = self.sigma,
+                    reduction = reduction,
+                    ).to(device)
+        return ssim(x, x_hat)
+
+    
 class NLL_Typicality_Loss(nn.Module):
     """Get the combined loss on NLL and typicality.
         
