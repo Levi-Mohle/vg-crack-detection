@@ -34,6 +34,8 @@ trainer:
   enable_model_summary: false
   gradient_clip_val: 0.5
 
+reconstruct_coef: 0.2
+
 data:
   batch_size: 32
   ID_number: 3

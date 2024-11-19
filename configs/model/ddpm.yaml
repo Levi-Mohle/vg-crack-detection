@@ -13,7 +13,7 @@ scheduler:
   gamma: 0.99
 
 criterion:
-  _target_: src.models.components.loss_functions.losses.MSE_loss
+  _target_: src.models.components.loss_functions.losses.SSIM_loss
 
 noise_scheduler:
   _target_: diffusers.schedulers.DDPMScheduler
@@ -81,6 +81,8 @@ unet:
   upsample_type: conv
 
 compile: false
+
+reconstruct_coef: .8
 
 paths: 
   log_dir: ${paths.output_dir}

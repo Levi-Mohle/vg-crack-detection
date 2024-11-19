@@ -19,6 +19,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         criterion: torch.nn.Module,
         noise_scheduler,
         compile,
+        reconstruct_coef: float,
         paths: DictConfig,
     ):
         """ImageFlow.
@@ -36,7 +37,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.criterion          = criterion
 
         # Fraction of forward diffusion for reconstructing test images
-        self.reconstruct_coef = 0.8
+        self.reconstruct_coef = reconstruct_coef
 
         # Specify fontsize for plots
         self.fs = 16
@@ -88,6 +89,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
         losses = self.criterion(x,reconstruct, self.device, reduction='none')
         self.last_test_batch = [x, reconstruct]
+        # In case you want to evaluate on just the MSE from the Unet
+        # losses = self.criterion(residual, noise, self.device, reduction='none')
         
         self.test_losses.append(losses)
         self.test_labels.append(batch[1])
@@ -196,9 +199,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         y_id = y_score[np.where(y_true == 0)]
         y_ood = y_score[np.where(y_true != 0)]
 
-        fig = plt.figure(figsize=(10, 10))
-        axes = fig.subplots(2,1)
-        fig.subplots_adjust(hspace=0.2)
+        fig, axes= plt.subplots(2,1, figsize=(10, 10))
         
         # plot histograms of scores in same plot
         axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
@@ -208,18 +209,17 @@ class DenoisingDiffusionLitModule(LightningModule):
         axes[0].set_ylabel('Counts', fontsize = self.fs)
         axes[0].set_xlabel('Loss', fontsize = self.fs)
 
-        disp_roc = RocCurveDisplay(fpr=fpr, tpr=tpr, roc_auc=auc_score,
-                                      estimator_name='Model')
-        disp_roc.plot(ax=axes[1])
-        
-        plt.rcParams.update({
-            "font.size": self.fs,
-            "axes.titlesize": self.fs,
-            "axes.labelsize": self.fs,
-            "legend.fontsize": 14,
-        })
-        
+        # plot roc
+        axes[1].plot(fpr, tpr)
         axes[1].set_title('ROC', fontsize = self.fs)
+        axes[1].set_ylabel('True Positive Rate', fontsize = self.fs)
+        axes[1].set_xlabel('False Positive Rate', fontsize = self.fs)
+        axes[1].legend([f"AUC {auc_score:.2f}"], fontsize = 12)
+        axes[1].set_box_aspect(1)
+
+        plt.tight_layout()
+        fig.subplots_adjust(hspace=0.3)
+        
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
         fig.savefig(plt_dir)
         

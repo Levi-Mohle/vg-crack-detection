@@ -18,15 +18,22 @@ class SSIM_loss(nn.Module):
     def __init__(self):
 
         super().__init__()
-        self.kernel_size = 11
+        self.kernel_size = 5
         self.sigma = 1.5
 
+    def normalize(self, x):
+        min = x.min(dim=0, keepdim=True)[0]
+        max = x.max(dim=0, keepdim=True)[0]
+        x_norm = (x - min) / (max - min + 1e-8)
+        return x_norm
+        
     def forward(self, x, x_hat, device, reduction = 'elementwise_mean'): 
+        
         ssim = SSIM(kernel_size= self.kernel_size,
                     sigma = self.sigma,
                     reduction = reduction,
                     ).to(device)
-        return ssim(x, x_hat)
+        return torch.abs(1 - ssim(self.normalize(x), self.normalize(x_hat)))
 
     
 class NLL_Typicality_Loss(nn.Module):
