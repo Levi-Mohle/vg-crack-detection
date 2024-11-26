@@ -105,7 +105,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.last_test_batch = [x, reconstruct]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
-        
+
         self.test_losses.append(losses)
         self.test_labels.append(batch[self.target])
         
@@ -121,6 +121,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         self._log_histogram()
 
         # Clear variables
+        self.train_epoch_loss.clear()
+        self.val_epoch_loss.clear()
         self.test_losses.clear()
         self.test_labels.clear()
 
@@ -201,9 +203,10 @@ class DenoisingDiffusionLitModule(LightningModule):
 
     def plot_loss(self):
 
-        epochs = range(1, len(self.train_losses) + 1)
-        plt.plot(epochs, self.train_epoch_loss, label = "Training")
-        plt.plot(epochs, self.val_epoch_loss, label = "Validation")
+        epochs = [i for i in range(1, self.current_epoch + 1)]
+        print(len(self.train_epoch_loss), len(epochs))
+        plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
+        plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], marker='o', linestyle = '-', label = "Validation")
         plt.xlabel('Epochs', fontsize = self.fs)
         plt.ylabel('Loss [-]', fontsize = self.fs)
         plt.legend()

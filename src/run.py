@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 
-src_path  = Path.cwd() / "src"
+src_path  = Path.cwd() # / "src"
 
 mode = "train" # ["train", "eval"]
 
@@ -11,10 +11,10 @@ experiment  = "impasto_ddpm"
 max_epochs  = 2
 data = "impasto"
 debug = 'fdr'
-device = "cpu" 
+device = "gpu" 
 
 train_size = .1
-test_size = .1
+test_size = .2
 
 ckpt_path = None
 
@@ -24,10 +24,10 @@ if mode == "train":
                     # f"model={model}",
                     f"trainer={device}",
                     f"experiment={experiment}",
-                    # f"trainer.max_epochs={max_epochs}",
-                    # f"+trainer.limit_train_batches={train_size}",
-                    # f"+trainer.limit_test_batches={test_size}",
-                    f"debug={debug}",
+                    f"trainer.max_epochs={max_epochs}",
+                    f"+trainer.limit_train_batches={train_size}",
+                    f"+trainer.limit_test_batches={test_size}",
+                    # f"debug={debug}",
                     # f"logger={logger}",
                     ],
                     cwd=src_path)
