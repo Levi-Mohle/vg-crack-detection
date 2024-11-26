@@ -54,6 +54,11 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.val_loss = MeanMetric()
         self.test_loss = MeanMetric()
 
+        # Used for inspecting learning curve
+        self.train_losses = []
+        self.val_losses  = []
+
+        # Used for classification 
         self.test_losses = []
         self.test_labels = []
 
@@ -78,6 +83,9 @@ class DenoisingDiffusionLitModule(LightningModule):
         residual, noise = self(batch[0])
         loss = self.criterion(residual, noise, self.device)
         self.log("val/loss", loss, prog_bar=True)
+
+    def on_train_epoch_end(self) -> None:
+        self.train_losses.append(loss)
         
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
