@@ -55,8 +55,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.test_loss = MeanMetric()
 
         # Used for inspecting learning curve
-        self.train_losses = []
-        self.val_losses  = []
+        self.train_epoch_loss   = []
+        self.val_epoch_loss     = []
 
         # Used for classification 
         self.test_losses = []
@@ -85,13 +85,15 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.log("val/loss", loss, prog_bar=True)
 
     def on_train_epoch_end(self) -> None:
-        self.train_losses.append(loss)
+        """Lightning hook that is called when a training epoch ends."""
+        self.train_epoch_loss.append(self.trainer.callback_metrics['train/loss'])
         
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
-        if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
-            x_hat = self.sample(num_samples=16)
-            self.visualize_samples(x_hat)
+        self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
+        # if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
+        #     x_hat = self.sample(num_samples=16)
+        #     self.visualize_samples(x_hat)
             
     def test_step(self, batch, batch_idx):
         residual, noise = self(batch[0])
@@ -114,6 +116,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         
         # Visualizations
         # self.visualize_samples(x_hat)
+        self.plot_loss()
         self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1])
         self._log_histogram()
 
@@ -195,7 +198,21 @@ class DenoisingDiffusionLitModule(LightningModule):
         # Send figure as artifact to logger
         if self.logger.__class__.__name__ == "MLFlowLogger":
             self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-            
+
+    def plot_loss(self):
+
+        epochs = range(1, len(self.train_losses) + 1)
+        plt.plot(epochs, self.train_epoch_loss, label = "Training")
+        plt.plot(epochs, self.val_epoch_loss, label = "Validation")
+        plt.xlabel('Epochs', fontsize = self.fs)
+        plt.ylabel('Loss [-]', fontsize = self.fs)
+        plt.legend()
+        plt.title('Training and Validation Loss', fontsize = self.fs)
+
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_loss.png")
+        plt.savefig(plt_dir)
+        plt.close()
+
     def _log_histogram(self):
 
         y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses])

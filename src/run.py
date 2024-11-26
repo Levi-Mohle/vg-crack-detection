@@ -8,13 +8,13 @@ mode = "train" # ["train", "eval"]
 model = "ddpm"
 logger      = "csv"
 experiment  = "impasto_ddpm"
-max_epochs  = 4
+max_epochs  = 2
 data = "impasto"
 debug = 'fdr'
 device = "cpu" 
 
-train_size = 1
-test_size = 1
+train_size = .1
+test_size = .1
 
 ckpt_path = None
 
