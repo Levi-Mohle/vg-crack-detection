@@ -19,6 +19,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         criterion: torch.nn.Module,
         noise_scheduler,
         compile,
+        target: int,
         reconstruct_coef: float,
         paths: DictConfig,
     ):
@@ -38,6 +39,9 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Fraction of forward diffusion for reconstructing test images
         self.reconstruct_coef = reconstruct_coef
+
+        # Define which dimension has the target
+        self.target = target
 
         # Specify fontsize for plots
         self.fs = 16
@@ -93,15 +97,15 @@ class DenoisingDiffusionLitModule(LightningModule):
         # losses = self.criterion(residual, noise, self.device, reduction='none')
         
         self.test_losses.append(losses)
-        self.test_labels.append(batch[1])
+        self.test_labels.append(batch[self.target])
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Sample from gaussian nosie
-        x_hat = self.sample(num_samples=16)
+        # x_hat = self.sample(num_samples=16)
         
         # Visualizations
-        self.visualize_samples(x_hat)
+        # self.visualize_samples(x_hat)
         self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1])
         self._log_histogram()
 
@@ -130,7 +134,6 @@ class DenoisingDiffusionLitModule(LightningModule):
             steps = self.noise_scheduler.config.num_train_timesteps
             x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
 
-        # TO DO check the sampling process, it is not correctly implemented
         for timestep in range(steps-1, 0, -1):
             t = torch.tensor([timestep] * num_samples, device=self.device)
             noise_pred = self.model(x, t)['sample']

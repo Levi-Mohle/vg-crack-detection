@@ -13,6 +13,20 @@ import skimage
 def discretize_255(sample):
     return (sample * 255).to(torch.int32)
 
+def normalize_rgb(x):
+    """
+    Function to transform height data from 8bit [0, 255] to 32float [-1, 1]
+    """
+    x = x / 255
+    return x * 2 - 1
+
+def normalize_height(x):
+    """
+    Function to transform height data from 16bit [0, 65535] to 32float [-1, 1]
+    """
+    x = x / 2**16
+    return x * 2 - 1
+
 def rescale_diffuser(sample):
     return sample * 2 - 1
 
@@ -20,7 +34,6 @@ def custom_reshape(img):
     og_img = img[0]
     img = img[1]
     return og_img, img.reshape(1,1, img.shape[0],img.shape[1]).type(torch.float)
-
 
 class Scale_Image_Intensity(object):
     def __init__(self, scale) -> None:

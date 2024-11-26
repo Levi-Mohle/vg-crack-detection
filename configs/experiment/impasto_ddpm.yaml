@@ -1,0 +1,62 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: impasto
+  - override /model: ddpm
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["impasto", "denoising diffusion"]
+
+seed: 12345
+
+callbacks:
+    early_stopping:
+        monitor: "val/loss"
+        patience: 15
+        mode: "min"
+    model_summary:
+      max_depth: 1
+
+model:
+    criterion:
+      _target_: src.models.components.loss_functions.losses.MSE_loss
+    unet:
+      in_channels: 3
+      out_channels: 3
+    target: 2
+    reconstruct_coef: 0.1
+    
+trainer:
+  min_epochs: 5
+  max_epochs: 30
+  enable_model_summary: false
+  gradient_clip_val: 0.5
+
+reconstruct_coef: 0.2
+
+data:
+  batch_size: 32
+
+extras:
+  print_config: false
+
+logger:
+  csv:
+      prefix: "impasto_ddpm"
+  wandb:
+    tags: ${tags}
+    group: "impasto"
+  aim:
+    experiment: "impasto"
+  mlflow:
+    experiment_name: "impasto ddpm"
+  tensorboard:
+    name: "impasto ddpm"
+

@@ -82,7 +82,9 @@ unet:
 
 compile: false
 
-reconstruct_coef: .8
+reconstruct_coef: .1
+
+target: 1
 
 paths: 
   log_dir: ${paths.output_dir}
