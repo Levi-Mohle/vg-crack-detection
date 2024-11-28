@@ -84,7 +84,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.log("test/loss", loss, prog_bar=True)
 
         losses = self.criterion(x,x_hat, self.device, reduction='none')
-        self.last_test_batch = [x, x_hat]
+        self.last_test_batch = [x, x_hat, batch[2]]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
 
@@ -96,7 +96,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         
         # Visualizations
         self.plot_loss()
-        self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1])
+        self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
         self._log_histogram()
 
         # Clear variables
@@ -104,52 +104,66 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.val_epoch_loss.clear()
         self.test_losses.clear()
         self.test_labels.clear()
-
-    def visualize_reconstructs(self, x, reconstruct):
-        x = x[:8].permute(0,2,3,1).cpu()
-        reconstruct = reconstruct[:8].permute(0,2,3,1).cpu()
+    
+    def min_max_normalize(self, x):
+        min_val = x.amin(dim=(0,1,2), keepdim=True)
+        max_val = x.amax(dim=(0,1,2), keepdim=True)
+        return (x - min_val) / (max_val - min_val + 1e-8)
         
-        fig, axes = plt.subplots(4, 4, figsize=(12,12))
-        
-        for i in range(8):
-            if i > 3:
-                axes[i-4,2].imshow(x[i], cmap='grey')
-                axes[i-4,2].axis("off")
-                axes[i-4,3].imshow(reconstruct[i], cmap='grey')
-                axes[i-4,3].axis("off")
-            else:
-                axes[i,0].imshow(x[i], cmap='grey')
-                axes[i,0].axis("off")
-                axes[i,1].imshow(reconstruct[i], cmap='grey')
-                axes[i,1].axis("off")
-                
-        axes[0,0].set_title("Original Sample", fontsize = self.fs)
-        axes[0,1].set_title("Reconstructed Sample", fontsize = self.fs)
-        axes[0,2].set_title("Original Sample", fontsize = self.fs)
-        axes[0,3].set_title("Reconstructed Sample", fontsize = self.fs)
-                
-        plt.tight_layout()          
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
-        plt.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+    def visualize_reconstructs(self, x, reconstruct, labels):
+        x = x.permute(0,2,3,1).cpu()
+        reconstruct = reconstruct.permute(0,2,3,1).cpu()
 
+        # Calculate pixel-wise squared error + normalize + convert to grey-scale
+        rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
+        error = self.min_max_normalize((x - reconstruct)**2)
+        error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
+
+        img = [x, reconstruct, error]
+
+        title = ["Original sample", "Reconstructed Sample", "Pixel-wise Squared Error"]
+
+        for i in range(4):
+            fig = plt.figure(constrained_layout=True, figsize=(11,9))
+            # create 3x1 subfigs
+            subfigs = fig.subfigures(nrows=3, ncols=1)
+            for row, subfig in enumerate(subfigs):
+                subfig.suptitle(title[row], fontsize = self.fs)
+                # create 1x3 subplots per subfig
+                axs = subfig.subplots(nrows=1, ncols=4)
+                for col, ax in enumerate(axs):
+                    ax.imshow(img[row][col+4*i])
+                    ax.axis("off")
+                    ax.set_title(f"Label: {labels[col+4*i]}")
+                
+                        
+            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
+            fig.savefig(plt_dir)
+            plt.close()
+            # Send figure as artifact to logger
+            # if self.logger.__class__.__name__ == "MLFlowLogger":
+            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+    
     def plot_loss(self):
 
         epochs = [i for i in range(1, self.current_epoch + 1)]
-        print(len(self.train_epoch_loss), len(epochs))
-        plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
-        plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], marker='o', linestyle = '-', label = "Validation")
-        plt.xlabel('Epochs', fontsize = self.fs)
-        plt.ylabel('Loss [-]', fontsize = self.fs)
+
+        fig = plt.figure()
+        plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], figure = fig, marker='o', linestyle = '-', label = "Training")
+        plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], figure = fig, marker='o', linestyle = '-', label = "Validation")
+        plt.xlabel('Epochs', figure = fig, fontsize = self.fs)
+        plt.ylabel('Loss [-]', figure = fig, fontsize = self.fs)
         plt.legend()
-        plt.title('Training and Validation Loss', fontsize = self.fs)
+        plt.title('Training and Validation Loss', figure = fig, fontsize = self.fs)
 
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_loss.png")
-        plt.savefig(plt_dir)
-        plt.close()
+        fig.savefig(plt_dir)
+        # plt.close()
+
+        # Logging plot as figure to mlflow
+        # if self.logger.__class__.__name__ == "MLFlowLogger":
+        #     self.logger.experiment.log_artifact(local_path = plt_dir,
+        #                                         run_id=self.logger.run_id)
 
     def _log_histogram(self):
 
@@ -190,9 +204,9 @@ class ConvAutoEncoderLitModule(LightningModule):
         fig.savefig(plt_dir)
         
         # Logging plot as figure to mlflow
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path = self.image_dir,
-                                                run_id=self.logger.run_id)
+        # if self.logger.__class__.__name__ == "MLFlowLogger":
+        #     self.logger.experiment.log_artifact(local_path = plt_dir,
+        #                                         run_id=self.logger.run_id)
         # Remove image from folder (saved to logger)
         # os.remove(image_path)
         

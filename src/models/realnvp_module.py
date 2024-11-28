@@ -2,11 +2,13 @@ from typing import Any, Dict, Tuple
 
 import torch
 import numpy as np
+import os
 from lightning import LightningModule
 from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_auc_score, roc_curve, RocCurveDisplay
 from torchmetrics import MeanMetric
+from omegaconf import DictConfig
 # from models.components.loss_functions.realnvp_loss import RealNVPLoss
 
 
@@ -50,6 +52,7 @@ class RealNVPLitModule(LightningModule):
         scheduler: torch.optim.lr_scheduler,
         criterion: torch.nn.Module,
         compile: bool,
+        paths: DictConfig,
     ) -> None:
         """Initialize a `MNISTLitModule`.
 
@@ -67,6 +70,9 @@ class RealNVPLitModule(LightningModule):
 
         # loss function
         self.criterion = criterion
+        self.log_dir = paths.log_dir
+        self.image_dir = os.path.join(self.log_dir, "images")
+        os.makedirs(self.image_dir, exist_ok=True)
 
         # for averaging loss across batches
         self.train_loss     = MeanMetric()

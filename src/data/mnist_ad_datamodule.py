@@ -81,7 +81,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         # data transformations
         self.transforms = transforms.Compose([transforms.Resize(32),
                                             transforms.ToTensor(),
-                                            rescale_diffuser,
+                                            # rescale_diffuser,
                                             # discretize_255,
              ])
 

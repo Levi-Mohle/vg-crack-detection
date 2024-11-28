@@ -31,3 +31,6 @@ net:
 
 # compile model for faster training with pytorch 2.0
 compile: false
+
+paths: 
+  log_dir: ${paths.output_dir}
