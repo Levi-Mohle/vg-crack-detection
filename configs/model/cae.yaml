@@ -1,0 +1,30 @@
+_target_: src.models.cae_module.ConvAutoEncoderLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+criterion:
+  _target_: src.models.components.loss_functions.losses.MSE_loss
+
+net:
+  _target_: src.models.components.cae_net.AutoEncoder
+  input_channels: 3
+  feature_maps: [32, 16, 8]
+  latent_dim: 1
+
+compile: false
+
+target: 2
+
+paths: 
+  log_dir: ${paths.output_dir}

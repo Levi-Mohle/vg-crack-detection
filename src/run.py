@@ -1,17 +1,17 @@
 import subprocess
 from pathlib import Path
 
-src_path  = Path.cwd() # / "src"
+src_path  = Path.cwd() / "src"
 
 mode = "train" # ["train", "eval"]
 
-model = "ddpm"
+model = "cae"
 logger      = "csv"
-experiment  = "impasto_ddpm"
+experiment  = "impasto_cae"
 max_epochs  = 2
 data = "impasto"
 debug = 'fdr'
-device = "gpu" 
+device = "cpu" 
 
 train_size = .1
 test_size = .2
