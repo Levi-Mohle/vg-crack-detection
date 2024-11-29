@@ -41,6 +41,10 @@ trainer:
 
 data:
   batch_size: 32
+  rgb_transform:
+    _target_: src.data.components.transforms.normalize
+  height_transform:
+    _target_: src.data.components.transforms.normalize_height
 
 extras:
   print_config: false

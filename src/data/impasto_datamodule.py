@@ -2,10 +2,8 @@ from typing import Any, Dict, Optional, Tuple
 
 import os
 from lightning import LightningDataModule
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, random_split, Subset
-from torchvision.datasets import MNIST
+from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
-from src.data.components.transforms import normalize_rgb, normalize_height
 from src.data.components.loading import HDF5PatchesDatasetCustom
 from src.data.components.path_setup import IMPASTO_test_dir, IMPASTO_train_dir, IMPASTO_val_dir
 
@@ -56,6 +54,8 @@ class IMPASTO_DataModule(LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
+        rgb_transform: transforms.Compose = None,
+        height_transform: transforms.Compose = None,
     ) -> None:
         """Initialize a `IMPASTO_DataModule`.
 
@@ -72,10 +72,8 @@ class IMPASTO_DataModule(LightningDataModule):
         
         # data transformations
         # TODO create selective transform function
-        self.rgb_transform = transforms.Compose([transforms.ToTensor(),
-                                            ])
-        self.height_transform = transforms.Compose([transforms.ToTensor(),
-                                            ])
+        self.rgb_transform = rgb_transform
+        self.height_transform = height_transform
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
