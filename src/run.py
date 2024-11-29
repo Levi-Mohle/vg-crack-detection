@@ -1,9 +1,9 @@
 import subprocess
 from pathlib import Path
 
-src_path  = Path.cwd() / "src"
+src_path  = Path.cwd() # / "src"
 
-mode = "eval" # ["train", "eval"]
+mode = "train" # ["train", "eval"]
 
 model = "cae"
 logger      = "mlflow"
@@ -11,7 +11,7 @@ experiment  = "impasto_cae"
 max_epochs  = 1
 data = "impasto"
 debug = 'fdr'
-device = "cpu" 
+device = "gpu" 
 
 train_size = .1
 test_size = .2

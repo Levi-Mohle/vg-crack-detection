@@ -102,7 +102,7 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
         losses = self.criterion(x,reconstruct, self.device, reduction='none')
-        self.last_test_batch = [x, reconstruct]
+        self.last_test_batch = [x, reconstruct, batch[2]]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
 
@@ -117,7 +117,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         # Visualizations
         # self.visualize_samples(x_hat)
         self.plot_loss()
-        self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1])
+        self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
         self._log_histogram()
 
         # Clear variables
@@ -169,37 +169,75 @@ class DenoisingDiffusionLitModule(LightningModule):
         if self.logger.__class__.__name__ == "MLFlowLogger":
             self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
         # os.remove(image_path)
+    
+    def min_max_normalize(self, x):
+        min_val = x.amin(dim=(0,1,2), keepdim=True)
+        max_val = x.amax(dim=(0,1,2), keepdim=True)
+        return (x - min_val) / (max_val - min_val + 1e-8)
+        
+    def visualize_reconstructs(self, x, reconstruct, labels):
+        x = x.permute(0,2,3,1).cpu()
+        reconstruct = reconstruct.permute(0,2,3,1).cpu()
 
-    def visualize_reconstructs(self, x, reconstruct):
-        x = x[:8].permute(0,2,3,1).cpu()
-        reconstruct = reconstruct[:8].permute(0,2,3,1).cpu()
-        
-        fig, axes = plt.subplots(4, 4, figsize=(12,12))
-        
-        for i in range(8):
-            if i > 3:
-                axes[i-4,2].imshow(x[i], cmap='grey')
-                axes[i-4,2].axis("off")
-                axes[i-4,3].imshow(reconstruct[i], cmap='grey')
-                axes[i-4,3].axis("off")
-            else:
-                axes[i,0].imshow(x[i], cmap='grey')
-                axes[i,0].axis("off")
-                axes[i,1].imshow(reconstruct[i], cmap='grey')
-                axes[i,1].axis("off")
+        # Calculate pixel-wise squared error + normalize + convert to grey-scale
+        rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
+        error = self.min_max_normalize((x - reconstruct)**2)
+        error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
+
+        img = [x, reconstruct, error]
+
+        title = ["Original sample", "Reconstructed Sample", "Pixel-wise Squared Error"]
+
+        for i in range(4):
+            fig = plt.figure(constrained_layout=True, figsize=(11,9))
+            # create 3x1 subfigs
+            subfigs = fig.subfigures(nrows=3, ncols=1)
+            for row, subfig in enumerate(subfigs):
+                subfig.suptitle(title[row], fontsize = self.fs)
+                # create 1x3 subplots per subfig
+                axs = subfig.subplots(nrows=1, ncols=4)
+                for col, ax in enumerate(axs):
+                    ax.imshow(img[row][col+4*i])
+                    ax.axis("off")
+                    ax.set_title(f"Label: {labels[col+4*i]}")
                 
-        axes[0,0].set_title("Original Sample", fontsize = self.fs)
-        axes[0,1].set_title("Reconstructed Sample", fontsize = self.fs)
-        axes[0,2].set_title("Original Sample", fontsize = self.fs)
-        axes[0,3].set_title("Reconstructed Sample", fontsize = self.fs)
+                        
+            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
+            fig.savefig(plt_dir)
+            plt.close()
+            # Send figure as artifact to logger
+            # if self.logger.__class__.__name__ == "MLFlowLogger":
+            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+    # def visualize_reconstructs(self, x, reconstruct):
+    #     x = x[:8].permute(0,2,3,1).cpu()
+    #     reconstruct = reconstruct[:8].permute(0,2,3,1).cpu()
+        
+    #     fig, axes = plt.subplots(4, 4, figsize=(12,12))
+        
+    #     for i in range(8):
+    #         if i > 3:
+    #             axes[i-4,2].imshow(x[i], cmap='grey')
+    #             axes[i-4,2].axis("off")
+    #             axes[i-4,3].imshow(reconstruct[i], cmap='grey')
+    #             axes[i-4,3].axis("off")
+    #         else:
+    #             axes[i,0].imshow(x[i], cmap='grey')
+    #             axes[i,0].axis("off")
+    #             axes[i,1].imshow(reconstruct[i], cmap='grey')
+    #             axes[i,1].axis("off")
                 
-        plt.tight_layout()          
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
-        plt.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+    #     axes[0,0].set_title("Original Sample", fontsize = self.fs)
+    #     axes[0,1].set_title("Reconstructed Sample", fontsize = self.fs)
+    #     axes[0,2].set_title("Original Sample", fontsize = self.fs)
+    #     axes[0,3].set_title("Reconstructed Sample", fontsize = self.fs)
+                
+    #     plt.tight_layout()          
+    #     plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
+    #     plt.savefig(plt_dir)
+    #     plt.close()
+    #     # Send figure as artifact to logger
+    #     if self.logger.__class__.__name__ == "MLFlowLogger":
+    #         self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
 
     def plot_loss(self):
 
