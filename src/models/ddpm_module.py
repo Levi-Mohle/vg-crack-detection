@@ -242,7 +242,6 @@ class DenoisingDiffusionLitModule(LightningModule):
     def plot_loss(self):
 
         epochs = [i for i in range(1, self.current_epoch + 1)]
-        print(len(self.train_epoch_loss), len(epochs))
         plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
         plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], marker='o', linestyle = '-', label = "Validation")
         plt.xlabel('Epochs', fontsize = self.fs)

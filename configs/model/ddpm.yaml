@@ -67,14 +67,14 @@ unet:
   dropout: 0.0
   flip_sin_to_cos: true
   freq_shift: 0
-  in_channels: 1
+  in_channels: 3
   layers_per_block: 2
   mid_block_scale_factor: 1
   norm_eps: 1.0e-05
   norm_num_groups: 32
   num_class_embeds: null
   num_train_timesteps: null
-  out_channels: 1
+  out_channels: 3
   resnet_time_scale_shift: default
   sample_size: 32
   time_embedding_type: positional
@@ -82,9 +82,9 @@ unet:
 
 compile: false
 
-reconstruct_coef: .1
+reconstruct_coef: .99
 
-target: 1
+target: 2
 
 paths: 
   log_dir: ${paths.output_dir}

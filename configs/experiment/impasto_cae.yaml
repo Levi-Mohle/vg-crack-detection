@@ -26,7 +26,7 @@ callbacks:
 
 model:
   criterion:
-    _target_: src.models.components.loss_functions.losses.MSE_loss
+    _target_: src.models.components.loss_functions.losses.SSIM_loss
   net:
     _target_: src.models.components.cae_net.AutoEncoder
     input_channels: 3
