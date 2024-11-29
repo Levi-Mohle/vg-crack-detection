@@ -43,6 +43,10 @@ reconstruct_coef: 0.5
 
 data:
   batch_size: 32
+  rgb_transform:
+    _target_: src.data.components.transforms.diffuser_normalize
+  height_transform:
+    _target_: src.data.components.transforms.diffuser_normalize_height
 
 extras:
   print_config: false

@@ -82,7 +82,7 @@ unet:
 
 compile: false
 
-reconstruct_coef: .99
+reconstruct_coef: .5
 
 target: 2
 
