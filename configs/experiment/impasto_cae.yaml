@@ -26,11 +26,11 @@ callbacks:
 
 model:
   criterion:
-    _target_: src.models.components.loss_functions.losses.SSIM_loss
+    _target_: src.models.components.loss_functions.losses.MSE_loss
   net:
     _target_: src.models.components.cae_net.AutoEncoder
     input_channels: 3
-    feature_maps: [32, 16, 8]
+    feature_maps: [64, 32, 16]
     latent_dim: 1
     
 trainer:
@@ -42,9 +42,9 @@ trainer:
 data:
   batch_size: 32
   rgb_transform:
-    _target_: src.data.components.transforms.normalize
+    _target_: src.data.components.transforms.normalize_0_1
   height_transform:
-    _target_: src.data.components.transforms.normalize_height
+    _target_: src.data.components.transforms.normalize_height_0_1
 
 extras:
   print_config: false

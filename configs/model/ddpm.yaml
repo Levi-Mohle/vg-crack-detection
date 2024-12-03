@@ -17,7 +17,7 @@ criterion:
 
 noise_scheduler:
   _target_: diffusers.schedulers.DDPMScheduler
-  num_train_timesteps: 300
+  num_train_timesteps: 1000
   beta_start: 0.0001
   beta_end: 0.02
   beta_schedule: linear
@@ -82,7 +82,7 @@ unet:
 
 compile: false
 
-reconstruct_coef: .5
+reconstruct_coef: .2
 
 target: 2
 

@@ -19,7 +19,7 @@ criterion:
 net:
   _target_: src.models.components.cae_net.AutoEncoder
   input_channels: 3
-  feature_maps: [32, 16, 8]
+  feature_maps: [64, 32, 16]
   latent_dim: 1
 
 compile: false

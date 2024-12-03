@@ -45,12 +45,12 @@ def rescale_diffuser(sample):
 # Transforms
 #################################################################################
 
-def normalize():
+def normalize_0_1():
     transform = transforms.Compose([transforms.ToTensor(),
                                         ])
     return transform
 
-def normalize_height():
+def normalize_height_0_1():
     transform = transforms.Compose([transforms.ToTensor(),
                                     normalize_height,])
     return transform
