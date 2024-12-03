@@ -3,6 +3,7 @@
 defaults:
   - _self_
   - data: mnist # choose datamodule with `test_dataloader()` for evaluation
+  - callbacks: null
   - model: mnist
   - logger: null
   - trainer: default

@@ -23,6 +23,9 @@ callbacks:
         mode: "min"
     model_summary:
       max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
 
 model:
     criterion:

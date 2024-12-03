@@ -22,11 +22,14 @@ callbacks:
         patience: 15
         mode: "min"
     model_summary:
-      max_depth: 1
+        max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
 
 model:
   criterion:
-    _target_: src.models.components.loss_functions.losses.MSE_loss
+    _target_: src.models.components.loss_functions.losses.SSIM_loss
   net:
     _target_: src.models.components.cae_net.AutoEncoder
     input_channels: 3
