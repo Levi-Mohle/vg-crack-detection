@@ -3,7 +3,7 @@ from pathlib import Path
 
 src_path  = Path.cwd()  / "src"
 
-mode = "train" # ["train", "eval"]
+mode = "eval" # ["train", "eval"]
 
 model = "cae"
 logger      = "mlflow"
@@ -16,7 +16,7 @@ device = "cpu"
 train_size = .1
 test_size = .2
 
-ckpt_path = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2024-11-28_14-59-45_Good\checkpoints\last.ckpt"
+ckpt_path = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2024-12-03_15-05-34\checkpoints\epoch_004.ckpt"
 
 if mode == "train":
     subprocess.run(["python", "train.py",
@@ -33,9 +33,10 @@ if mode == "train":
                     cwd=src_path)
 elif mode == "eval":
     subprocess.run(["python", "eval.py",
-                    f"data={data}",
-                    f"model={model}",
+                    # f"data={data}",
+                    # f"model={model}",
                     # f"logger={logger}", 
                     f"ckpt_path={ckpt_path}",
+                    f"+experiment={experiment}",
                     ],
                     cwd=src_path)

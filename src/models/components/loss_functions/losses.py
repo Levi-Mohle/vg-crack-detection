@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
+# from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
+from torchmetrics.functional import structural_similarity_index_measure as SSIM
 
 class MSE_loss(nn.Module):
     def __init__(self):
@@ -21,19 +22,21 @@ class SSIM_loss(nn.Module):
         self.kernel_size = 5
         self.sigma = 1.5
 
-    def normalize(self, x):
-        min = x.min(dim=0, keepdim=True)[0]
-        max = x.max(dim=0, keepdim=True)[0]
-        x_norm = (x - min) / (max - min + 1e-8)
-        return x_norm
+    # def normalize(self, x):
+    #     min = x.min(dim=0, keepdim=True)[0]
+    #     max = x.max(dim=0, keepdim=True)[0]
+    #     x_norm = (x - min) / (max - min + 1e-8)
+    #     return x_norm
         
-    def forward(self, x, x_hat, device, reduction = 'elementwise_mean'): 
+    # def forward(self, x, x_hat, device, reduction = 'elementwise_mean'): 
         
-        ssim = SSIM(kernel_size= self.kernel_size,
-                    sigma = self.sigma,
-                    reduction = reduction,
-                    ).to(device)
-        return torch.abs(1 - ssim(self.normalize(x), self.normalize(x_hat)))
+    #     ssim = SSIM(kernel_size= self.kernel_size,
+    #                 sigma = self.sigma,
+    #                 reduction = reduction,
+    #                 ).to(device)
+    #     return torch.abs(1 - ssim(self.normalize(x), self.normalize(x_hat)))
+    def forward(self, x, x_hat, device, reduction = 'elementwise_mean'):
+        return 1- SSIM(x, x_hat, reduction = reduction)
 
     
 class NLL_Typicality_Loss(nn.Module):
