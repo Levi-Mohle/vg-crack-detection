@@ -1,0 +1,44 @@
+_target_: src.models.cddpm_module.ConditionalDenoisingDiffusionLitModule
+
+optimizer:
+  _target_: torch.optim.AdamW
+  _partial_: true
+  lr: 0.0001
+  weight_decay: 0.0
+
+criterion:
+  _target_: src.models.components.loss_functions.losses.CustomCosineSimilarity
+  DLlambda: 0.1
+
+net:
+  _target_: src.models.components.fe_net.FeatureExtractor
+
+unet: 
+  ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'
+  num_condition_steps: 250
+  condition_weight: 3
+
+noise_scheduler:
+  _target_: diffusers.schedulers.DDPMScheduler
+  num_train_timesteps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  beta_schedule: linear
+  trained_betas: null
+  variance_type: fixed_small
+  clip_sample: false
+  prediction_type: epsilon
+  thresholding: false
+  dynamic_thresholding_ratio: 0.995
+  clip_sample_range: 1.0
+  sample_max_value: 1.0
+  timestep_spacing: leading
+  steps_offset: 0
+  rescale_betas_zero_snr: false
+
+compile: false
+
+target: 2
+
+paths: 
+  log_dir: ${paths.output_dir}
