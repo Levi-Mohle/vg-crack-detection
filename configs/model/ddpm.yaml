@@ -6,11 +6,17 @@ optimizer:
   lr: 0.0002
   weight_decay: 0.0
 
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.StepLR
+#   _partial_: true
+#   step_size: 1
+#   gamma: 0.99
 scheduler:
-  _target_: torch.optim.lr_scheduler.StepLR
+  _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
   _partial_: true
-  step_size: 1
-  gamma: 0.99
+  num_warmup_steps: 500
+  num_training_steps: 6400
+  num_cycles: 0.5
 
 criterion:
   _target_: src.models.components.loss_functions.losses.SSIM_loss
