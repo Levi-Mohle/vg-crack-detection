@@ -29,14 +29,15 @@ callbacks:
 
 model:
     criterion:
-      _target_: src.models.components.loss_functions.losses.MSE_loss
+      _target_: src.models.components.loss_functions.losses.L1norm
     unet:
       in_channels: 3
       out_channels: 3
     noise_scheduler:
       num_train_timesteps: 1000
-      num_condition_steps: 250
     target: 2
+    num_condition_steps: 200
+    condition_weight: 3
     
 trainer:
   min_epochs: 5

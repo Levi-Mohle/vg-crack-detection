@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 # from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics.functional import structural_similarity_index_measure as SSIM
+from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 
 class MSE_loss(nn.Module):
     def __init__(self):
@@ -10,17 +10,31 @@ class MSE_loss(nn.Module):
 
     def forward(self, x_hat, x, device, reduction ='mean'):
         if reduction == 'none':
-            loss = nn.functional.mse_loss(input=x_hat, target=x, reduction = reduction).mean(dim=(1,2,3))
-        else:
-            loss = nn.functional.mse_loss(input=x_hat, target=x, reduction = reduction)
-        return loss
+            return (x - x_hat)**2
+        elif reduction == 'mean':
+            return torch.mean((x - x_hat)**2)
+        elif reduction == 'batch':
+            return torch.mean((x - x_hat)**2, dim=(1,2,3))
 
+class L1norm(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x_hat, x, device, reduction ='mean'):
+        if reduction == 'none':
+            return torch.abs(x - x_hat)
+        elif reduction == 'mean':
+            return torch.mean(torch.abs(x - x_hat))
+        elif reduction == 'batch':
+            return torch.mean(torch.abs(x - x_hat), dim=(1,2,3))
+        
 class SSIM_loss(nn.Module):
     def __init__(self):
 
         super().__init__()
         self.kernel_size = 5
         self.sigma = 1.5
+        self.data_range = (-1., 1.)
 
     # def normalize(self, x):
     #     min = x.min(dim=0, keepdim=True)[0]
@@ -28,15 +42,23 @@ class SSIM_loss(nn.Module):
     #     x_norm = (x - min) / (max - min + 1e-8)
     #     return x_norm
         
-    # def forward(self, x, x_hat, device, reduction = 'elementwise_mean'): 
+    def forward(self, x, x_hat, device, reduction = 'mean'):
+        if reduction == 'none':
+            return (x - x_hat)**2
+        elif reduction == 'mean':
+            ssim = SSIM(kernel_size=self.kernel_size,
+                    sigma = self.sigma,
+                    data_range = self.data_range,
+                    reduction = 'elementwise_mean').to(device)
+            return 1- ssim(x_hat, x)
+        elif reduction == 'batch':
+            ssim = SSIM(kernel_size=self.kernel_size,
+                    sigma = self.sigma,
+                    data_range = self.data_range,
+                    reduction = 'none').to(device)
+            return 1- ssim(x_hat, x)
         
-    #     ssim = SSIM(kernel_size= self.kernel_size,
-    #                 sigma = self.sigma,
-    #                 reduction = reduction,
-    #                 ).to(device)
-    #     return torch.abs(1 - ssim(self.normalize(x), self.normalize(x_hat)))
-    def forward(self, x, x_hat, device, reduction = 'elementwise_mean'):
-        return 1- SSIM(x, x_hat, reduction = reduction)
+        
 
     
 class NLL_Typicality_Loss(nn.Module):

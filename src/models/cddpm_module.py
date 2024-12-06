@@ -21,6 +21,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         compile,
         target: int,
         num_condition_steps: int,
+        condition_weight: float,
         paths: DictConfig,
     ):
         """ImageFlow.
@@ -42,6 +43,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
 
         # Define start of conditioning 
         self.num_condition_steps = num_condition_steps
+        self.condition_weight = condition_weight
         
         # Specify fontsize for plots
         self.fs = 16
@@ -102,7 +104,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         self.log("test/loss", loss, prog_bar=True)
 
         reconstruct = self.reconstruction(x)
-        losses = self.criterion(x,reconstruct, self.device, reduction='none')
+        losses = self.criterion(x,reconstruct, self.device, reduction='batch')
         self.last_test_batch = [x, reconstruct, batch[2]]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
@@ -130,22 +132,28 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
     def reconstruction(self, x):
         Tc = self.num_condition_steps
 
-        # Start with 
-        xt = self.noise_scheduler.add_noise(x, torch.randn_like(x), Tc)
+        # Define target
+        y = x
+
+        # Start with adding noise at timestep Tc
+        t = torch.tensor([Tc] * x.shape[0], device=self.device)
+        xt = self.noise_scheduler.add_noise(x, torch.randn_like(x), t)
+
+        # Implementation from Mousakha et al, 2023
         for timestep in range(Tc, 0, -1):
             t = torch.tensor([timestep] * x.shape[0], device=self.device)
-            noise_pred = self.model(xt, t)['sample']
+            e = self.model(xt, t)['sample']
             
             var         = self.noise_scheduler._get_variance(timestep)
-            alpha_next  = self.noise_scheduler.alphas_cumprod[timestep-1]
+            alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
+            alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
             
-            y = x
-            yt = self.noise_scheduler.add_noise(y, noise_pred, t)
-            e_hat = noise_pred - self.w * (yt-xt)
-            xt = self.noise_scheduler.step(e_hat, timestep , xt, generator=None)['prev_sample']
-            xt_hat = torch.sqrt(alpha_next) * xt + torch.sqrt(1-alpha_next-var) * e_hat + torch.sqrt(var) * torch.randn_like(xt)
-            
-        return xt_hat
+            yt = self.noise_scheduler.add_noise(y, e, t)
+            e_hat = e - self.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
+            ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
+            xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-var) * e_hat + torch.sqrt(var) * torch.randn_like(xt)
+
+        return xt
     
     @torch.no_grad()
     def sample(self, num_samples, x=None, steps=None):
@@ -191,9 +199,9 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
 
-        # Calculate pixel-wise squared error + normalize + convert to grey-scale
+        # Calculate pixel-wise error + normalize + convert to grey-scale
         rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
-        error = self.min_max_normalize((x - reconstruct)**2)
+        error = self.min_max_normalize(self.criterion(x, reconstruct, self.device, reduction='none'))
         error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
 
         img = [x, reconstruct, error]

@@ -1,4 +1,4 @@
-_target_: src.models.ddpm_module.ConditionalDenoisingDiffusionLitModule
+_target_: src.models.cddpm_module.ConditionalDenoisingDiffusionLitModule
 
 optimizer:
   _target_: torch.optim.AdamW
@@ -85,6 +85,8 @@ compile: false
 target: 2
 
 num_condition_steps: 250
+
+condition_weight: 3
 
 paths: 
   log_dir: ${paths.output_dir}
