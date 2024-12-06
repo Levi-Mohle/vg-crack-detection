@@ -12,6 +12,7 @@ criterion:
 
 net:
   _target_: src.models.components.fe_net.FeatureExtractor
+  dir: 'location'
 
 unet: 
   ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'

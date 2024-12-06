@@ -9,10 +9,11 @@ from typing import Type, Any, Callable, Union, List, Optional
 
 class FeatureExtractor(nn.Module):
     def __init__(self,
+                 dir,
                  ):
         super(FeatureExtractor, self).__init__()
 
-        self.model = wide_resnet101_2(pretrained = True)
+        self.model = wide_resnet101_2(dir = dir, pretrained = True)
 
     def forward(self, x):
         return self.model(x)
@@ -253,7 +254,7 @@ class ResNet(nn.Module):
 
 
 def _resnet(
-    arch: str,
+    dir: str,
     block: Type[Union[BasicBlock, Bottleneck]],
     layers: List[int],
     pretrained: bool,
@@ -262,7 +263,7 @@ def _resnet(
 ) -> ResNet:
     model = ResNet(block, layers, **kwargs)
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls[arch],
+        state_dict = load_state_dict_from_url(dir,
                                               progress=progress)
         #for k,v in list(state_dict.items()):
         #    if 'layer4' in k or 'fc' in k:
@@ -464,7 +465,7 @@ def _resnet(
 #     def forward(self, x: Tensor) -> Tensor:
 #         return self._forward_impl(x)
     
-def wide_resnet101_2(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
+def wide_resnet101_2(dir, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
     r"""Wide ResNet-101-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_.
     The model is the same as ResNet except for the bottleneck number of channels
@@ -476,7 +477,7 @@ def wide_resnet101_2(pretrained: bool = False, progress: bool = True, **kwargs: 
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     kwargs['width_per_group'] = 64 * 2
-    return _resnet('wide_resnet101_2', Bottleneck, [3, 4, 23, 3],
+    return _resnet(dir, Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, **kwargs)
 
 

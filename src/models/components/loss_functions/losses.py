@@ -4,6 +4,24 @@ import torch.nn as nn
 # from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 
+class CustomCosineSimilarity(nn.Module):
+    def __init__(self,
+                 DLlambda: float):
+        super().__init__()
+        self.DLlambda = DLlambda
+
+    def forward(self, a, b, c, d):
+        cos_loss = torch.nn.CosineSimilarity()
+        loss1 = 0
+        loss2 = 0
+        loss3 = 0
+        for item in range(len(a)):
+            loss1 += torch.mean(1-cos_loss(a[item].view(a[item].shape[0],-1),b[item].view(b[item].shape[0],-1))) 
+            loss2 += torch.mean(1-cos_loss(b[item].view(b[item].shape[0],-1),c[item].view(c[item].shape[0],-1))) * self.DLlambda
+            loss3 += torch.mean(1-cos_loss(a[item].view(a[item].shape[0],-1),d[item].view(d[item].shape[0],-1))) * self.DLlambda
+        loss = loss1+loss2+loss3
+        return loss
+
 class MSE_loss(nn.Module):
     def __init__(self):
         super().__init__()
