@@ -12,7 +12,7 @@ criterion:
 
 net:
   _target_: src.models.components.fe_net.FeatureExtractor
-  dir: 'location'
+  dir: '/data/storage_crack_detection/Pretrained_models/wide_resnet101_2-32ee1156.pth'
 
 unet: 
   ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'
