@@ -10,10 +10,6 @@ import matplotlib.pyplot as plt
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-
-class UNET():
-    def __init__(self):
-        self.unet = diffusers
         
 class FeatureExtractorLitModule(LightningModule):
     def __init__(
@@ -63,7 +59,8 @@ class FeatureExtractorLitModule(LightningModule):
         # self.unet_model = unet.load_from_checkpoint(self.unet_dict.ckpt_path)
         # self.unet_model.from_pretrained(checkpoint["state_dict"])
         print(checkpoint["state_dict"])
-        self.unet_model.load_state_dict(checkpoint["state_dict"])
+        state_dict = {key.replace("model.", ""): value for key, value in checkpoint["state_dict"].items()}
+        self.unet_model.load_state_dict(state_dict)
         
         self.noise_scheduler            = noise_scheduler
         self.unet_model.eval() 
