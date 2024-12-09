@@ -39,13 +39,7 @@ class FeatureExtractorLitModule(LightningModule):
         # Pre-trained wide ResNet
         self.feature_extractor          = FE
         self.criterion                  = criterion
-        # checkpoint = torch.load(self.unet_dict.ckpt_path, map_location= self.device)
-        # print(self.unet_model)
-        # for name, module in self.feature_extractor.named_modules():
-        #     print(f"{name}: {module}")
-        # self.unet_model.load_state_dict(checkpoint["state_dict"])
-        
-        
+
         # Freeze models
         self.frozen_feature_extractor   = frozen_FE
         self.frozen_feature_extractor.eval()
@@ -56,9 +50,8 @@ class FeatureExtractorLitModule(LightningModule):
         self.unet_dict                  = unet_dict
         self.unet_model                 = unet 
         checkpoint = torch.load(self.unet_dict.ckpt_path)
-        # self.unet_model = unet.load_from_checkpoint(self.unet_dict.ckpt_path)
-        # self.unet_model.from_pretrained(checkpoint["state_dict"])
-        print(checkpoint["state_dict"])
+
+        # Fix issue with dict names
         state_dict = {key.replace("model.", ""): value for key, value in checkpoint["state_dict"].items()}
         self.unet_model.load_state_dict(state_dict)
         

@@ -18,14 +18,16 @@ criterion:
 
 FE:
   _target_: src.models.components.fe_net.FeatureExtractor
-  dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\resnet18-f37072fd.pth'
+  # dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\resnet18-f37072fd.pth'
+  dir: '/data/storage_crack_detection/Pretrained_models/resnet18-f37072fd.pth'
       
 frozen_FE:
   _target_: src.models.components.fe_net.FeatureExtractor
-  dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\resnet18-f37072fd.pth'
+  # dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\resnet18-f37072fd.pth'
+  dir: '/data/storage_crack_detection/Pretrained_models/resnet18-f37072fd.pth'
 
 unet_dict: 
-  ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'
+  ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-09_10-43-10_DDPM_1000steps/checkpoints/last.ckpt'
   num_condition_steps: 250
   condition_weight: 3
 

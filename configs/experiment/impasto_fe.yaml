@@ -43,7 +43,7 @@ model:
       out_channels: 3
       
     unet_dict: 
-      ckpt_path: 'C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2024-12-09_15-52-27\checkpoints\last.ckpt'
+      ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'
       num_condition_steps: 250
       condition_weight: 3
     
@@ -54,7 +54,7 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-  batch_size: 16
+  batch_size: 32
   rgb_transform:
     _target_: src.data.components.transforms.diffuser_normalize
   height_transform:
