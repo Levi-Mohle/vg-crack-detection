@@ -1,4 +1,4 @@
-_target_: src.models.cddpm_module.ConditionalDenoisingDiffusionLitModule
+_target_: src.models.fe_module.FeatureExtractorLitModule
 
 optimizer:
   _target_: torch.optim.AdamW
@@ -6,18 +6,75 @@ optimizer:
   lr: 0.0001
   weight_decay: 0.0
 
+scheduler:
+  _target_: torch.optim.lr_scheduler.StepLR
+  _partial_: true
+  step_size: 1
+  gamma: 0.99
+
 criterion:
   _target_: src.models.components.loss_functions.losses.CustomCosineSimilarity
   DLlambda: 0.1
 
-net:
+FE:
   _target_: src.models.components.fe_net.FeatureExtractor
-  dir: '/data/storage_crack_detection/Pretrained_models/wide_resnet101_2-32ee1156.pth'
+  dir: '/data/storage_crack_detection/Pretrained_models/resnet18-f37072fd.pth'
+      
+frozen_FE:
+  _target_: src.models.components.fe_net.FeatureExtractor
+  dir: '/data/storage_crack_detection/Pretrained_models/resnet18-f37072fd.pth'
 
-unet: 
+unet_dict: 
   ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'
   num_condition_steps: 250
   condition_weight: 3
+
+unet:
+  _target_: diffusers.models.UNet2DModel
+  act_fn: silu
+  add_attention: true
+  attention_head_dim: 8
+  attn_norm_num_groups: null
+  center_input_sample: false
+  class_embed_type: null
+  block_out_channels:
+    - 128
+    - 128
+    - 256
+    - 256
+    - 512
+    - 512
+  down_block_types:
+    - DownBlock2D
+    - DownBlock2D
+    - DownBlock2D
+    - DownBlock2D
+    - AttnDownBlock2D
+    - DownBlock2D
+  up_block_types:
+    - UpBlock2D
+    - AttnUpBlock2D
+    - UpBlock2D
+    - UpBlock2D
+    - UpBlock2D
+    - UpBlock2D
+  downsample_padding: 1
+  downsample_type: conv
+  dropout: 0.0
+  flip_sin_to_cos: true
+  freq_shift: 0
+  in_channels: 3
+  layers_per_block: 2
+  mid_block_scale_factor: 1
+  norm_eps: 1.0e-05
+  norm_num_groups: 32
+  num_class_embeds: null
+  num_train_timesteps: null
+  out_channels: 3
+  resnet_time_scale_shift: default
+  sample_size: 32
+  time_embedding_type: positional
+  upsample_type: conv
 
 noise_scheduler:
   _target_: diffusers.schedulers.DDPMScheduler

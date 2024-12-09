@@ -13,7 +13,7 @@ class FeatureExtractor(nn.Module):
                  ):
         super(FeatureExtractor, self).__init__()
 
-        self.model = wide_resnet101_2(dir = dir, pretrained = True)
+        self.model = resnet18(dir = dir, pretrained = True)
 
     def forward(self, x):
         return self.model(x)
@@ -263,8 +263,9 @@ def _resnet(
 ) -> ResNet:
     model = ResNet(block, layers, **kwargs)
     if pretrained:
-        state_dict = load_state_dict_from_url(dir,
-                                              progress=progress)
+        # state_dict = load_state_dict_from_url(dir,
+        #                                       progress=progress)
+        state_dict = torch.load(dir)
         #for k,v in list(state_dict.items()):
         #    if 'layer4' in k or 'fc' in k:
         #        state_dict.pop(k)
@@ -464,6 +465,16 @@ def _resnet(
 
 #     def forward(self, x: Tensor) -> Tensor:
 #         return self._forward_impl(x)
+
+def resnet18(dir, pretrained: bool = False, progress: bool = True,**kwargs: Any) -> ResNet:
+    r"""ResNet-18 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    return _resnet(dir, BasicBlock, [2, 2, 2, 2], pretrained, progress,
+                   **kwargs)
     
 def wide_resnet101_2(dir, pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
     r"""Wide ResNet-101-2 model from

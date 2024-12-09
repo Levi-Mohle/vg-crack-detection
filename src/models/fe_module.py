@@ -11,18 +11,23 @@ from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
 
+class UNET():
+    def __init__(self):
+        self.unet = diffusers
+        
 class FeatureExtractorLitModule(LightningModule):
     def __init__(
         self, 
-        net: torch.nn.Module,
+        FE: torch.nn.Module,
+        frozen_FE: torch.nn.Module,
+        unet: torch.nn.Module,
+        unet_dict: DictConfig,
+        noise_scheduler,
         optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
         criterion: torch.nn.Module,
         compile,
-        unet: DictConfig,
-        noise_scheduler,
         target: int,
-        num_condition_steps: int,
-        condition_weight: float,
         paths: DictConfig,
     ):
         """Feature extractor.
@@ -33,27 +38,38 @@ class FeatureExtractorLitModule(LightningModule):
         super().__init__()
 
         self.save_hyperparameters(logger=False)
-        self.save_hyperparameters(ignore=['net', 'criterion'])
-
-        # Unet dict
-        self.unet                       = unet
+        self.save_hyperparameters(ignore=['net', 'criterion'])        
 
         # Pre-trained wide ResNet
-        self.feature_extractor          = net
-        self.frozen_feature_extractor   = net
-
-        # Trained Unet model
-        self.unet_model                 = UNet2DModel.from_pretrained(self.unet.ckpt_path)
-        self.noise_scheduler            = noise_scheduler
+        self.feature_extractor          = FE
         self.criterion                  = criterion
-
-        # Enable training
-        self.feature_extractor.train()
-
+        # checkpoint = torch.load(self.unet_dict.ckpt_path, map_location= self.device)
+        # print(self.unet_model)
+        # for name, module in self.feature_extractor.named_modules():
+        #     print(f"{name}: {module}")
+        # self.unet_model.load_state_dict(checkpoint["state_dict"])
+        
+        
         # Freeze models
+        self.frozen_feature_extractor   = frozen_FE
         self.frozen_feature_extractor.eval()
-        self.unet.eval()
-
+        for param in self.frozen_feature_extractor.parameters():
+            param.requires_grad= False
+            
+        # Trained Unet model
+        self.unet_dict                  = unet_dict
+        self.unet_model                 = unet 
+        checkpoint = torch.load(self.unet_dict.ckpt_path)
+        # self.unet_model = unet.load_from_checkpoint(self.unet_dict.ckpt_path)
+        # self.unet_model.from_pretrained(checkpoint["state_dict"])
+        print(checkpoint["state_dict"])
+        self.unet_model.load_state_dict(checkpoint["state_dict"])
+        
+        self.noise_scheduler            = noise_scheduler
+        self.unet_model.eval() 
+        for param in self.unet_model.parameters():
+            param.requires_grad= False   
+        
         self.transform = transforms.Compose([
                     transforms.Lambda(lambda t: (t + 1) / (2)),
                     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -90,7 +106,7 @@ class FeatureExtractorLitModule(LightningModule):
         target = batch[0][:half_batch_size]
         input = batch[0][half_batch_size:]  
         
-        x0 = self.reconstruction(input, target)[-1]
+        x0 = self.reconstruction(input, target)
         x0 = self.transform(x0)
         target = self.transform(target)
 
@@ -128,7 +144,7 @@ class FeatureExtractorLitModule(LightningModule):
         self.test_labels.clear()
     
     def reconstruction(self, x, y):
-        Tc = self.unet.num_condition_steps
+        Tc = self.unet_dict.num_condition_steps
 
         # Start with adding noise at timestep Tc
         t = torch.tensor([Tc] * x.shape[0], device=self.device)
@@ -144,7 +160,7 @@ class FeatureExtractorLitModule(LightningModule):
             alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
             
             yt = self.noise_scheduler.add_noise(y, e, t)
-            e_hat = e - self.unet.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
+            e_hat = e - self.unet_dict.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
             ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
             xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-var) * e_hat + torch.sqrt(var) * torch.randn_like(xt)
 
@@ -160,7 +176,7 @@ class FeatureExtractorLitModule(LightningModule):
         :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
         """
         if self.hparams.compile and stage == "fit":
-            self.unet = torch.compile(self.unet)
+            self.unet_model = torch.compile(self.unet_model)
 
     def configure_optimizers(self):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
