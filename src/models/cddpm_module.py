@@ -1,8 +1,10 @@
 import torch
-import torch.nn as nn
+import torch.nn.functional as F
 import diffusers
 import numpy as np
 import os
+import math
+from torchvision import transforms
 from torchvision.utils import make_grid
 from sklearn.metrics import roc_auc_score, roc_curve, RocCurveDisplay
 import matplotlib.pyplot as plt
@@ -50,16 +52,17 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
 
         self.feature_extractor = resnet18()
         # checkpoint = torch.load(fe_dict.ckpt_path)
-        state_dict = {
-            key.replace("feature_extractor.model.", ""): value 
-            for key, value in checkpoint["state_dict"].items()
-            if key.startswith("feature_extractor.")
-        }
-        print(state_dict.keys())
-        self.feature_extractor.load_state_dict(state_dict)
+        # state_dict = {
+        #     key.replace("feature_extractor.model.", ""): value 
+        #     for key, value in checkpoint["state_dict"].items()
+        #     if key.startswith("feature_extractor.")
+        # }
+        # print(state_dict.keys())
+        # self.feature_extractor.load_state_dict(state_dict)
         self.feature_extractor.eval()
         for param in self.feature_extractor.parameters():
             param.requires_grad= False
+        self.v = fe_dict.v
 
         # Specify fontsize for plots
         self.fs = 16
@@ -208,17 +211,19 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         return (x - min_val) / (max_val - min_val + 1e-8)
         
     def visualize_reconstructs(self, x, reconstruct, labels):
-        x = x.permute(0,2,3,1).cpu()
-        reconstruct = reconstruct.permute(0,2,3,1).cpu()
-
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
+        # # Convert back to [0,1] for plotting
+        # x = (x + 1) / 2
+        # reconstruct = (reconstruct + 1) / 2
 
         # Calculate pixel-wise error + normalize + convert to grey-scale
-        rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
-        error = self.min_max_normalize(self.criterion(x, reconstruct, self.device, reduction='none'))
-        error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
+        # rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
+        # error = self.min_max_normalize(self.criterion(x, reconstruct, self.device, reduction='none'))
+        # error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
+        error = self.heat_map(output=reconstruct, target=x)
+
+        error       = error.permute(0,2,3,1).cpu()
+        x           = x.permute(0,2,3,1).cpu()
+        reconstruct = reconstruct.permute(0,2,3,1).cpu()
 
         img = [x, reconstruct, error]
 
@@ -260,6 +265,116 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_loss.png")
         plt.savefig(plt_dir)
         plt.close()
+
+    def heat_map(self, output, target):
+        '''
+        Compute the anomaly map
+        :param output: the output of the reconstruction
+        :param target: the target image
+        :param FE: the feature extractor
+        :param sigma: the sigma of the gaussian kernel
+        :param i_d: the pixel distance
+        :param f_d: the feature distance
+        '''
+        sigma = 4
+        kernel_size = 2 * int(4 * sigma + 0.5) +1
+        anomaly_map = 0
+
+        output = output#.to(config.model.device)
+        target = target#.to(config.model.device)
+
+        i_d = self.pixel_distance(output, target)
+        f_d = self.feature_distance((output),  (target))
+        f_d = torch.Tensor(f_d)#.to(config.model.device)
+
+        gaussian_blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
+        anomaly_map += f_d + self.v * (torch.max(f_d)/ torch.max(i_d)) * i_d  
+        anomaly_map = gaussian_blur(anomaly_map)
+        anomaly_map = torch.sum(anomaly_map, dim=1).unsqueeze(1)
+        return anomaly_map
+
+    def feature_maps_resnet(self, input, module_name):
+
+        activation = {}
+        def get_activation(name):
+            def hook(model, input, output):
+                activation[name] = output.detach()
+            return hook
+        if module_name == 'layer2':
+            self.feature_extractor.layer2.register_forward_hook(get_activation(module_name))
+        if module_name == 'layer3':
+            self.feature_extractor.layer3.register_forward_hook(get_activation(module_name))
+
+        self.feature_extractor(input)
+
+        return activation[module_name]
+
+    def pixel_distance(self, output, target):
+        '''
+        Pixel distance between image1 and image2
+        '''
+        distance_map = torch.mean(torch.abs(output - target), dim=1).unsqueeze(1)
+        return distance_map
+
+    def feature_distance(self, output, target):
+        '''
+        Feature distance between output and target
+        '''
+        self.feature_extractor.eval()
+        transform = transforms.Compose([
+                transforms.Lambda(lambda t: (t + 1) / (2)),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            ])
+        target = transform(target)
+        output = transform(output)
+
+        input_features = [self.feature_maps_resnet(target, 'layer2'), 
+                           self.feature_maps_resnet(target, 'layer3')]
+        
+        output_features = [self.feature_maps_resnet(output, 'layer2'), 
+                           self.feature_maps_resnet(output, 'layer3')]
+
+        out_size = output.shape[-1]
+        anomaly_map = torch.zeros([input_features[0].shape[0] ,1 ,out_size, out_size])#to(config.model.device)
+        for i in range(len(input_features)):
+            if i == 0:
+                continue
+            a_map = 1 - F.cosine_similarity(self.patchify(input_features[i]), self.patchify(output_features[i]))
+            a_map = torch.unsqueeze(a_map, dim=1)
+            a_map = F.interpolate(a_map, size=out_size, mode='bilinear', align_corners=True)
+            anomaly_map += a_map
+        return anomaly_map 
+
+    def patchify(self, features, return_spatial_info=False):
+        """Convert a tensor into a tensor of respective patches.
+        Args:
+            x: [torch.Tensor, bs x c x w x h]
+        Returns:
+            x: [torch.Tensor, bs * w//stride * h//stride, c, patchsize,
+            patchsize]
+        """
+        patchsize = 3
+        stride = 1
+        padding = int((patchsize - 1) / 2)
+        unfolder = torch.nn.Unfold(
+            kernel_size=patchsize, stride=stride, padding=padding, dilation=1
+        )
+        unfolded_features = unfolder(features)
+        number_of_total_patches = []
+        for s in features.shape[-2:]:
+            n_patches = (
+                s + 2 * padding - 1 * (patchsize - 1) - 1
+            ) / stride + 1
+            number_of_total_patches.append(int(n_patches))
+        unfolded_features = unfolded_features.reshape(
+            *features.shape[:2], patchsize, patchsize, -1
+        )
+        unfolded_features = unfolded_features.permute(0, 4, 1, 2, 3)
+        max_features = torch.mean(unfolded_features, dim=(3,4))
+        features = max_features.reshape(features.shape[0], int(math.sqrt(max_features.shape[1])) , int(math.sqrt(max_features.shape[1])), max_features.shape[-1]).permute(0,3,1,2)
+        if return_spatial_info:
+            return unfolded_features, number_of_total_patches
+        return features
 
     def _log_histogram(self):
 

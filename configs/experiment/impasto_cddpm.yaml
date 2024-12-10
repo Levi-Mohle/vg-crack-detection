@@ -36,9 +36,10 @@ model:
     noise_scheduler:
       num_train_timesteps: 1000
     fe_dict:
+      v: 1
       ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-09_16-26-30_FE_2/checkpoints/last.ckpt'
     target: 2
-    num_condition_steps: 200
+    num_condition_steps: 50
     condition_weight: 3
     
 trainer:

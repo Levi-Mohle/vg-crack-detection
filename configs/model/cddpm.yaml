@@ -14,6 +14,7 @@ scheduler:
 
 fe_dict:
   ckpt_path: ''
+  v: 1
 criterion:
   _target_: src.models.components.loss_functions.losses.MSE_loss
 
