@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
+from torchvision.models import resnet18
 
 class ConditionalDenoisingDiffusionLitModule(LightningModule):
     def __init__(
@@ -17,6 +18,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         criterion: torch.nn.Module,
+        fe_dict: DictConfig,
         noise_scheduler,
         compile,
         target: int,
@@ -45,6 +47,16 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         self.num_condition_steps = num_condition_steps
         self.condition_weight = condition_weight
         
+
+        self.feature_extractor = resnet18()
+        checkpoint = torch.load(fe_dict.ckpt_path)
+        print(checkpoint["state_dict"])
+        state_dict = {key.replace("model.", ""): value for key, value in checkpoint["state_dict"].items()}
+        self.feature_extractor.load_state_dict(state_dict)
+        self.feature_extractor.eval()
+        for param in self.feature_extractor.parameters():
+            param.requires_grad= False
+
         # Specify fontsize for plots
         self.fs = 16
 

@@ -12,8 +12,10 @@ scheduler:
   step_size: 1
   gamma: 0.99
 
+fe_dict:
+  ckpt_path: ''
 criterion:
-  _target_: src.models.components.loss_functions.losses.SSIM_loss
+  _target_: src.models.components.loss_functions.losses.MSE_loss
 
 noise_scheduler:
   _target_: diffusers.schedulers.DDPMScheduler

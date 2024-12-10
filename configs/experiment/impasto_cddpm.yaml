@@ -35,6 +35,8 @@ model:
       out_channels: 3
     noise_scheduler:
       num_train_timesteps: 1000
+    fe_dict:
+      ckpt_path: ''
     target: 2
     num_condition_steps: 200
     condition_weight: 3
