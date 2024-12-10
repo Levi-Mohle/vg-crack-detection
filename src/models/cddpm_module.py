@@ -49,9 +49,13 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         
 
         self.feature_extractor = resnet18()
-        checkpoint = torch.load(fe_dict.ckpt_path)
-        print(checkpoint["state_dict"])
-        state_dict = {key.replace("model.", ""): value for key, value in checkpoint["state_dict"].items()}
+        # checkpoint = torch.load(fe_dict.ckpt_path)
+        state_dict = {
+            key.replace("feature_extractor.model.", ""): value 
+            for key, value in checkpoint["state_dict"].items()
+            if key.startswith("feature_extractor.")
+        }
+        print(state_dict.keys())
         self.feature_extractor.load_state_dict(state_dict)
         self.feature_extractor.eval()
         for param in self.feature_extractor.parameters():
