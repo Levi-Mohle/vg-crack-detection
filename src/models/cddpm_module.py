@@ -17,15 +17,12 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
     def __init__(
         self, 
         unet: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler,
         criterion: torch.nn.Module,
+        unet_dict: DictConfig,
         fe_dict: DictConfig,
         noise_scheduler,
         compile,
         target: int,
-        num_condition_steps: int,
-        condition_weight: float,
         paths: DictConfig,
     ):
         """ImageFlow.
@@ -38,30 +35,43 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         self.save_hyperparameters(logger=False)
         self.save_hyperparameters(ignore=['unet', 'criterion'])
 
-        self.model              = unet
-        self.noise_scheduler    = noise_scheduler
+        # Import pretrained unet
+        self.unet_dict                  = unet_dict
+        self.unet_model                 = unet 
+        checkpoint = torch.load(self.unet_dict.ckpt_path)
+        # Fix issue with dict names
+        state_dict = {key.replace("model.", ""): value for key, value in checkpoint["state_dict"].items()}
+        self.unet_model.load_state_dict(state_dict)
+        self.unet_model.eval() 
+        for param in self.unet_model.parameters():
+            param.requires_grad= False   
+
+        self.noise_scheduler            = noise_scheduler
+
+        self.fe_dict                  = fe_dict
+        if self.fe_dict.use_FE:
+        # Import pretrained feature extractor
+            self.feature_extractor = resnet18()
+            checkpoint = torch.load(self.fe_dict.ckpt_path)
+            # Fix issue with dict names
+            state_dict = {
+                key.replace("feature_extractor.model.", ""): value 
+                for key, value in checkpoint["state_dict"].items()
+                if key.startswith("feature_extractor.")
+            }
+            self.feature_extractor.load_state_dict(state_dict)
+            self.feature_extractor.eval()
+            for param in self.feature_extractor.parameters():
+                param.requires_grad= False
+
         self.criterion          = criterion
 
-        # Define which dimension has the target
+        # Define which dimension contains the target
         self.target = target
 
-        # Define start of conditioning 
-        self.num_condition_steps = num_condition_steps
-        self.condition_weight = condition_weight
-        
-
-        self.feature_extractor = resnet18()
-        # checkpoint = torch.load(fe_dict.ckpt_path)
-        # state_dict = {
-        #     key.replace("feature_extractor.model.", ""): value 
-        #     for key, value in checkpoint["state_dict"].items()
-        #     if key.startswith("feature_extractor.")
-        # }
-        # print(state_dict.keys())
-        # self.feature_extractor.load_state_dict(state_dict)
-        self.feature_extractor.eval()
-        for param in self.feature_extractor.parameters():
-            param.requires_grad= False
+        # Define start and weightof conditioning 
+        self.num_condition_steps = self.unet_dict.num_condition_steps
+        self.condition_weight    = self.unet_dict.condition_weight
         self.v = fe_dict.v
 
         # Specify fontsize for plots
@@ -71,15 +81,8 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
         
-        self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
         self.test_loss = MeanMetric()
 
-        # Used for inspecting learning curve
-        self.train_epoch_loss   = []
-        self.val_epoch_loss     = []
-
-        # Used for classification 
         self.test_losses = []
         self.test_labels = []
 
@@ -90,31 +93,9 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         else:
             steps = torch.tensor([steps] * x.shape[0], device=self.device)
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
-        residual = self.model(noisy_images, steps).sample
+        residual = self.unet_model(noisy_images, steps).sample
         
         return residual, noise
-    
-    def training_step(self, batch, batch_idx):
-        residual, noise = self(batch[0])
-        loss = self.criterion(residual, noise, self.device)
-        self.log("train/loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        residual, noise = self(batch[0])
-        loss = self.criterion(residual, noise, self.device)
-        self.log("val/loss", loss, prog_bar=True)
-
-    def on_train_epoch_end(self) -> None:
-        """Lightning hook that is called when a training epoch ends."""
-        self.train_epoch_loss.append(self.trainer.callback_metrics['train/loss'])
-        
-    def on_validation_epoch_end(self) -> None:
-        """Lightning hook that is called when a validation epoch ends."""
-        self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        # if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
-        #     x_hat = self.sample(num_samples=16)
-        #     self.visualize_samples(x_hat)
             
     def test_step(self, batch, batch_idx):
         x = batch[0]
@@ -125,8 +106,6 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         reconstruct = self.reconstruction(x)
         losses = self.criterion(x,reconstruct, self.device, reduction='batch')
         self.last_test_batch = [x, reconstruct, batch[2]]
-        # In case you want to evaluate on just the MSE from the Unet
-        # losses = self.criterion(residual, noise, self.device, reduction='none')
 
         self.test_losses.append(losses)
         self.test_labels.append(batch[self.target])
@@ -138,18 +117,18 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         
         # Visualizations
         # self.visualize_samples(x_hat)
-        self.plot_loss()
         self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
         self._log_histogram()
 
         # Clear variables
-        self.train_epoch_loss.clear()
-        self.val_epoch_loss.clear()
         self.test_losses.clear()
         self.test_labels.clear()
     
+    @torch.no_grad()
     def reconstruction(self, x):
         Tc = self.num_condition_steps
+        skip = self.unet_dict.skip
+        eta = self.unet_dict.eta
 
         # Define target
         y = x
@@ -158,52 +137,75 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         t = torch.tensor([Tc] * x.shape[0], device=self.device)
         xt = self.noise_scheduler.add_noise(x, torch.randn_like(x), t)
 
-        # Implementation from Mousakha et al, 2023
-        for timestep in range(Tc, 0, -1):
-            t = torch.tensor([timestep] * x.shape[0], device=self.device)
-            e = self.model(xt, t)['sample']
-            
-            var         = self.noise_scheduler._get_variance(timestep)
-            alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
-            alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
-            
-            yt = self.noise_scheduler.add_noise(y, e, t)
-            e_hat = e - self.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
-            ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
-            xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-var) * e_hat + torch.sqrt(var) * torch.randn_like(xt)
+        
+        if self.fe_dict.use_DDIM:
+            # Implementation from Mousakha et al, 2023
+            seq = range(1 , Tc+1, skip)
+            seq_next = [0] + list(seq[:-1])
+            for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
+                t = torch.tensor([i] * x.shape[0], device=self.device)
+                
+                e = self.unet_model(xt, t)['sample']
+                
+                alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
+                alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
+                sigma = eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
+                
+                yt = self.noise_scheduler.add_noise(y, e, t)
+                
+                e_hat = e - self.unet_dict.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
+                ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
+                
+                xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-sigma**2) * e_hat + sigma * torch.randn_like(xt)
+
+        else:
+            # Implementation of DDPM from Ho et al, 2020
+            for timestep in range(Tc, 0, -1):
+                t = torch.tensor([timestep] * x.shape[0], device=self.device)
+                e = self.unet_model(xt, t)['sample']
+                
+                # var         = self.noise_scheduler._get_variance(timestep)
+                alpha            = self.noise_scheduler.alphas[timestep]
+                alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
+                alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
+                sigma = eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
+                
+                yt = self.noise_scheduler.add_noise(y, e, t)
+                e_hat = e - self.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
+                xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e_hat) + sigma * torch.randn_like(xt)
 
         return xt
     
-    @torch.no_grad()
-    def sample(self, num_samples, x=None, steps=None):
-        img_size = self.model.config.sample_size
-        channels = self.model.config.in_channels
-        if steps == None:
-            steps = self.noise_scheduler.config.num_train_timesteps
-            x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
+    # @torch.no_grad()
+    # def sample(self, num_samples, x=None, steps=None):
+    #     img_size = self.model.config.sample_size
+    #     channels = self.model.config.in_channels
+    #     if steps == None:
+    #         steps = self.noise_scheduler.config.num_train_timesteps
+    #         x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
 
-        for timestep in range(steps-1, 0, -1):
-            t = torch.tensor([timestep] * num_samples, device=self.device)
-            noise_pred = self.model(x, t)['sample']
-            x = self.noise_scheduler.step(noise_pred, timestep , x, generator=None)['prev_sample']
+    #     for timestep in range(steps-1, 0, -1):
+    #         t = torch.tensor([timestep] * num_samples, device=self.device)
+    #         noise_pred = self.model(x, t)['sample']
+    #         x = self.noise_scheduler.step(noise_pred, timestep , x, generator=None)['prev_sample']
             
-        x = (x + 1.) / 2.
-        return torch.clamp(x, min=0, max=1)
+    #     x = (x + 1.) / 2.
+    #     return torch.clamp(x, min=0, max=1)
         
-    @torch.no_grad()
-    def visualize_samples(self, x):
-        # Create figure
-        grid = make_grid(x, nrow=int(np.sqrt(x.shape[0])))
-        plt.figure(figsize=(12,12))
-        plt.imshow(grid.permute(1,2,0).cpu().squeeze(), cmap='gray')
-        plt.axis('off')
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_epoch_sample.png")
-        plt.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-        # os.remove(image_path)
+    # @torch.no_grad()
+    # def visualize_samples(self, x):
+    #     # Create figure
+    #     grid = make_grid(x, nrow=int(np.sqrt(x.shape[0])))
+    #     plt.figure(figsize=(12,12))
+    #     plt.imshow(grid.permute(1,2,0).cpu().squeeze(), cmap='gray')
+    #     plt.axis('off')
+    #     plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_epoch_sample.png")
+    #     plt.savefig(plt_dir)
+    #     plt.close()
+    #     # Send figure as artifact to logger
+    #     if self.logger.__class__.__name__ == "MLFlowLogger":
+    #         self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+    #     # os.remove(image_path)
     
     def min_max_normalize(self, x):
         min_val = x.amin(dim=(0,1,2), keepdim=True)
@@ -212,22 +214,29 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         
     def visualize_reconstructs(self, x, reconstruct, labels):
         # # Convert back to [0,1] for plotting
-        # x = (x + 1) / 2
-        # reconstruct = (reconstruct + 1) / 2
+        x           = (x + 1) / 2
+        reconstruct = (reconstruct + 1) / 2
 
-        # Calculate pixel-wise error + normalize + convert to grey-scale
-        # rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
-        # error = self.min_max_normalize(self.criterion(x, reconstruct, self.device, reduction='none'))
-        # error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
-        error = self.heat_map(output=reconstruct, target=x)
+        if self.fe_dict.use_FE:
+            # Calculate error based on L1 + feature based
+            error = self.heat_map(output=reconstruct, target=x)
+        else:
+            # Calculate pixel-wise error + convert to grey-scale
+            error = (x - reconstruct)**2
+            rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140]).to(self.device)
+            error = torch.tensordot(error, rgb_weights, dims=([1],[0])).unsqueeze(1)
 
+        # Normalize over all batches
+        error = self.min_max_normalize(error)
+
+        # Necessary permutation for plotting
         error       = error.permute(0,2,3,1).cpu()
         x           = x.permute(0,2,3,1).cpu()
         reconstruct = reconstruct.permute(0,2,3,1).cpu()
-
+        
         img = [x, reconstruct, error]
 
-        title = ["Original sample", "Reconstructed Sample", "Pixel-wise Squared Error"]
+        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
         vmax = torch.max(error).item()
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
@@ -243,8 +252,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
                     ax.set_title(f"Label: {labels[col+4*i]}")
                     if (row == 2) & (col == 0):
                         plt.colorbar(im, ax=ax)
-                
-                        
+   
             plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
             fig.savefig(plt_dir)
             plt.close()
@@ -280,12 +288,12 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         kernel_size = 2 * int(4 * sigma + 0.5) +1
         anomaly_map = 0
 
-        output = output#.to(config.model.device)
-        target = target#.to(config.model.device)
+        output = output
+        target = target
 
         i_d = self.pixel_distance(output, target)
         f_d = self.feature_distance((output),  (target))
-        f_d = torch.Tensor(f_d)#.to(config.model.device)
+        f_d = torch.Tensor(f_d)
 
         gaussian_blur = transforms.GaussianBlur(kernel_size=kernel_size, sigma=sigma)
         anomaly_map += f_d + self.v * (torch.max(f_d)/ torch.max(i_d)) * i_d  
@@ -335,10 +343,8 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
                            self.feature_maps_resnet(output, 'layer3')]
 
         out_size = output.shape[-1]
-        anomaly_map = torch.zeros([input_features[0].shape[0] ,1 ,out_size, out_size])#to(config.model.device)
-        for i in range(len(input_features)):
-            if i == 0:
-                continue
+        anomaly_map = torch.zeros([input_features[0].shape[0] ,1 ,out_size, out_size]).to(self.device)
+        for i in self.fe_dict.layer:
             a_map = 1 - F.cosine_similarity(self.patchify(input_features[i]), self.patchify(output_features[i]))
             a_map = torch.unsqueeze(a_map, dim=1)
             a_map = F.interpolate(a_map, size=out_size, mode='bilinear', align_corners=True)
@@ -408,6 +414,8 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         axes[1].legend([f"AUC {auc_score:.2f}"], fontsize = 12)
         axes[1].set_box_aspect(1)
 
+        axes[1].plot([0,1], [0,1], ls="--")
+
         plt.tight_layout()
         fig.subplots_adjust(hspace=0.3)
         
@@ -433,19 +441,6 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         if self.hparams.compile and stage == "fit":
             self.unet = torch.compile(self.unet)
 
-    def configure_optimizers(self):
-        optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
-        if self.hparams.scheduler is not None:
-            scheduler = self.hparams.scheduler(optimizer=optimizer)
-            return {
-                'optimizer': optimizer,
-                'lr_scheduler': 
-                {'scheduler': scheduler, 
-                 'interval': 'epoch', 
-                 'frequency': 1
-                },
-            }
-        return {"optimizer": optimizer}
     
 if __name__ == "__main__":
     _ = ConditionalDenoisingDiffusionLitModule(None, None, None, None, None)

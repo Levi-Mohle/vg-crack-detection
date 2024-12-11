@@ -29,18 +29,21 @@ callbacks:
 
 model:
     criterion:
-      _target_: src.models.components.loss_functions.losses.L1norm
-    unet:
-      in_channels: 3
-      out_channels: 3
-    noise_scheduler:
-      num_train_timesteps: 1000
+      _target_: src.models.components.loss_functions.losses.MSE_loss
+    unet_dict: 
+      # ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-09_10-43-10_DDPM_1000steps/checkpoints/last.ckpt'
+      ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-02_12-46-26_DDPM_1000steps/checkpoints/last.ckpt'
+      num_condition_steps: 200
+      condition_weight: 3
+      skip: 25
+      eta: 1
     fe_dict:
-      v: 1
-      ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-09_16-26-30_FE_2/checkpoints/last.ckpt'
+      v: 10
+      ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-11_10-47-05_FE_DDIM/checkpoints/epoch_002.ckpt'
+      use_DDIM: true
+      use_FE: true
+      layer: [0,1]
     target: 2
-    num_condition_steps: 50
-    condition_weight: 3
     
 trainer:
   min_epochs: 5

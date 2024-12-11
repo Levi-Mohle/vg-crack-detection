@@ -30,6 +30,8 @@ unet_dict:
   ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-09_10-43-10_DDPM_1000steps/checkpoints/last.ckpt'
   num_condition_steps: 250
   condition_weight: 3
+  skip: 25
+  eta: 1
 
 unet:
   _target_: diffusers.models.UNet2DModel

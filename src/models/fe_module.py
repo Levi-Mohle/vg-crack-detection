@@ -135,24 +135,33 @@ class FeatureExtractorLitModule(LightningModule):
     
     def reconstruction(self, x, y):
         Tc = self.unet_dict.num_condition_steps
+        skip = self.unet_dict.skip
+        eta = self.unet_dict.eta
 
         # Start with adding noise at timestep Tc
         t = torch.tensor([Tc] * x.shape[0], device=self.device)
         xt = self.noise_scheduler.add_noise(x, torch.randn_like(x), t)
 
         # Implementation from Mousakha et al, 2023
-        for timestep in range(Tc, 0, -1):
-            t = torch.tensor([timestep] * x.shape[0], device=self.device)
+        seq = range(1 , Tc+1, skip)
+        seq_next = [0] + list(seq[:-1])
+        for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
+            t = torch.tensor([i] * x.shape[0], device=self.device)
+            
             e = self.unet_model(xt, t)['sample']
             
-            var         = self.noise_scheduler._get_variance(timestep)
-            alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
-            alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
+            # var              = self.noise_scheduler._get_variance(i)
+            alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
+            alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
+            sigma = eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
             
             yt = self.noise_scheduler.add_noise(y, e, t)
+            
             e_hat = e - self.unet_dict.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
             ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
-            xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-var) * e_hat + torch.sqrt(var) * torch.randn_like(xt)
+            
+            xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-sigma**2) * e_hat + sigma * torch.randn_like(xt)
+            if torch.isnan(xt).any(): print(f"index i, j: {i}, {j}, {sigma}")
 
         return xt
         

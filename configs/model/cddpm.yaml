@@ -1,20 +1,32 @@
 _target_: src.models.cddpm_module.ConditionalDenoisingDiffusionLitModule
 
-optimizer:
-  _target_: torch.optim.AdamW
-  _partial_: true
-  lr: 0.0002
-  weight_decay: 0.0
+# optimizer:
+#   _target_: torch.optim.AdamW
+#   _partial_: true
+#   lr: 0.0002
+#   weight_decay: 0.0
 
-scheduler:
-  _target_: torch.optim.lr_scheduler.StepLR
-  _partial_: true
-  step_size: 1
-  gamma: 0.99
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.StepLR
+#   _partial_: true
+#   step_size: 1
+#   gamma: 0.99
 
 fe_dict:
   ckpt_path: ''
+  use_DDIM: true
+  use_FE: true
+  layer: [2,3]
   v: 1
+
+
+unet_dict: 
+  ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-09_10-43-10_DDPM_1000steps/checkpoints/last.ckpt'
+  num_condition_steps: 250
+  condition_weight: 3
+  skip: 25
+  eta: 1
+  
 criterion:
   _target_: src.models.components.loss_functions.losses.MSE_loss
 
@@ -86,10 +98,6 @@ unet:
 compile: false
 
 target: 2
-
-num_condition_steps: 250
-
-condition_weight: 3
 
 paths: 
   log_dir: ${paths.output_dir}
