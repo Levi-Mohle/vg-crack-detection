@@ -121,7 +121,7 @@ class ConvAutoEncoderLitModule(LightningModule):
 
         img = [x, reconstruct, error]
 
-        title = ["Original sample", "Reconstructed Sample", "Pixel-wise Squared Error"]
+        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
         vmax = torch.max(error).item()
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
@@ -199,6 +199,8 @@ class ConvAutoEncoderLitModule(LightningModule):
         axes[1].legend([f"AUC {auc_score:.2f}"], fontsize = 12)
         axes[1].set_box_aspect(1)
 
+        axes[1].plot([0,1], [0,1], ls="--")
+        
         plt.tight_layout()
         fig.subplots_adjust(hspace=0.3)
         
