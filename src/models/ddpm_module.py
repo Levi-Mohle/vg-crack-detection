@@ -101,7 +101,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.log("test/loss", loss, prog_bar=True)
 
         x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
-        losses = self.criterion(x,reconstruct, self.device, reduction='none')
+        losses = self.criterion(x,reconstruct, self.device, reduction='batch')
         self.last_test_batch = [x, reconstruct, batch[2]]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
@@ -190,7 +190,7 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         img = [x, reconstruct, error]
 
-        title = ["Original sample", "Reconstructed Sample", "Pixel-wise Squared Error"]
+        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
         vmax = torch.max(error).item()
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
@@ -260,6 +260,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         axes[1].set_xlabel('False Positive Rate', fontsize = self.fs)
         axes[1].legend([f"AUC {auc_score:.2f}"], fontsize = 12)
         axes[1].set_box_aspect(1)
+
+        axes[1].plot([0,1], [0,1], ls="--")
 
         plt.tight_layout()
         fig.subplots_adjust(hspace=0.3)
