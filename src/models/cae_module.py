@@ -83,7 +83,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         loss = self.criterion(x_hat, x, self.device)
         self.log("test/loss", loss, prog_bar=True)
 
-        losses = self.criterion(x,x_hat, self.device, reduction='none')
+        losses = self.criterion(x,x_hat, self.device, reduction='batch')
         self.last_test_batch = [x, x_hat, batch[2]]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
