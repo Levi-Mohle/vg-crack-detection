@@ -130,13 +130,27 @@ class DenoisingDiffusionLitModule(LightningModule):
         # Define noise
         noise = torch.randn(x.shape, device=self.device)
         # Take fraction of steps for forward diffusion process
-        steps = int(coef * self.noise_scheduler.config.num_train_timesteps)
-        steps_tensor = torch.tensor([steps] * x.shape[0], device=self.device)
+        Tc = int(coef * self.noise_scheduler.config.num_train_timesteps)
+        Tc_tensor = torch.tensor([Tc] * x.shape[0], device=self.device)
         # Noise the samples
-        noisy_images = self.noise_scheduler.add_noise(x, noise, steps_tensor)
+        xt = self.noise_scheduler.add_noise(x, noise, Tc_tensor)
         # Reconstruct the samples
-        reconstruct = self.sample(x.shape[0], noisy_images, steps)
+        for timestep in range(Tc, 0, -1):
+                t = torch.tensor([timestep] * x.shape[0], device=self.device)
+                e = self.model(xt, t).sample
+                
+                alpha            = self.noise_scheduler.alphas[timestep]
+                alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
+                alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
+                sigma = torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
 
+                if timestep > 1:
+                    xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) + sigma * torch.randn_like(xt)
+                else:
+                    xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) 
+            
+        reconstruct = xt
+        
         return x, reconstruct
         
     @torch.no_grad()
@@ -191,7 +205,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         img = [x, reconstruct, error]
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
-        vmax = torch.max(error).item()
+        vmax_e = torch.max(error).item()
+        vmax_list = [1, 1, vmax_e]
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
             # create 3x1 subfigs
@@ -201,7 +216,7 @@ class DenoisingDiffusionLitModule(LightningModule):
                 # create 1x3 subplots per subfig
                 axs = subfig.subplots(nrows=1, ncols=4)
                 for col, ax in enumerate(axs):
-                    im = ax.imshow(img[row][col+4*i], vmin=0, vmax=vmax)
+                    im = ax.imshow(img[row][col+4*i], vmin=0, vmax=vmax_list[row])
                     ax.axis("off")
                     ax.set_title(f"Label: {labels[col+4*i]}")
                     if (row == 2) & (col == 0):

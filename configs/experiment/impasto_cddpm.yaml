@@ -40,8 +40,8 @@ model:
     fe_dict:
       v: 10
       ckpt_path: '/data/storage_crack_detection/lightning-hydra-template/logs/train/runs/2024-12-11_10-47-05_FE_DDIM/checkpoints/epoch_002.ckpt'
-      use_DDIM: true
-      use_FE: true
+      use_DDIM: false
+      use_FE: false
       layer: [0,1]
     target: 2
     
