@@ -238,7 +238,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
         vmax_e = torch.max(error).item()
-        vmax_list = [1, 1, vmax_e]
+        vmax_list = [1, 1, 1]
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
             # create 3x1 subfigs

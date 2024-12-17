@@ -200,13 +200,14 @@ class DenoisingDiffusionLitModule(LightningModule):
         # Calculate pixel-wise squared error + normalize + convert to grey-scale
         rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
         error = self.min_max_normalize((x - reconstruct)**2)
+        # error = (x-reconstruct)**2
         error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
 
         img = [x, reconstruct, error]
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
         vmax_e = torch.max(error).item()
-        vmax_list = [1, 1, vmax_e]
+        vmax_list = [1, 1, 1]
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
             # create 3x1 subfigs

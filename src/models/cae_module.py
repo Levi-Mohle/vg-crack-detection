@@ -123,6 +123,7 @@ class ConvAutoEncoderLitModule(LightningModule):
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
         vmax = torch.max(error).item()
+        vmax_list = [1,1,1]
         for i in range(4):
             fig = plt.figure(constrained_layout=True, figsize=(11,9))
             # create 3x1 subfigs
@@ -132,7 +133,7 @@ class ConvAutoEncoderLitModule(LightningModule):
                 # create 1x3 subplots per subfig
                 axs = subfig.subplots(nrows=1, ncols=4)
                 for col, ax in enumerate(axs):
-                    im = ax.imshow(img[row][col+4*i], vmin=0, vmax=vmax)
+                    im = ax.imshow(img[row][col+4*i], vmin=0, vmax=vmax_list[row])
                     ax.axis("off")
                     ax.set_title(f"Label: {labels[col+4*i]}")
                     if (row == 2) & (col == 0):
