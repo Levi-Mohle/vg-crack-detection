@@ -14,6 +14,8 @@ FM_param:
   solver_lib: torchdiffeq
   solver: euler
   pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+  reconstruct: 1
+  target: 1
 
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR

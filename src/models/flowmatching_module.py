@@ -74,7 +74,6 @@ class FlowMatchingLitModule(LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x = batch[0]
-        self.shape = x.shape
         loss = self.conditional_flow_matching_loss(x)
         self.log("val/loss", loss, prog_bar=True)
 
@@ -89,28 +88,29 @@ class FlowMatchingLitModule(LightningModule):
             
     def test_step(self, batch, batch_idx):
         x       = batch[0]
+        self.shape = x.shape
         loss    = self.conditional_flow_matching_loss(x)
         self.log("test/loss", loss, prog_bar=True)
 
-        # x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
-        # losses = self.criterion(x,reconstruct, self.device, reduction='batch')
-        # self.last_test_batch = [x, reconstruct, batch[2]]
+        reconstruct = self.reconstruction(x)
+        losses = torch.mean((x-reconstruct)**2, dim=(1,2,3))
+        self.last_test_batch = [x, reconstruct, batch[2]]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
 
-        # self.test_losses.append(losses)
-        # self.test_labels.append(batch[self.target])
+        self.test_losses.append(losses)
+        self.test_labels.append(batch[self.FM_param.target])
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Sample from gaussian nosie
-        x_hat = self.sample(n_samples=16)
+        # x_hat = self.sample(n_samples=16)
         
         # Visualizations
-        self.visualize_samples(x_hat)
+        # self.visualize_samples(x_hat)
         self.plot_loss()
-        # self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
-        # self._log_histogram()
+        self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
+        self._log_histogram()
 
         # Clear variables
         self.train_epoch_loss.clear()
@@ -164,7 +164,38 @@ class FlowMatchingLitModule(LightningModule):
         samples = samples.clamp(0, 1)
 
         return samples
+    
+    @torch.no_grad()
+    def reconstruction(self, x):
+
+        def f(t: float, x):
+            return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
         
+        if self.FM_param.solver_lib == 'torchdiffeq':
+            if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' \
+            or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver== 'implicit_adams':
+                
+                reconstruct = odeint(f, x, t=torch.linspace(0, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, \
+                                 method=self.FM_param.solver, rtol=1e-5, atol=1e-5)
+            else:
+                reconstruct = odeint(f, x, t=torch.linspace(0, 1, 2).to(self.device), method=self.FM_param.solver, \
+                                 options={'max_num_steps': 1//self.FM_param.step_size}, rtol=1e-5, atol=1e-5)
+            reconstruct = reconstruct[1]
+        else:
+            t=0
+            for i in tqdm(range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))), desc='Sampling', leave=False):
+                v = self(x, torch.full(x_0.shape[:1], t, device=self.device))
+                x = x + self.FM_param.step_size * v
+                t += self.FM_param.step_size
+            reconstruct = x
+        
+        if self.vae is not None:
+            reconstruct = self.vae.decode(reconstruct / 0.18215).sample
+        reconstruct = reconstruct*0.5 + 0.5
+        reconstruct = reconstruct.clamp(0, 1)
+
+        return reconstruct
+    
     @torch.no_grad()
     def visualize_samples(self, x):
         # Create figure
