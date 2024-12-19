@@ -123,7 +123,7 @@ class FlowMatchingLitModule(LightningModule):
         Conditional flow matching loss
         :param x: input image
         '''
-        sigma_min = 1e-4
+        sigma_min = self.FM_param.sigma_min
         t = torch.rand(x.shape[0], device=self.device)
         noise = torch.randn_like(x)
 
@@ -167,7 +167,13 @@ class FlowMatchingLitModule(LightningModule):
     
     @torch.no_grad()
     def reconstruction(self, x):
-
+        
+        sigma_min = self.FM_param.sigma_min
+        tstart = 1 - self.FM_param.reconstruct
+        e = torch.rand_like(x, device=self.device)
+        
+        xt = (1-(1-sigma_min)*tstart)*e + x*tstart
+        
         def f(t: float, x):
             return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
         
@@ -175,19 +181,19 @@ class FlowMatchingLitModule(LightningModule):
             if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' \
             or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver== 'implicit_adams':
                 
-                reconstruct = odeint(f, x, t=torch.linspace(0, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, \
+                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, \
                                  method=self.FM_param.solver, rtol=1e-5, atol=1e-5)
             else:
-                reconstruct = odeint(f, x, t=torch.linspace(0, 1, 2).to(self.device), method=self.FM_param.solver, \
+                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), method=self.FM_param.solver, \
                                  options={'max_num_steps': 1//self.FM_param.step_size}, rtol=1e-5, atol=1e-5)
             reconstruct = reconstruct[1]
         else:
-            t=0
-            for i in tqdm(range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))), desc='Sampling', leave=False):
-                v = self(x, torch.full(x_0.shape[:1], t, device=self.device))
-                x = x + self.FM_param.step_size * v
+            t=tstart
+            for i in range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))):
+                v = self(xt, torch.full(xt.shape[:1], t, device=self.device)).sample
+                xt = xt + self.FM_param.step_size * v
                 t += self.FM_param.step_size
-            reconstruct = x
+            reconstruct = xt
         
         if self.vae is not None:
             reconstruct = self.vae.decode(reconstruct / 0.18215).sample
