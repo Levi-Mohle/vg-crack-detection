@@ -118,7 +118,7 @@ class ConditionalDenoisingDiffusionLitModule(LightningModule):
         # Visualizations
         # self.visualize_samples(x_hat)
         self.visualize_reconstructs(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
-        plot_histogram()
+        plot_histogram(self)
 
         # Clear variables
         self.test_losses.clear()

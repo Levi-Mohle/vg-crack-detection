@@ -34,6 +34,18 @@ class MSE_loss(nn.Module):
         elif reduction == 'batch':
             return torch.mean((x - x_hat)**2, dim=(1,2,3))
 
+class SSE_loss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x_hat, x, device, reduction ='mean'):
+        if reduction == 'none':
+            return (x - x_hat)**2
+        elif reduction == 'mean':
+            return torch.sum((x - x_hat)**2)
+        elif reduction == 'batch':
+            return torch.sum((x - x_hat)**2, dim=(1,2,3))
+
 class L1norm(nn.Module):
     def __init__(self):
         super().__init__()
