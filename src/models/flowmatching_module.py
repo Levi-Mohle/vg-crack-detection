@@ -5,7 +5,8 @@ from diffusers.models import AutoencoderKL
 import numpy as np
 import os
 from torchvision.utils import make_grid
-from sklearn.metrics import roc_auc_score, roc_curve, RocCurveDisplay
+from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix
+from pandas import DataFrame
 import matplotlib.pyplot as plt
 from torchmetrics import MeanMetric
 from lightning import LightningModule
@@ -278,6 +279,26 @@ class FlowMatchingLitModule(LightningModule):
         plt.savefig(plt_dir)
         plt.close()
 
+    def confusion_matrix(y_scores, y_true, thresholds):
+
+        accuracies = []
+        for th in thresholds:
+            y_pred = (y_scores >= th).astype(int)
+            acc = (y_pred == y_true).sum() / len(y_true)
+            accuracies.append(acc)
+
+        best_index = np.argmax(accuracies) 
+        best_th = thresholds[best_index]
+        best_acc = accuracies[best_index]
+        y_pred = (y_scores >= best_th).astype(int)
+
+        cm = confusion_matrix(y_true, y_pred)
+        class_names = ["No crack", "Crack"]
+        cm_df = DataFrame(cm, index=class_names, columns=class_names)
+
+        print(f"Confusion Matrix for best accuracy {best_acc:.3f}:")
+        print(cm_df)
+
     def _log_histogram(self):
 
         y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses])
@@ -286,9 +307,13 @@ class FlowMatchingLitModule(LightningModule):
         auc_score = roc_auc_score(y_true, y_score)
         if auc_score < 0.2:
             auc_score = 1. - auc_score
-        fpr, tpr, _ = roc_curve(y_true, y_score)
+        fpr, tpr, thresholds = roc_curve(y_true, y_score)
         fpr95 = fpr[np.argmax(tpr >= 0.95)]
-            
+        
+        # Print confusion matrix
+        self.confusion_matrix(y_score, y_true, thresholds)
+
+        # Separate ID and OOD samples
         y_id = y_score[np.where(y_true == 0)]
         y_ood = y_score[np.where(y_true != 0)]
 
