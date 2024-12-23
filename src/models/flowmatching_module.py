@@ -279,7 +279,7 @@ class FlowMatchingLitModule(LightningModule):
         plt.savefig(plt_dir)
         plt.close()
 
-    def confusion_matrix(y_scores, y_true, thresholds):
+    def confusion_matrix(self, y_scores, y_true, thresholds):
 
         accuracies = []
         for th in thresholds:
