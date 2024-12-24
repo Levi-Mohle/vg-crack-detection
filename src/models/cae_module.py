@@ -17,8 +17,8 @@ class ConvAutoEncoderLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         criterion: torch.nn.Module,
+        CAE_param: DictConfig
         compile,
-        target: int,
         paths: DictConfig,
     ):
         """ImageFlow.
@@ -32,9 +32,6 @@ class ConvAutoEncoderLitModule(LightningModule):
 
         self.model              = net
         self.criterion          = criterion
-
-        # Define which dimension has the target
-        self.target = target
 
         # Specify fontsize for plots
         self.fs = 16
@@ -59,14 +56,16 @@ class ConvAutoEncoderLitModule(LightningModule):
         return self.model(x)
     
     def training_step(self, batch, batch_idx):
-        x_hat = self(batch[0])
-        loss = self.criterion(x_hat, batch[0], self.device)
+        x = self.select_mode(self.CAE_param.mode)
+        x_hat = self(x)
+        loss = self.criterion(x_hat, x, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x_hat = self(batch[0])
-        loss = self.criterion(x_hat, batch[0], self.device)
+        x = self.select_mode(self.CAE_param.mode)
+        x_hat = self(x)
+        loss = self.criterion(x_hat, x, self.device)
         self.log("val/loss", loss, prog_bar=True)
 
     def on_train_epoch_end(self) -> None:
@@ -78,18 +77,19 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
             
     def test_step(self, batch, batch_idx):
-        x = batch[0]
+        x = self.select_mode(self.CAE_param.mode)
+        y = batch[self.CAE_param.target]
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("test/loss", loss, prog_bar=True)
 
-        losses = self.criterion(x,x_hat, self.device, reduction='batch')
-        self.last_test_batch = [x, x_hat, batch[2]]
+        losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
+        self.last_test_batch = [x, x_hat, y]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
 
         self.test_losses.append(losses)
-        self.test_labels.append(batch[self.target])
+        self.test_labels.append(y)
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
@@ -104,20 +104,41 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.val_epoch_loss.clear()
         self.test_losses.clear()
         self.test_labels.clear()
-    
+
+    def select_mode(mode):
+        if mode == "both"
+            x = torch.cat(batch[0], batch[1])
+        elif mode == "height"
+            x = batch[1]
+        elif mode == "rgb"
+            x = batch[0]
+        return x
+        
+    def reconstruction_loss(self, x, reconstruct, reduction=None):
+        if reduction == None:
+            chl_loss = (x - reconstruct)**2
+        elif reduction == 'batch':
+            chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
+
+        if self.DDPM_param.mode == "both":
+            return (chl_loss[:,0] + self.DDPM_param.wh * chl_loss[:,1]).unsqueeze(1)
+        else:
+            return chl_loss
+            
     def min_max_normalize(self, x):
         min_val = x.amin(dim=(0,1,2), keepdim=True)
         max_val = x.amax(dim=(0,1,2), keepdim=True)
         return (x - min_val) / (max_val - min_val + 1e-8)
         
     def visualize_reconstructs(self, x, reconstruct, labels):
+        
+        # Calculate pixel-wise squared error + normalize
+        error = self.reconstruction_loss(x, reconstruct, reduction=None)
+        error = self.min_max_normalize(error)
+
+        # For plotting reasons
         x = x.permute(0,2,3,1).cpu()
         reconstruct = reconstruct.permute(0,2,3,1).cpu()
-
-        # Calculate pixel-wise squared error + normalize + convert to grey-scale
-        rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
-        error = self.min_max_normalize((x - reconstruct)**2)
-        error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
 
         img = [x, reconstruct, error]
 

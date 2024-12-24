@@ -6,17 +6,17 @@ optimizer:
   lr: 0.0002
   weight_decay: 0.0
 
-# scheduler:
-#   _target_: torch.optim.lr_scheduler.StepLR
-#   _partial_: true
-#   step_size: 1
-#   gamma: 0.99
 scheduler:
-  _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
+  _target_: torch.optim.lr_scheduler.StepLR
   _partial_: true
-  num_warmup_steps: 500
-  num_training_steps: 6400
-  num_cycles: 0.5
+  step_size: 1
+  gamma: 0.99
+# scheduler:
+#   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
+#   _partial_: true
+#   num_warmup_steps: 500
+#   num_training_steps: 6400
+#   num_cycles: 0.5
 
 criterion:
   _target_: src.models.components.loss_functions.losses.SSIM_loss
@@ -80,17 +80,18 @@ unet:
   norm_num_groups: 32
   num_class_embeds: null
   num_train_timesteps: null
-  out_channels: 3
+  out_channels: ${model.unet.in_channels}
   resnet_time_scale_shift: default
   sample_size: 32
   time_embedding_type: positional
   upsample_type: conv
 
+DDPM_param:
+    target: 2
+    reconstruct: 1
+    wh: 1
+    
 compile: false
-
-reconstruct_coef: .2
-
-target: 2
 
 paths: 
   log_dir: ${paths.output_dir}

@@ -18,9 +18,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         scheduler: torch.optim.lr_scheduler,
         criterion: torch.nn.Module,
         noise_scheduler,
+        DDPM_param: DictConfig,
         compile,
-        target: int,
-        reconstruct_coef: float,
         paths: DictConfig,
     ):
         """ImageFlow.
@@ -37,11 +36,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.noise_scheduler    = noise_scheduler
         self.criterion          = criterion
 
-        # Fraction of forward diffusion for reconstructing test images
-        self.reconstruct_coef = reconstruct_coef
-
-        # Define which dimension has the target
-        self.target = target
+        # Configure DDPM related parameters dict
+        self.DDPM_param = DDPM_param
 
         # Specify fontsize for plots
         self.fs = 16
@@ -72,15 +68,26 @@ class DenoisingDiffusionLitModule(LightningModule):
         residual = self.model(noisy_images, steps).sample
         
         return residual, noise
-    
+
+    def select_mode(mode):
+        if mode == "both"
+            x = torch.cat(batch[0], batch[1])
+        elif mode == "height"
+            x = batch[1]
+        elif mode == "rgb"
+            x = batch[0]
+        return x
+        
     def training_step(self, batch, batch_idx):
-        residual, noise = self(batch[0])
+        x = self.select_mode(self.DDPM_param.mode)
+        residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        residual, noise = self(batch[0])
+        x = self.select_mode(self.DDPM_param.mode)
+        residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("val/loss", loss, prog_bar=True)
 
@@ -94,20 +101,34 @@ class DenoisingDiffusionLitModule(LightningModule):
         # if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
         #     x_hat = self.sample(num_samples=16)
         #     self.visualize_samples(x_hat)
-            
+
+    def reconstruction_loss(self, x, reconstruct, reduction=None):
+        if reduction == None:
+            chl_loss = (x - reconstruct)**2
+        elif reduction == 'batch':
+            chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
+
+        if self.DDPM_param.mode == "both":
+            return (chl_loss[:,0] + self.DDPM_param.wh * chl_loss[:,1]).unsqueeze(1)
+        else:
+            return chl_loss
+        
     def test_step(self, batch, batch_idx):
-        residual, noise = self(batch[0])
+        x = self.select_mode(self.DDPM_param.mode)
+        y = batch[self.DDPM_param.target]
+        residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("test/loss", loss, prog_bar=True)
 
-        x, reconstruct = self.partial_diffusion(batch[0], self.reconstruct_coef)
-        losses = self.criterion(x,reconstruct, self.device, reduction='batch')
-        self.last_test_batch = [x, reconstruct, batch[2]]
-        # In case you want to evaluate on just the MSE from the Unet
-        # losses = self.criterion(residual, noise, self.device, reduction='none')
+        # Reconstruct test samples
+        x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
+        # Calculate reconstruction loss used for OOD-detection
+        losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
+        # Save last batch for visualization
+        self.last_test_batch = [x, reconstruct, y]
 
         self.test_losses.append(losses)
-        self.test_labels.append(batch[self.target])
+        self.test_labels.append(y)
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
@@ -145,44 +166,14 @@ class DenoisingDiffusionLitModule(LightningModule):
                 sigma = torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
 
                 if timestep > 1:
-                    xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) + sigma * torch.randn_like(xt)
+                    xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) \
+                    + sigma * torch.randn_like(xt)
                 else:
                     xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) 
             
         reconstruct = xt
         
         return x, reconstruct
-        
-    @torch.no_grad()
-    def sample(self, num_samples, x=None, steps=None):
-        img_size = self.model.config.sample_size
-        channels = self.model.config.in_channels
-        if steps == None:
-            steps = self.noise_scheduler.config.num_train_timesteps
-            x = torch.randn(num_samples, channels, img_size, img_size).to(self.device)
-
-        for timestep in range(steps-1, 0, -1):
-            t = torch.tensor([timestep] * num_samples, device=self.device)
-            noise_pred = self.model(x, t)['sample']
-            x = self.noise_scheduler.step(noise_pred, timestep , x, generator=None)['prev_sample']
-            
-        x = (x + 1.) / 2.
-        return torch.clamp(x, min=0, max=1)
-        
-    @torch.no_grad()
-    def visualize_samples(self, x):
-        # Create figure
-        grid = make_grid(x, nrow=int(np.sqrt(x.shape[0])))
-        plt.figure(figsize=(12,12))
-        plt.imshow(grid.permute(1,2,0).cpu().squeeze(), cmap='gray')
-        plt.axis('off')
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_epoch_sample.png")
-        plt.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-        # os.remove(image_path)
     
     def min_max_normalize(self, x):
         min_val = x.amin(dim=(0,1,2), keepdim=True)
@@ -190,19 +181,18 @@ class DenoisingDiffusionLitModule(LightningModule):
         return (x - min_val) / (max_val - min_val + 1e-8)
         
     def visualize_reconstructs(self, x, reconstruct, labels):
-        x = x.permute(0,2,3,1).cpu()
-        reconstruct = reconstruct.permute(0,2,3,1).cpu()
-
         # Convert back to [0,1] for plotting
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
 
-        # Calculate pixel-wise squared error + normalize + convert to grey-scale
-        rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140])
-        error = self.min_max_normalize((x - reconstruct)**2)
-        # error = (x-reconstruct)**2
-        error = torch.tensordot(error, rgb_weights, dims=([-1],[0]))
+        # Calculate pixel-wise squared error + normalize
+        error = self.reconstruction_loss(x, reconstruct, reduction=None)
+        error = self.min_max_normalize(error)
 
+        # For plotting reasons
+        x = x.permute(0,2,3,1).cpu()
+        reconstruct = reconstruct.permute(0,2,3,1).cpu()
+        
         img = [x, reconstruct, error]
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]

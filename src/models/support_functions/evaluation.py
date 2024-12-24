@@ -85,6 +85,8 @@ def plot_histogram(self):
     plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
     fig.savefig(plt_dir)
     
+    plt.close()
+    
     # Logging plot as figure to mlflow
     # if self.logger.__class__.__name__ == "MLFlowLogger":
     #     self.logger.experiment.log_artifact(local_path = self.image_dir,

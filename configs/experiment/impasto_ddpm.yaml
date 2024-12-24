@@ -39,12 +39,17 @@ model:
       num_train_timesteps: 1000
     target: 2
     reconstruct_coef: 0.2
+    # scheduler:
+    #   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
+    #   _partial_: true
+    #   num_warmup_steps: 500
+    #   num_training_steps: 6400
+    #   num_cycles: 0.5
     scheduler:
-      _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
+      _target_: torch.optim.lr_scheduler.StepLR
       _partial_: true
-      num_warmup_steps: 500
-      num_training_steps: 6400
-      num_cycles: 0.5
+      step_size: 1
+      gamma: 0.99
     
 trainer:
   min_epochs: 5

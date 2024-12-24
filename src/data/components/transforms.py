@@ -50,10 +50,16 @@ def normalize_0_1():
                                         ])
     return transform
 
-def diffuser_to_greyscale():
+def diffuser_to_grayscale():
     transform = transforms.Compose([transforms.ToTensor(),
                                     transforms.Grayscale(),
                                     rescale_diffuser,
+                                        ])
+    return transform
+
+def normalize_0_1_grayscale():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    transforms.Grayscale(),
                                         ])
     return transform
 

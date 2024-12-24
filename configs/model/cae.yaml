@@ -22,9 +22,12 @@ net:
   feature_maps: [64, 32, 16]
   latent_dim: 1
 
+CAE_param:
+    target: 2
+    wh: 1
+    mode: "rgb"
+    
 compile: false
-
-target: 2
 
 paths: 
   log_dir: ${paths.output_dir}
