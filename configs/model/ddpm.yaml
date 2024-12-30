@@ -87,9 +87,11 @@ unet:
   upsample_type: conv
 
 DDPM_param:
+    mode: both
     target: 2
-    reconstruct: 1
+    reconstruct: .05
     wh: 1
+    plot_ids: [0,1,16,17]
     
 compile: false
 
