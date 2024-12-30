@@ -33,12 +33,10 @@ model:
     optimizer:
       lr: 1e-4
     unet:
-      in_channels: 3
-      out_channels: 3
+      in_channels: 2
+      out_channels: 2
     noise_scheduler:
       num_train_timesteps: 1000
-    target: 2
-    reconstruct_coef: 0.2
     # scheduler:
     #   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
     #   _partial_: true
@@ -50,6 +48,12 @@ model:
       _partial_: true
       step_size: 1
       gamma: 0.99
+    DDPM_param:
+      mode: both
+      target: 2
+      reconstruct: .05
+      wh: 1
+      plot_ids: [0]
     
 trainer:
   min_epochs: 5
@@ -60,7 +64,7 @@ trainer:
 data:
   batch_size: 32
   rgb_transform:
-    _target_: src.data.components.transforms.diffuser_normalize
+    _target_: src.data.components.transforms.diffuser_to_grayscale
   height_transform:
     _target_: src.data.components.transforms.diffuser_normalize_height
 
