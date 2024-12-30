@@ -231,13 +231,13 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Calculate pixel-wise squared error per channel + normalize
         error_idv = (x - reconstruct)**2
-        error_idv = self.min_max_normalize(error_idv, dim=(2,3))
+        error_idv = self.min_max_normalize(error_idv, dim=(2,3)).cpu()
 
         # Calculate pixel-wise squared error combined + normalize
         error_comb = self.reconstruction_loss(x, reconstruct, reduction=None)
-        error_comb = self.min_max_normalize(error_comb, dim=(2,3))
+        error_comb = self.min_max_normalize(error_comb, dim=(2,3)).cpu()
         
-        img = [self.min_max_normalize(x, dim=(2,3)), self.min_max_normalize(reconstruct, dim=(2,3)), error_idv, error_comb]
+        img = [self.min_max_normalize(x, dim=(2,3)).cpu(), self.min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
 
         for i in plot_ids:
             fig = plt.figure(constrained_layout=True, figsize=(15,7))
@@ -275,7 +275,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             cax4 = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(im4, cax=cax4)
 
-            im5 = ax5.imshow(img[1][i,1], vmin=0, vmax=1)
+            im5 = ax5.imshow(reconstruct[i,1].cpu())
 
             im6 = ax6.imshow(img[2][i,1], vmin=0, vmax=1)
             divider = make_axes_locatable(ax6)
