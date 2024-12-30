@@ -17,6 +17,9 @@ FM_param:
   sigma_min: 1e-4
   reconstruct: 1
   target: 1
+  mode: rgb
+  wh: 1
+  plot_ids: [0,1,16,17]
 
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR

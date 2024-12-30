@@ -41,6 +41,11 @@ def rescale_diffuser(sample):
     # to float32 is necessary due to subtracting not possible for uint16
     return sample * 2 - 1
 
+def rescale_diffuser_height_idv(x):
+    x = x / 2**16
+    x = (x - x.min()) / (x.max() - x.min() + 1e-8)
+    return x * 2 - 1
+
 #################################################################################
 # Transforms
 #################################################################################
@@ -77,6 +82,12 @@ def diffuser_normalize():
 def diffuser_normalize_height():
     transform = transforms.Compose([transforms.ToTensor(),
                                     rescale_diffuser_height,
+                                        ])
+    return transform
+
+def diffuser_normalize_height_idv():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    rescale_diffuser_height_idv,
                                         ])
     return transform
 

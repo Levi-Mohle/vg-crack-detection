@@ -39,6 +39,9 @@ model:
       reconstruct: 0.2
       target: 2
       solver_lib: null
+      mode: both
+      wh: 1
+      plot_ids: [0]
   
 trainer:
   min_epochs: 5
