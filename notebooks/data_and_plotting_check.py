@@ -15,7 +15,7 @@ from src.data.components.transforms import *
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
                                     batch_size = 32,
-                                    rgb_transform = diffuser_to_grayscale(),
+                                    rgb_transform = diffuser_to_grayscale_idv(),
                                     height_transform = diffuser_normalize_height_idv()
                                     )
 lightning_data.setup()
