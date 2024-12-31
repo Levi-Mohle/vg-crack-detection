@@ -31,8 +31,8 @@ model:
     optimizer:
       lr: 1e-4
     unet:
-      in_channels: 1
-      out_channels: 1
+      in_channels: 2
+      out_channels: 2
     FM_param:
       pretrained: 'data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
@@ -52,9 +52,9 @@ trainer:
 data:
   batch_size: 32
   rgb_transform:
-    _target_: src.data.components.transforms.diffuser_to_greyscale
+    _target_: src.data.components.transforms.diffuser_to_grayscale_idv
   height_transform:
-    _target_: src.data.components.transforms.diffuser_normalize_height
+    _target_: src.data.components.transforms.diffuser_normalize_height_idv
 
 extras:
   print_config: false

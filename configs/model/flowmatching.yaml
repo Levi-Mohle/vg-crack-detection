@@ -8,7 +8,7 @@ optimizer:
 
 FM_param:
   step_size: 0.1
-  warm_up: 10
+  warm_up: 0
   latent: false
   size: 32
   solver_lib: torchdiffeq

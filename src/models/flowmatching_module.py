@@ -101,7 +101,7 @@ class FlowMatchingLitModule(LightningModule):
             chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
 
         if self.FM_param.mode == "both":
-            return (chl_loss[:,0] + self.CAE.wh * chl_loss[:,1]).unsqueeze(1)
+            return (chl_loss[:,0] + self.FM_param.wh * chl_loss[:,1]).unsqueeze(1)
         else:
             return chl_loss
                 
