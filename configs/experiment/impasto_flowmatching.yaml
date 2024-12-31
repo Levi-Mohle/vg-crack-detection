@@ -34,14 +34,15 @@ model:
       in_channels: 2
       out_channels: 2
     FM_param:
+      latent: false
       pretrained: 'data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
       reconstruct: 0.2
       target: 2
-      solver_lib: null
+      solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0]
+      plot_ids: [0, 1, 2, 15, 16, 17]
   
 trainer:
   min_epochs: 5
