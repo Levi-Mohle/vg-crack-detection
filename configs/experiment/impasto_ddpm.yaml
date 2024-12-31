@@ -64,9 +64,9 @@ trainer:
 data:
   batch_size: 32
   rgb_transform:
-    _target_: src.data.components.transforms.diffuser_to_grayscale
+    _target_: src.data.components.transforms.diffuser_to_grayscale_idv
   height_transform:
-    _target_: src.data.components.transforms.diffuser_normalize_height
+    _target_: src.data.components.transforms.diffuser_normalize_height_idv
 
 extras:
   print_config: false
