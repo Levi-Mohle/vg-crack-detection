@@ -1,22 +1,25 @@
 import torch
 import pytorch_lightning as pl
+from lightning import LightningModule
 import torch.nn.functional as F
 from contextlib import contextmanager
 
 from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
-from ldm.modules.diffusionmodules.model import Encoder, Decoder
-from ldm.modules.distributions.distributions import DiagonalGaussianDistribution
+from src.models.ldm.modules.diffusionmodules.model import Encoder, Decoder
+from src.models.ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 
-from ldm.util import instantiate_from_config
+from src.models.ldm.util import instantiate_from_config
 
 
-class VQModel(pl.LightningModule):
+class VQModel(LightningModule):
     def __init__(self,
+                 base_learning_rate,
                  ddconfig,
                  lossconfig,
                  n_embed,
                  embed_dim,
+                 mode,
                  ckpt_path=None,
                  ignore_keys=[],
                  image_key="image",
@@ -30,6 +33,9 @@ class VQModel(pl.LightningModule):
                  use_ema=False
                  ):
         super().__init__()
+        self.mode = mode
+        self.automatic_optimization = False
+        self.learning_rate = base_learning_rate
         self.embed_dim = embed_dim
         self.n_embed = n_embed
         self.image_key = image_key
@@ -121,11 +127,20 @@ class VQModel(pl.LightningModule):
             return dec, diff, ind
         return dec, diff
 
+    def select_mode(self, batch):
+        if self.mode == "both":
+            x = torch.cat((batch[0], batch[1]), dim=1)
+        elif self.mode == "height":
+            x = batch[1]
+        elif self.mode == "rgb":
+            x = batch[0]
+        return x
+    
     def get_input(self, batch, k):
-        x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
+        x = self.select_mode(batch)
+        # if len(x.shape) == 3:
+        #     x = x[..., None]
+        x = x.to(memory_format=torch.contiguous_format).float()
         if self.batch_resize_range is not None:
             lower_size = self.batch_resize_range[0]
             upper_size = self.batch_resize_range[1]
@@ -139,12 +154,12 @@ class VQModel(pl.LightningModule):
             x = x.detach()
         return x
 
-    def training_step(self, batch, batch_idx, optimizer_idx):
+    def training_step(self, batch, batch_idx):
         # https://github.com/pytorch/pytorch/issues/37142
         # try not to fool the heuristics
         x = self.get_input(batch, self.image_key)
         xrec, qloss, ind = self(x, return_pred_indices=True)
-
+        optimizer_idx = self.optimizers()
         if optimizer_idx == 0:
             # autoencode
             aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
@@ -174,14 +189,14 @@ class VQModel(pl.LightningModule):
                                         self.global_step,
                                         last_layer=self.get_last_layer(),
                                         split="val"+suffix,
-                                        predicted_indices=ind
+                                        cond=ind
                                         )
 
         discloss, log_dict_disc = self.loss(qloss, x, xrec, 1,
                                             self.global_step,
                                             last_layer=self.get_last_layer(),
                                             split="val"+suffix,
-                                            predicted_indices=ind
+                                            cond=ind
                                             )
         rec_loss = log_dict_ae[f"val{suffix}/rec_loss"]
         self.log(f"val{suffix}/rec_loss", rec_loss,
@@ -343,9 +358,9 @@ class AutoencoderKL(pl.LightningModule):
 
     def get_input(self, batch, k):
         x = batch[k]
-        if len(x.shape) == 3:
-            x = x[..., None]
-        x = x.permute(0, 3, 1, 2).to(memory_format=torch.contiguous_format).float()
+        # if len(x.shape) == 3:
+        #     x = x[..., None]
+        x = x.to(memory_format=torch.contiguous_format).float()
         return x
 
     def training_step(self, batch, batch_idx, optimizer_idx):
