@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from torchvision.transforms import GaussianBlur
 
 # add main folder to working directory
 wd = Path(__file__).parent.parent
@@ -12,6 +13,9 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
+# %% Functions
+
+
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
                                     batch_size = 32,
@@ -30,10 +34,12 @@ print(f"mean diff gray: {torch.mean(avg_diff_gray):.2f}")
 print(f"mean diff height: {torch.mean(avg_diff_height):.2f}")
 
 # %%
-def visualize_reconstructs_2ch(x, reconstruct, plot_ids, fs=12):
+def visualize_reconstructs_2ch(x, plot_ids, fs=12):
         # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
+        # x = (x + 1) / 2
+        # reconstruct = (reconstruct + 1) / 2
+        Blur = GaussianBlur(kernel_size=9)
+        reconstruct = Blur(x)
 
         # Calculate pixel-wise squared error per channel + normalize
         error_idv = (x - reconstruct)**2
@@ -41,13 +47,13 @@ def visualize_reconstructs_2ch(x, reconstruct, plot_ids, fs=12):
 
         # Calculate pixel-wise squared error combined + normalize
         # error_comb = self.reconstruction_loss(x, reconstruct, reduction=None)
-        error_comb = x[:,0] #self.min_max_normalize(error_comb, dim=(2,3))
+        error_comb = error_idv[:,0] + error_idv[:,1] #self.min_max_normalize(error_comb, dim=(2,3))
         
         img = [x, reconstruct, error_idv, error_comb]
 
         for i in plot_ids:
             fig = plt.figure(constrained_layout=True, figsize=(15,7))
-            gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.1)
+            gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
             ax1 = fig.add_subplot(gs[0,0])
             ax2 = fig.add_subplot(gs[0,1])
             ax3 = fig.add_subplot(gs[0,2])
@@ -69,7 +75,7 @@ def visualize_reconstructs_2ch(x, reconstruct, plot_ids, fs=12):
             im2 = ax2.imshow(img[1][i,0], vmin=0, vmax=1)
             ax2.set_title("Reconstructed sample", fontsize =fs)
             
-            im3 = ax3.imshow(img[2][i,0], vmin=0, vmax=1)
+            im3 = ax3.imshow(img[2][i,0], vmin=0)
             ax3.set_title("Anomaly map individual", fontsize =fs)
             divider = make_axes_locatable(ax3)
             cax3 = divider.append_axes("right", size="5%", pad=0.1)
@@ -83,17 +89,18 @@ def visualize_reconstructs_2ch(x, reconstruct, plot_ids, fs=12):
 
             im5 = ax5.imshow(img[1][i,1], vmin=0, vmax=1)
 
-            im6 = ax6.imshow(img[2][i,1], vmin=0, vmax=1)
+            im6 = ax6.imshow(img[2][i,1], vmin=0)
             divider = make_axes_locatable(ax6)
             cax6 = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(im6, cax=cax6)
 
             # Span whole column
-            im7 = ax7.imshow(img[3][i,0], vmin=0, vmax=1)
+            im7 = ax7.imshow(img[3][i], vmin=0)
             ax7.set_title("Anomaly map combined", fontsize =fs)
 
             for ax in axs:
                 ax.axis("off")
 
-visualize_reconstructs_2ch(gray, height, [0])
+x = torch.cat((gray,height), dim=1)
+visualize_reconstructs_2ch(x, [0])
 # %%
