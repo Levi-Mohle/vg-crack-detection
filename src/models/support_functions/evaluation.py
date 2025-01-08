@@ -6,18 +6,39 @@ import os
 
 def plot_loss(self):
 
-        epochs = [i for i in range(1, self.current_epoch + 1)]
-        plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
-        plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], marker='o', linestyle = '-', label = "Validation")
-        plt.xlabel('Epochs', fontsize = self.fs)
-        plt.ylabel('Loss [-]', fontsize = self.fs)
-        plt.legend()
-        plt.title('Training and Validation Loss', fontsize = self.fs)
+    epochs = [i for i in range(1, self.current_epoch + 1)]
+    plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
+    plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], marker='o', linestyle = '-', label = "Validation")
+    plt.xlabel('Epochs', fontsize = self.fs)
+    plt.ylabel('Loss [-]', fontsize = self.fs)
+    plt.legend()
+    plt.title('Training and Validation Loss', fontsize = self.fs)
 
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_loss.png")
-        plt.savefig(plt_dir)
-        plt.close()
+    plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_loss.png")
+    plt.savefig(plt_dir)
+    plt.close()
+
+def plot_loss_VQGAN(self):
+    epochs = [i for i in range(1, self.current_epoch + 1)]
     
+    fig, axes = plt.subplots(1, 2, figsize=(12,6))
+    axes[0].plot(epochs, [t.cpu().numpy() for t in self.train_epoch_aeloss], marker='o', linestyle = '-', label = "Training")
+    axes[0].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_aeloss][1:], marker='o', linestyle = '-', label = "Validation")
+    axes[0].set_xlabel('Epochs', fontsize = self.fs)
+    axes[0].set_ylabel('Loss [-]', fontsize = self.fs)
+    axes[0].legend()
+    axes[0].set_title('Training and Validation Autoencoder Loss', fontsize = self.fs)
+
+    axes[1].plot(epochs, [t.cpu().numpy() for t in self.train_epoch_discloss], marker='o', linestyle = '-', label = "Training")
+    axes[1].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_discloss][1:], marker='o', linestyle = '-', label = "Validation")
+    axes[1].set_xlabel('Epochs', fontsize = self.fs)
+    axes[1].legend()
+    axes[1].set_title('Training and Validation Discriminator Loss', fontsize = self.fs)
+
+    plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_VQGAN_loss.png")
+    plt.savefig(plt_dir)
+    plt.close()
+
 def plot_confusion_matrix(y_scores, y_true, thresholds):
 
         accuracies = []

@@ -12,6 +12,7 @@ from src.models.ldm.modules.diffusionmodules.model import Encoder, Decoder
 from src.models.ldm.modules.distributions.distributions import DiagonalGaussianDistribution
 
 from src.models.ldm.util import instantiate_from_config
+from src.models.support_functions.evaluation import *
 
 
 class VQModel(lightning.LightningModule):
@@ -23,6 +24,7 @@ class VQModel(lightning.LightningModule):
                  embed_dim,
                  mode,
                  paths,
+                 use_logger=False,
                  ckpt_path=None,
                  ignore_keys=[],
                  image_key="image",
@@ -38,8 +40,9 @@ class VQModel(lightning.LightningModule):
         super().__init__()
 
         self.save_hyperparameters(logger=False)
-        
+
         self.mode = mode
+        self.use_logger = use_logger
         self.automatic_optimization = False
         self.learning_rate = base_learning_rate
         self.embed_dim = embed_dim
@@ -72,10 +75,20 @@ class VQModel(lightning.LightningModule):
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
         self.scheduler_config = scheduler_config
         self.lr_g_factor = lr_g_factor
-
+        
+        # Create direction to save images
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
+        
+        # Specify fontsize for plots
+        self.fs = 16
+
+        # Used for inspecting learning curve
+        self.train_epoch_aeloss     = []
+        self.train_epoch_discloss   = []
+        self.val_epoch_aeloss       = []
+        self.val_epoch_discloss     = []
 
     @contextmanager
     def ema_scope(self, context=None):
@@ -170,22 +183,41 @@ class VQModel(lightning.LightningModule):
         # try not to fool the heuristics
         x = self.get_input(batch, self.image_key)
         xrec, qloss, ind = self(x, return_pred_indices=True)
-        optimizer_idx = self.optimizers() # CHANGED
-        if optimizer_idx == 0:
-            # autoencode
-            aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
-                                            last_layer=self.get_last_layer(), split="train",
-                                            predicted_indices=ind)
+        opt_ae, opt_disc = self.optimizers() # CHANGED
 
-            self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-            return aeloss
+        # Manually optimize over 2 optimizers (VQ and GAN)
 
-        if optimizer_idx == 1:
-            # discriminator
-            discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
-                                            last_layer=self.get_last_layer(), split="train")
-            self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True)
-            return discloss
+        # autoencode
+        self.toggle_optimizer(opt_ae)
+        aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0, self.global_step,
+                                        last_layer=self.get_last_layer(), split="train",
+                                        # predicted_indices=ind
+                                        )
+        opt_ae.zero_grad()
+        self.manual_backward(aeloss)
+        opt_ae.step()
+        self.untoggle_optimizer(opt_ae)
+
+        self.log_dict(log_dict_ae, prog_bar=False, logger=self.use_logger, on_step=True, on_epoch=True)
+
+        # discriminator
+        self.toggle_optimizer(opt_disc)
+        discloss, log_dict_disc = self.loss(qloss, x, xrec, 1, self.global_step,
+                                        last_layer=self.get_last_layer(), split="train")
+        self.log_dict(log_dict_disc, prog_bar=False, logger=self.use_logger, on_step=True, on_epoch=True)
+
+        opt_disc.zero_grad()
+        self.manual_backward(discloss)
+        opt_disc.step()
+        self.untoggle_optimizer(opt_disc)
+
+        self.log("train/aeloss", aeloss, prog_bar=True)
+        self.log("train/discloss", discloss, prog_bar=True)
+
+    def on_train_epoch_end(self) -> None:
+        """Lightning hook that is called when a training epoch ends."""
+        self.train_epoch_aeloss.append(self.trainer.callback_metrics['train/aeloss'])
+        self.train_epoch_discloss.append(self.trainer.callback_metrics['train/discloss'])
 
     def validation_step(self, batch, batch_idx):
         log_dict = self._validation_step(batch, batch_idx)
@@ -211,14 +243,21 @@ class VQModel(lightning.LightningModule):
                                             )
         rec_loss = log_dict_ae[f"val{suffix}/rec_loss"]
         self.log(f"val{suffix}/rec_loss", rec_loss,
-                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+                   prog_bar=True, logger=self.use_logger, on_step=False, on_epoch=True, sync_dist=True)
         self.log(f"val{suffix}/aeloss", aeloss,
-                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+                   prog_bar=True, logger=self.use_logger, on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"val{suffix}/discloss", discloss,
+                   prog_bar=True, logger=self.use_logger, on_step=False, on_epoch=True, sync_dist=True)
         if (lightning.__version__) >= '1.4.0':
             del log_dict_ae[f"val{suffix}/rec_loss"]
         self.log_dict(log_dict_ae)
         self.log_dict(log_dict_disc)
         return self.log_dict
+
+    def on_validation_epoch_end(self) -> None:
+        """Lightning hook that is called when a validation epoch ends."""
+        self.val_epoch_aeloss.append(self.trainer.callback_metrics['val/aeloss'])
+        self.val_epoch_discloss.append(self.trainer.callback_metrics['val/discloss'])
 
     def test_step(self, batch, batch_idx):
         log_dict = self._test_step(batch, batch_idx)
@@ -244,15 +283,25 @@ class VQModel(lightning.LightningModule):
                                             )
         rec_loss = log_dict_ae[f"test{suffix}/rec_loss"]
         self.log(f"test{suffix}/rec_loss", rec_loss,
-                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+                   prog_bar=True, logger=self.use_logger, on_step=False, on_epoch=True, sync_dist=True)
         self.log(f"test{suffix}/aeloss", aeloss,
-                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+                   prog_bar=True, logger=self.use_logger, on_step=False, on_epoch=True, sync_dist=True)
         if (lightning.__version__) >= '1.4.0':
             del log_dict_ae[f"test{suffix}/rec_loss"]
         self.log_dict(log_dict_ae)
         self.log_dict(log_dict_disc)
         return self.log_dict
-    
+
+    def on_test_epoch_end(self) -> None:
+        """Lightning hook that is called when a test epoch ends."""
+        plot_loss_VQGAN(self)
+        
+        # Clear variables
+        self.train_epoch_aeloss.clear()
+        self.val_epoch_aeloss.clear()
+        self.train_epoch_discloss.clear()
+        self.val_epoch_discloss.clear()
+
     def configure_optimizers(self):
         lr_d = self.learning_rate
         lr_g = self.lr_g_factor*self.learning_rate
@@ -284,6 +333,7 @@ class VQModel(lightning.LightningModule):
                 },
             ]
             return [opt_ae, opt_disc], scheduler
+        
         return [opt_ae, opt_disc], []
 
     def get_last_layer(self):
@@ -318,6 +368,22 @@ class VQModel(lightning.LightningModule):
         x = F.conv2d(x, weight=self.colorize)
         x = 2.*(x-x.min())/(x.max()-x.min()) - 1.
         return x
+
+def on_test_epoch_end(self) -> None:
+        """Lightning hook that is called when a test epoch ends."""
+        # Sample from gaussian nosie
+        # x_hat = self.sample(num_samples=16)
+        
+        # Visualizations
+        # self.visualize_samples(x_hat)
+        plot_loss(self)
+
+
+        # Clear variables
+        self.train_epoch_loss.clear()
+        self.val_epoch_loss.clear()
+        self.test_losses.clear()
+        self.test_labels.clear()
 
 
 class VQModelInterface(VQModel):
@@ -415,8 +481,8 @@ class AutoencoderKL(pl.LightningModule):
             # train encoder+decoder+logvar
             aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, optimizer_idx, self.global_step,
                                             last_layer=self.get_last_layer(), split="train")
-            self.log("aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False)
+            self.log("aeloss", aeloss, prog_bar=True, logger=self.use_logger, on_step=True, on_epoch=True)
+            self.log_dict(log_dict_ae, prog_bar=False, logger=self.use_logger, on_step=True, on_epoch=False)
             return aeloss
 
         if optimizer_idx == 1:
@@ -424,8 +490,8 @@ class AutoencoderKL(pl.LightningModule):
             discloss, log_dict_disc = self.loss(inputs, reconstructions, posterior, optimizer_idx, self.global_step,
                                                 last_layer=self.get_last_layer(), split="train")
 
-            self.log("discloss", discloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=False)
+            self.log("discloss", discloss, prog_bar=True, logger=self.use_logger, on_step=True, on_epoch=True)
+            self.log_dict(log_dict_disc, prog_bar=False, logger=self.use_logger, on_step=True, on_epoch=False)
             return discloss
 
     def validation_step(self, batch, batch_idx):

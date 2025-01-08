@@ -88,8 +88,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("train"):
         log.info("Starting training!")
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
-        ckpt_path = os.path.join(cfg.callbacks.model_checkpoint.dirpath, "last.ckpt")
-        trainer.save_checkpoint(ckpt_path)
+        # ckpt_path = os.path.join(cfg.callbacks.model_checkpoint.dirpath, "last.ckpt")
+        # trainer.save_checkpoint(ckpt_path)
         
     train_metrics = trainer.callback_metrics
 
