@@ -12,24 +12,26 @@ seed: 12345
 
 callbacks:
     early_stopping:
-        monitor: "val/loss"
+        monitor: "val/rec_loss"
         patience: 15
         mode: "min"
     model_summary:
       max_depth: 1
     model_checkpoint:
         mode: "min"
-        monitor: "val/loss"
+        monitor: "val/rec_loss"
+        dirpath: ${paths.output_dir}/checkpoints
 
 model:
   mode: both
   embed_dim: 3
   ddconfig:
     z_channels: 3
-    in_channels: 2
-    out_ch: 2
+    in_channels: 3
+    out_ch: 3
   lossconfig:
     params:
+      disc_conditional: false
       disc_in_channels: 3
 
 trainer:
@@ -47,3 +49,16 @@ data:
 
 extras:
   print_config: false
+
+logger:
+  csv:
+      prefix: "impasto_VQ-GAN"
+  wandb:
+    tags: ${tags}
+    group: "impasto VQ-GAN"
+  aim:
+    experiment: "impasto VQ-GAN"
+  mlflow:
+    experiment_name: "impasto VQ-GAN"
+  tensorboard:
+    name: "impasto VQ-GAN"

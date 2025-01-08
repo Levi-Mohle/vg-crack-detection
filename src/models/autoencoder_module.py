@@ -1,6 +1,8 @@
 import torch
+import os
+import numpy as np
 import pytorch_lightning as pl
-from lightning import LightningModule
+import lightning
 import torch.nn.functional as F
 from contextlib import contextmanager
 
@@ -12,7 +14,7 @@ from src.models.ldm.modules.distributions.distributions import DiagonalGaussianD
 from src.models.ldm.util import instantiate_from_config
 
 
-class VQModel(LightningModule):
+class VQModel(lightning.LightningModule):
     def __init__(self,
                  base_learning_rate,
                  ddconfig,
@@ -20,6 +22,7 @@ class VQModel(LightningModule):
                  n_embed,
                  embed_dim,
                  mode,
+                 paths,
                  ckpt_path=None,
                  ignore_keys=[],
                  image_key="image",
@@ -33,6 +36,9 @@ class VQModel(LightningModule):
                  use_ema=False
                  ):
         super().__init__()
+
+        self.save_hyperparameters(logger=False)
+        
         self.mode = mode
         self.automatic_optimization = False
         self.learning_rate = base_learning_rate
@@ -58,13 +64,18 @@ class VQModel(LightningModule):
 
         self.use_ema = use_ema
         if self.use_ema:
-            self.model_ema = LitEma(self)
-            print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")
+            pass
+            # self.model_ema = LitEma(self)
+            # print(f"Keeping EMAs of {len(list(self.model_ema.buffers()))}.")
 
         if ckpt_path is not None:
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
         self.scheduler_config = scheduler_config
         self.lr_g_factor = lr_g_factor
+
+        self.log_dir = paths.log_dir
+        self.image_dir = os.path.join(self.log_dir, "images")
+        os.makedirs(self.image_dir, exist_ok=True)
 
     @contextmanager
     def ema_scope(self, context=None):
@@ -129,7 +140,7 @@ class VQModel(LightningModule):
 
     def select_mode(self, batch):
         if self.mode == "both":
-            x = torch.cat((batch[0], batch[1]), dim=1)
+            x = torch.cat((batch[0], batch[1], batch[0]), dim=1)
         elif self.mode == "height":
             x = batch[1]
         elif self.mode == "rgb":
@@ -159,7 +170,7 @@ class VQModel(LightningModule):
         # try not to fool the heuristics
         x = self.get_input(batch, self.image_key)
         xrec, qloss, ind = self(x, return_pred_indices=True)
-        optimizer_idx = self.optimizers()
+        optimizer_idx = self.optimizers() # CHANGED
         if optimizer_idx == 0:
             # autoencode
             aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
@@ -189,26 +200,59 @@ class VQModel(LightningModule):
                                         self.global_step,
                                         last_layer=self.get_last_layer(),
                                         split="val"+suffix,
-                                        cond=ind
+                                        # predicted_indices=ind
                                         )
 
         discloss, log_dict_disc = self.loss(qloss, x, xrec, 1,
                                             self.global_step,
                                             last_layer=self.get_last_layer(),
                                             split="val"+suffix,
-                                            cond=ind
+                                            # predicted_indices=ind
                                             )
         rec_loss = log_dict_ae[f"val{suffix}/rec_loss"]
         self.log(f"val{suffix}/rec_loss", rec_loss,
                    prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
         self.log(f"val{suffix}/aeloss", aeloss,
                    prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
-        if version.parse(pl.__version__) >= version.parse('1.4.0'):
+        if (lightning.__version__) >= '1.4.0':
             del log_dict_ae[f"val{suffix}/rec_loss"]
         self.log_dict(log_dict_ae)
         self.log_dict(log_dict_disc)
         return self.log_dict
 
+    def test_step(self, batch, batch_idx):
+        log_dict = self._test_step(batch, batch_idx)
+        with self.ema_scope():
+            log_dict_ema = self._test_step(batch, batch_idx, suffix="_ema")
+        return log_dict
+
+    def _test_step(self, batch, batch_idx, suffix=""):
+        x = self.get_input(batch, self.image_key)
+        xrec, qloss, ind = self(x, return_pred_indices=True)
+        aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0,
+                                        self.global_step,
+                                        last_layer=self.get_last_layer(),
+                                        split="test"+suffix,
+                                        # predicted_indices=ind
+                                        )
+
+        discloss, log_dict_disc = self.loss(qloss, x, xrec, 1,
+                                            self.global_step,
+                                            last_layer=self.get_last_layer(),
+                                            split="test"+suffix,
+                                            # predicted_indices=ind
+                                            )
+        rec_loss = log_dict_ae[f"test{suffix}/rec_loss"]
+        self.log(f"test{suffix}/rec_loss", rec_loss,
+                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log(f"test{suffix}/aeloss", aeloss,
+                   prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+        if (lightning.__version__) >= '1.4.0':
+            del log_dict_ae[f"test{suffix}/rec_loss"]
+        self.log_dict(log_dict_ae)
+        self.log_dict(log_dict_disc)
+        return self.log_dict
+    
     def configure_optimizers(self):
         lr_d = self.learning_rate
         lr_g = self.lr_g_factor*self.learning_rate

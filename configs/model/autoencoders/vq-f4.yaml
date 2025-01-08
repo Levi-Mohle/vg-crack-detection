@@ -29,3 +29,6 @@ lossconfig:
     disc_start: 0
     disc_weight: 0.75
     codebook_weight: 1.0
+
+paths: 
+  log_dir: ${paths.output_dir}
