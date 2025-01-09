@@ -3,6 +3,7 @@ data_dir: ${paths.data_dir}/impasto
 batch_size: 32 # Needs to be divisible by the number of devices (e.g., if in a distributed setup)
 num_workers: 0
 pin_memory: False
+variant: 32x32
 rgb_transform:
   _target_: src.data.components.transforms.diffuser_normalize
 height_transform:

@@ -5,7 +5,7 @@ from lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
 from src.data.components.loading import HDF5PatchesDatasetCustom
-from src.data.components.path_setup import IMPASTO_test_dir, IMPASTO_train_dir, IMPASTO_val_dir
+from src.data.components.path_setup import impasto_dataset_variant
 
 
 class IMPASTO_DataModule(LightningDataModule):
@@ -54,6 +54,7 @@ class IMPASTO_DataModule(LightningDataModule):
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
+        variant: str = "32x32",
         rgb_transform: transforms.Compose = None,
         height_transform: transforms.Compose = None,
     ) -> None:
@@ -81,6 +82,8 @@ class IMPASTO_DataModule(LightningDataModule):
 
         self.batch_size_per_device = batch_size
         self.data_dir = data_dir
+
+        self.variant = variant
     # @property
     # def num_classes(self) -> int:
     #     """Get the number of classes.
@@ -117,6 +120,7 @@ class IMPASTO_DataModule(LightningDataModule):
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
+        IMPASTO_train_dir, IMPASTO_val_dir, IMPASTO_test_dir = impasto_dataset_variant(self.variant)
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
             self.data_train = HDF5PatchesDatasetCustom(hdf5_file_path   = os.path.join(self.data_dir, IMPASTO_train_dir),
