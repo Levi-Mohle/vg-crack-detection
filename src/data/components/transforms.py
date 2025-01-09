@@ -30,6 +30,11 @@ def normalize_height(x):
     """
     return x / 2**16
 
+def normalize_height_idv(x):
+    # to float32 is necessary due to subtracting not possible for uint16
+    x = x.to(torch.float)
+    return (x - x.min()) / (x.max() - x.min() + 1e-8)
+
 def rescale_diffuser_height(x):
     """
     Function to transform height data from 16bit [0, 65535] to 32float [-1, 1]
@@ -83,6 +88,11 @@ def normalize_0_1_grayscale():
 def normalize_height_0_1():
     transform = transforms.Compose([transforms.ToTensor(),
                                     normalize_height,])
+    return transform
+
+def normalize_height_0_1_idv():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    normalize_height_idv,])
     return transform
 
 def diffuser_normalize():

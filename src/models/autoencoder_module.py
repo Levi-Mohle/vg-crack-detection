@@ -320,11 +320,11 @@ class VQModel(lightning.LightningModule):
         titles = ["grayscale", "height"]
         for i, ax in enumerate(axes.ravel()):
             if i < 4:
-                ax.imshow(x[i//2,i%2])
+                ax.imshow(x[i//2,i%2].cpu())
                 ax.set_title(f"Original sample {titles[i%2]} {i%2}")
                 ax.axis("off")
             else:
-                ax.imshow(xrec[ (i-4)//2, (i-4)%2 ])
+                ax.imshow(xrec[ (i-4)//2, (i-4)%2 ].cpu())
                 ax.set_title(f"Reconstruction {titles[i%2]} {i%2}")
                 ax.axis("off")
 

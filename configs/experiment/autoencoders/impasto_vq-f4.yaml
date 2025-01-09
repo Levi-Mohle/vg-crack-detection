@@ -41,12 +41,12 @@ trainer:
   # gradient_clip_val: 0.5
 
 data:
-  batch_size: 4
+  batch_size: 32
   variant: AE512x512
   rgb_transform:
-    _target_: src.data.components.transforms.diffuser_to_grayscale_idv
+    _target_: src.data.components.transforms.normalize_0_1_grayscale
   height_transform:
-    _target_: src.data.components.transforms.diffuser_normalize_height_idv
+    _target_: src.data.components.transforms.normalize_height_0_1_idv
 
 extras:
   print_config: false
