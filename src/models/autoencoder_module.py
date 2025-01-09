@@ -90,6 +90,9 @@ class VQModel(lightning.LightningModule):
         self.val_epoch_aeloss       = []
         self.val_epoch_discloss     = []
 
+        # Used for classification 
+        self.rec_losses = []
+
     @contextmanager
     def ema_scope(self, context=None):
         if self.use_ema:
@@ -263,6 +266,7 @@ class VQModel(lightning.LightningModule):
         log_dict = self._test_step(batch, batch_idx)
         with self.ema_scope():
             log_dict_ema = self._test_step(batch, batch_idx, suffix="_ema")
+            
         return log_dict
 
     def _test_step(self, batch, batch_idx, suffix=""):
@@ -290,17 +294,45 @@ class VQModel(lightning.LightningModule):
             del log_dict_ae[f"test{suffix}/rec_loss"]
         self.log_dict(log_dict_ae)
         self.log_dict(log_dict_disc)
+        
+        # Save last loss & batch for visualization
+        self.rec_losses.append(rec_loss)
+        self.last_test_batch = [x, xrec]
+
         return self.log_dict
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         plot_loss_VQGAN(self)
+        self.visualize_reconstructs()
         
         # Clear variables
         self.train_epoch_aeloss.clear()
         self.val_epoch_aeloss.clear()
         self.train_epoch_discloss.clear()
         self.val_epoch_discloss.clear()
+        self.rec_losses.clear()
+
+    def visualize_reconstructs(self):
+        x       = self.last_test_batch[0]
+        xrec    = self.last_test_batch[1]
+        fig, axes= plt.subplots(2,4, figsize=(15, 10))
+        titles = ["grayscale", "height"]
+        for i, ax in enumerate(axes.ravel()):
+            if i < 4:
+                ax.imshow(x[i//2,i%2])
+                ax.set_title(f"Original sample {titles[i%2]} {i%2}")
+                ax.axis("off")
+            else:
+                ax.imshow(xrec[ (i-4)//2, (i-4)%2 ])
+                ax.set_title(f"Reconstruction {titles[i%2]} {i%2}")
+                ax.axis("off")
+
+        plt.tight_layout()
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
+        fig.savefig(plt_dir)
+        plt.close()
+
 
     def configure_optimizers(self):
         lr_d = self.learning_rate
