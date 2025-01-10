@@ -89,6 +89,8 @@ class VQModel(lightning.LightningModule):
         self.train_epoch_discloss   = []
         self.val_epoch_aeloss       = []
         self.val_epoch_discloss     = []
+        self.train_epoch_recloss    = []
+        self.val_epoch_recloss      = []
 
         # Used for classification 
         self.rec_losses = []
@@ -196,6 +198,7 @@ class VQModel(lightning.LightningModule):
                                         last_layer=self.get_last_layer(), split="train",
                                         # predicted_indices=ind
                                         )
+        rec_loss = log_dict_ae[f"train/rec_loss"]
         opt_ae.zero_grad()
         self.manual_backward(aeloss)
         opt_ae.step()
@@ -221,6 +224,7 @@ class VQModel(lightning.LightningModule):
         """Lightning hook that is called when a training epoch ends."""
         self.train_epoch_aeloss.append(self.trainer.callback_metrics['train/aeloss'])
         self.train_epoch_discloss.append(self.trainer.callback_metrics['train/discloss'])
+        self.train_epoch_recloss.append(self.trainer.callback_metrics['train/rec_loss'])
 
     def validation_step(self, batch, batch_idx):
         log_dict = self._validation_step(batch, batch_idx)
@@ -231,6 +235,7 @@ class VQModel(lightning.LightningModule):
     def _validation_step(self, batch, batch_idx, suffix=""):
         x = self.get_input(batch, self.image_key)
         xrec, qloss, ind = self(x, return_pred_indices=True)
+        self.last_val_batch = [x, xrec]
         aeloss, log_dict_ae = self.loss(qloss, x, xrec, 0,
                                         self.global_step,
                                         last_layer=self.get_last_layer(),
@@ -261,6 +266,14 @@ class VQModel(lightning.LightningModule):
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_aeloss.append(self.trainer.callback_metrics['val/aeloss'])
         self.val_epoch_discloss.append(self.trainer.callback_metrics['val/discloss'])
+        self.val_epoch_recloss.append(self.trainer.callback_metrics['val/rec_loss'])
+
+        # Plot losses every 5 epochs5 % 
+        if (self.current_epoch % 5 == 0) & (self.current_epoch != 0):
+            plot_loss_VQGAN(self, 2, fs=14)
+            # Visualize reconstructions
+            x, xrec       = self.last_val_batch
+            self.visualize_reconstructs(x, xrec)
 
     def test_step(self, batch, batch_idx):
         log_dict = self._test_step(batch, batch_idx)
@@ -303,8 +316,11 @@ class VQModel(lightning.LightningModule):
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
-        plot_loss_VQGAN(self)
-        self.visualize_reconstructs()
+        plot_loss_VQGAN(self, 1, fs=14)
+
+        # Visualize reconstructions
+        x, xrec       = self.last_test_batch
+        self.visualize_reconstructs(x, xrec)
         
         # Clear variables
         self.train_epoch_aeloss.clear()
@@ -313,19 +329,18 @@ class VQModel(lightning.LightningModule):
         self.val_epoch_discloss.clear()
         self.rec_losses.clear()
 
-    def visualize_reconstructs(self):
-        x       = self.last_test_batch[0]
-        xrec    = self.last_test_batch[1]
+    def visualize_reconstructs(self, x, xrec):
         fig, axes= plt.subplots(2,4, figsize=(15, 10))
         titles = ["grayscale", "height"]
+        sample_nr = [0, 0, 1, 1]
         for i, ax in enumerate(axes.ravel()):
             if i < 4:
                 ax.imshow(x[i//2,i%2].cpu())
-                ax.set_title(f"Original sample {titles[i%2]} {i%2}")
+                ax.set_title(f"Original sample {titles[i%2]} {sample_nr[i%4]}")
                 ax.axis("off")
             else:
-                ax.imshow(xrec[ (i-4)//2, (i-4)%2 ].cpu())
-                ax.set_title(f"Reconstruction {titles[i%2]} {i%2}")
+                ax.imshow(xrec[(i-4)//2, (i-4)%2].cpu())
+                ax.set_title(f"Reconstruction {titles[i%2]} {sample_nr[i%4]}")
                 ax.axis("off")
 
         plt.tight_layout()

@@ -30,6 +30,9 @@ def normalize_height(x):
     """
     return x / 2**16
 
+def normalize_idv(x):
+    return (x - x.min()) / (x.max() - x.min() + 1e-8)
+    
 def normalize_height_idv(x):
     # to float32 is necessary due to subtracting not possible for uint16
     x = x.to(torch.float)
@@ -60,10 +63,29 @@ def rescale_diffuser_height_idv(x):
 # Transforms
 #################################################################################
 
+# General normalization (between [0,1])
 def normalize_0_1():
     transform = transforms.Compose([transforms.ToTensor(),
                                         ])
     return transform
+
+def normalize_0_1_grayscale_idv():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    transforms.Grayscale(),
+                                    normalize_idv])
+    return transform
+
+def normalize_height_0_1():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    normalize_height,])
+    return transform
+
+def normalize_height_0_1_idv():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    normalize_height_idv,])
+    return transform
+
+# Normalization for Diffusers (between [-1,1]
 
 def diffuser_to_grayscale():
     transform = transforms.Compose([transforms.ToTensor(),
@@ -79,21 +101,7 @@ def diffuser_to_grayscale_idv():
                                         ])
     return transform
 
-def normalize_0_1_grayscale():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Grayscale(),
-                                        ])
-    return transform
 
-def normalize_height_0_1():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    normalize_height,])
-    return transform
-
-def normalize_height_0_1_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    normalize_height_idv,])
-    return transform
 
 def diffuser_normalize():
     transform = transforms.Compose([transforms.ToTensor(),

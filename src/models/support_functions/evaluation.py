@@ -18,22 +18,28 @@ def plot_loss(self):
     plt.savefig(plt_dir)
     plt.close()
 
-def plot_loss_VQGAN(self):
+def plot_loss_VQGAN(self, skip, fs=16):
     epochs = [i for i in range(1, self.current_epoch + 1)]
     
-    fig, axes = plt.subplots(1, 2, figsize=(12,6))
+    fig, axes = plt.subplots(1, 3, figsize=(14,4))
     axes[0].plot(epochs, [t.cpu().numpy() for t in self.train_epoch_aeloss], marker='o', linestyle = '-', label = "Training")
-    axes[0].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_aeloss][1:], marker='o', linestyle = '-', label = "Validation")
-    axes[0].set_xlabel('Epochs', fontsize = self.fs)
-    axes[0].set_ylabel('Loss [-]', fontsize = self.fs)
+    axes[0].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_aeloss][skip:], marker='o', linestyle = '-', label = "Validation")
+    axes[0].set_xlabel('Epochs', fontsize = fs)
+    axes[0].set_ylabel('Loss [-]', fontsize = fs)
     axes[0].legend()
-    axes[0].set_title('Training and Validation Autoencoder Loss', fontsize = self.fs)
+    axes[0].set_title("Autoencoder Loss", fontsize = fs)
 
     axes[1].plot(epochs, [t.cpu().numpy() for t in self.train_epoch_discloss], marker='o', linestyle = '-', label = "Training")
-    axes[1].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_discloss][1:], marker='o', linestyle = '-', label = "Validation")
-    axes[1].set_xlabel('Epochs', fontsize = self.fs)
+    axes[1].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_discloss][skip:], marker='o', linestyle = '-', label = "Validation")
+    axes[1].set_xlabel('Epochs', fontsize = fs)
     axes[1].legend()
-    axes[1].set_title('Training and Validation Discriminator Loss', fontsize = self.fs)
+    axes[1].set_title('Discriminator Loss', fontsize = fs)
+
+    axes[2].plot(epochs, [t.cpu().numpy() for t in self.train_epoch_recloss], marker='o', linestyle = '-', label = "Training")
+    axes[2].plot(epochs, [t.cpu().numpy() for t in self.val_epoch_recloss][skip:], marker='o', linestyle = '-', label = "Validation")
+    axes[2].set_xlabel('Epochs', fontsize = fs)
+    axes[2].legend()
+    axes[2].set_title('Reconstruction Loss', fontsize = fs)
 
     plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_VQGAN_loss.png")
     plt.savefig(plt_dir)

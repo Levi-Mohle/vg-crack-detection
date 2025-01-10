@@ -24,9 +24,10 @@ callbacks:
 
 model:
   mode: both
-  embed_dim: 3
+  embed_dim: 256
+  n_embed: 1024
   ddconfig:
-    z_channels: 3
+    z_channels: 256
     in_channels: 3
     out_ch: 3
   lossconfig:
@@ -44,7 +45,7 @@ data:
   batch_size: 32
   variant: AE512x512
   rgb_transform:
-    _target_: src.data.components.transforms.normalize_0_1_grayscale
+    _target_: src.data.components.transforms.normalize_0_1_grayscale_idv
   height_transform:
     _target_: src.data.components.transforms.normalize_height_0_1_idv
 
