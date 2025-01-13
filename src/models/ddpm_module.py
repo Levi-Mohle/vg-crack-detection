@@ -4,6 +4,7 @@ import os
 from diffusers.models import AutoencoderKL
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
+from torchvision.transforms.functional import rgb_to_grayscale
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchmetrics import MeanMetric
@@ -42,8 +43,10 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.DDPM_param = DDPM_param
 
         if self.DDPM_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.DDPM_param.pretrained, \
-                                                    local_files_only=True).to(self.device)
+            self.vae =  AutoencoderKL.from_pretrained(self.DDPM_param.pretrained,
+                                                      local_files_only=True,
+                                                      use_safetensors=True
+                                                     ).to(self.device)
             # Make sure to freeze parameters 
             for param in self.vae.parameters():
                 param.requires_grad= False
@@ -81,6 +84,15 @@ class DenoisingDiffusionLitModule(LightningModule):
         return residual, noise
 
     def select_mode(self, batch, mode):
+        if mode == "both":
+                x = torch.cat((batch[0], batch[1]), dim=1)
+        elif mode == "height":
+            x = batch[1]
+        elif mode == "rgb":
+            x = batch[0]
+        return x
+        
+    def encode_data(self, batch, mode):
         if self.DDPM_param.latent:
             if mode == "both":
                 x1 = batch[0]
@@ -107,14 +119,14 @@ class DenoisingDiffusionLitModule(LightningModule):
         return x
         
     def training_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.DDPM_param.mode)
+        x = self.encode_data(batch, self.DDPM_param.mode)
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.DDPM_param.mode)
+        x = self.encode_data(batch, self.DDPM_param.mode)
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("val/loss", loss, prog_bar=True)
@@ -130,6 +142,23 @@ class DenoisingDiffusionLitModule(LightningModule):
         #     x_hat = self.sample(num_samples=16)
         #     self.visualize_samples(x_hat)
 
+    def decode_data(self, z, mode):
+        if mode=="both":
+            z1, z2 = z[:,:4], z[:,4:]
+            x1 = self.vae.decode(z1/0.18215).sample
+            
+            x2 = self.vae.decode(z2/0.18215).sample
+            # Extract only 1 channel
+            x2 = x2[:,0].unsqueeze(1)
+            return torch.cat((x1,x2), dim=1)
+        elif mode=="rgb":
+            x = self.vae.decode(z/0.18215).sample
+            return x
+        elif mode=="height":
+            x = self.vae.decode(z/0.18215).sample
+            x = x[:,0].unsqueeze(1)
+            return x
+        
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
             chl_loss = (x - reconstruct)**2
@@ -142,7 +171,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             return chl_loss
         
     def test_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.DDPM_param.mode)
+        x = self.encode_data(batch, self.DDPM_param.mode)
         y = batch[self.DDPM_param.target]
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
@@ -150,14 +179,19 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Reconstruct test samples
         x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
-        # Calculate reconstruction loss used for OOD-detection
-        losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
-        # Save last batch for visualization
-        self.last_test_batch = [x, reconstruct, y]
 
-        self.test_losses.append(losses)
-        self.test_labels.append(y)
-        
+        if self.DDPM_param.ood:
+            # Calculate reconstruction loss used for OOD-detection
+            losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
+            self.test_losses.append(losses)
+            self.test_labels.append(y)
+
+        # Pick the second last batch (which is full)
+        if x.shape[0] == self.DDPM_param.batch_size:
+            x = self.select_mode(batch, self.DDPM_param.mode)
+            self.last_test_batch = [x, reconstruct, y]
+
+            
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Sample from gaussian nosie
@@ -165,12 +199,19 @@ class DenoisingDiffusionLitModule(LightningModule):
         
         # Visualizations
         # self.visualize_samples(x_hat)
+
+        # Save last batch for visualization
+        if self.DDPM_param.latent:
+            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.DDPM_param.mode)
+            
         plot_loss(self)
         if self.DDPM_param.mode == "both":
             self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.DDPM_param.plot_ids)
         else:
             self.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
-        plot_histogram(self)
+
+        if self.DDPM_param.ood:
+            plot_histogram(self)
 
         # Clear variables
         self.train_epoch_loss.clear()
@@ -257,6 +298,13 @@ class DenoisingDiffusionLitModule(LightningModule):
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
 
+        if self.DDPM_param.latent:
+            x_gray = rgb_to_grayscale(x[:,:3])
+            x = torch.cat((x_gray, x[:,3:]), dim=1)
+            
+            reconstruct_gray = rgb_to_grayscale(reconstruct[:,:3])
+            reconstruct = torch.cat((reconstruct_gray, reconstruct[:,3:]), dim=1)
+            
         # Calculate pixel-wise squared error per channel + normalize
         error_idv = ((x - reconstruct)**2).cpu()
         # error_idv = self.min_max_normalize(error_idv, dim=(2,3))

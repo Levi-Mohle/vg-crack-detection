@@ -94,6 +94,9 @@ DDPM_param:
     plot_ids: [0,1,16,17]
     latent: false
     pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+    ood: false
+    max_epochs: ${trainer.max_epochs}
+    batch_size: ${data.batch_size}
     
 compile: false
 
