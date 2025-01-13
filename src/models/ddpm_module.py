@@ -131,6 +131,11 @@ class DenoisingDiffusionLitModule(LightningModule):
         loss = self.criterion(residual, noise, self.device)
         self.log("val/loss", loss, prog_bar=True)
 
+        # Reconstruct test samples
+        x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
+        x = self.select_mode(batch, self.DDPM_param.mode)
+        self.last_val_batch = [x, reconstruct]
+
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
         self.train_epoch_loss.append(self.trainer.callback_metrics['train/loss'])
@@ -138,9 +143,16 @@ class DenoisingDiffusionLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        # if (self.current_epoch % 3 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
-        #     x_hat = self.sample(num_samples=16)
-        #     self.visualize_samples(x_hat)
+        if (self.current_epoch % 1 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
+            plot_loss(self)
+            if self.DDPM_param.mode == "both":
+                self.visualize_reconstructs_2ch(self.last_val_batch[0], 
+                                                self.last_val_batch[1],  
+                                                self.DDPM_param.plot_ids)
+            else:
+                self.visualize_reconstructs_1ch(self.last_val_batch[0], 
+                                                self.last_val_batch[1], 
+                                                self.last_val_batch[2])
 
     def decode_data(self, z, mode):
         if mode=="both":
@@ -206,9 +218,13 @@ class DenoisingDiffusionLitModule(LightningModule):
             
         plot_loss(self)
         if self.DDPM_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.DDPM_param.plot_ids)
+            self.visualize_reconstructs_2ch(self.last_test_batch[0], 
+                                            self.last_test_batch[1], 
+                                            self.DDPM_param.plot_ids)
         else:
-            self.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
+            self.visualize_reconstructs_1ch(self.last_test_batch[0], 
+                                            self.last_test_batch[1], 
+                                            self.last_test_batch[2])
 
         if self.DDPM_param.ood:
             plot_histogram(self)
@@ -293,7 +309,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             # if self.logger.__class__.__name__ == "MLFlowLogger":
             #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
     
-    def visualize_reconstructs_2ch(self, x, reconstruct, labels, plot_ids):
+    def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
         # Convert back to [0,1] for plotting
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
