@@ -4,11 +4,11 @@ from sklearn.metrics import roc_curve, roc_auc_score, confusion_matrix
 import matplotlib.pyplot as plt
 import os
 
-def plot_loss(self):
+def plot_loss(self, skip):
 
     epochs = [i for i in range(1, self.current_epoch + 1)]
     plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
-    plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][1:], marker='o', linestyle = '-', label = "Validation")
+    plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][skip:], marker='o', linestyle = '-', label = "Validation")
     plt.xlabel('Epochs', fontsize = self.fs)
     plt.ylabel('Loss [-]', fontsize = self.fs)
     plt.legend()

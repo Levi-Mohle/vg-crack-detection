@@ -144,7 +144,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % 1 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
-            plot_loss(self)
+            plot_loss(self, skip=2)
             if self.DDPM_param.mode == "both":
                 self.visualize_reconstructs_2ch(self.last_val_batch[0], 
                                                 self.last_val_batch[1],  
@@ -216,7 +216,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         if self.DDPM_param.latent:
             self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.DDPM_param.mode)
             
-        plot_loss(self)
+        plot_loss(self, skip=1)
         if self.DDPM_param.mode == "both":
             self.visualize_reconstructs_2ch(self.last_test_batch[0], 
                                             self.last_test_batch[1], 
