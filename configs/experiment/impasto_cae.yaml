@@ -32,13 +32,13 @@ model:
     _target_: src.models.components.loss_functions.losses.MSE_loss
   net:
     _target_: src.models.components.cae_net.AutoEncoder
-    input_channels: 2
+    input_channels: 1
     feature_maps: [64, 32, 16]
     latent_dim: 1
   CAE_param:
     target: 2
     wh: 1
-    mode: "both"
+    mode: "rgb"
     plot_ids: [0]
     
 trainer:
@@ -50,9 +50,9 @@ trainer:
 data:
   batch_size: 32
   rgb_transform:
-    _target_: src.data.components.transforms.normalize_0_1_grayscale
+    _target_: src.data.components.transforms.normalize_0_1_grayscale_idv
   height_transform:
-    _target_: src.data.components.transforms.normalize_height_0_1
+    _target_: src.data.components.transforms.normalize_height_0_1_idv
 
 extras:
   print_config: false
