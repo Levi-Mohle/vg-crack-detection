@@ -92,6 +92,8 @@ DDPM_param:
     reconstruct: .05
     wh: 1
     plot_ids: [0,1,16,17]
+    latent: false
+    pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
     
 compile: false
 

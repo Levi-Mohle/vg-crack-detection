@@ -11,6 +11,8 @@ from omegaconf import DictConfig, OmegaConf
 
 OmegaConf.register_new_resolver("eval", eval)
 
+# os.environ["USE_LIBUV"] = "0"
+
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
@@ -70,7 +72,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     logger: List[Logger] = instantiate_loggers(cfg.get("logger"))
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, strategy="ddp_find_unused_parameters_true")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger) #, strategy="ddp_find_unused_parameters_true"
 
     object_dict = {
         "cfg": cfg,

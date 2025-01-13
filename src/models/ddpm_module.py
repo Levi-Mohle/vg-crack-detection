@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+from diffusers.models import AutoencoderKL
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -9,6 +10,7 @@ from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
 from src.models.support_functions.evaluation import *
+
 
 class DenoisingDiffusionLitModule(LightningModule):
     def __init__(
@@ -38,6 +40,15 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Configure DDPM related parameters dict
         self.DDPM_param = DDPM_param
+
+        if self.DDPM_param.latent:
+            self.vae =  AutoencoderKL.from_pretrained(self.DDPM_param.pretrained, \
+                                                    local_files_only=True).to(self.device)
+            # Make sure to freeze parameters 
+            for param in self.vae.parameters():
+                param.requires_grad= False
+        else:
+            self.vae = None
 
         # Specify fontsize for plots
         self.fs = 16
@@ -70,12 +81,29 @@ class DenoisingDiffusionLitModule(LightningModule):
         return residual, noise
 
     def select_mode(self, batch, mode):
-        if mode == "both":
-            x = torch.cat((batch[0], batch[1]), dim=1)
-        elif mode == "height":
-            x = batch[1]
-        elif mode == "rgb":
-            x = batch[0]
+        if self.DDPM_param.latent:
+            if mode == "both":
+                x1 = batch[0]
+                x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
+                with torch.no_grad():
+                    x1 = self.vae.encode(x1).latent_dist.sample().mul_(0.18215)
+                    x2 = self.vae.encode(x2).latent_dist.sample().mul_(0.18215)
+                x = torch.cat((x1, x2), dim=1)
+            elif mode == "height":
+                x = torch.cat((batch[1], batch[1], batch[1]), dim=1)
+                with torch.no_grad():
+                    x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
+            elif mode == "rgb":
+                x = batch[0]
+                with torch.no_grad():
+                    x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
+        else:
+            if mode == "both":
+                x = torch.cat((batch[0], batch[1]), dim=1)
+            elif mode == "height":
+                x = batch[1]
+            elif mode == "rgb":
+                x = batch[0]
         return x
         
     def training_step(self, batch, batch_idx):

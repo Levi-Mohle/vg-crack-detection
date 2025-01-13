@@ -33,8 +33,8 @@ model:
     optimizer:
       lr: 1e-4
     unet:
-      in_channels: 2
-      out_channels: 2
+      in_channels: 8
+      out_channels: 8
     noise_scheduler:
       num_train_timesteps: 1000
     # scheduler:
@@ -54,6 +54,7 @@ model:
       reconstruct: .05
       wh: 0
       plot_ids: [0,1,3,15,16,17]
+      latent: true
     
 trainer:
   min_epochs: 5
@@ -62,9 +63,9 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-  batch_size: 32
+  batch_size: 8
   rgb_transform:
-    _target_: src.data.components.transforms.diffuser_to_grayscale_idv
+    _target_: src.data.components.transforms.diffuser_normalize
   height_transform:
     _target_: src.data.components.transforms.diffuser_normalize_height_idv
 

@@ -1,10 +1,103 @@
+"""
+Routines to create a preprocessed dataset consisting of mini-patches from a keyence file
+
+    Source Name : preprocess.py
+    Contents    : 
+    Date        : 2025
+
+ """
+
+import numpy as np
+from torch.utils.data import Dataset
+import cv2
+import h5py
+import keyence
+import log
+import torch
+
+############################################################
+# Support functions
+############################################################
+
+def snake_matrix(start, size):
+    """
+    Creates a matrix of size patch_size, which has incremental values starting from start,
+    going in a snake-like structure, starting left upper corner to the right.
+
+    Args:
+        start (int): value of the upperleft corner of the matrix
+        size ([int, int]): size of the matrix
+
+    Returns:
+        end (int): last value of the snake-like matrix
+        snake (np.array): the snake-like matrix itself
+    """
+    # Define matrix
+    snake = np.zeros((size[0], size[1]))
+
+    for x in range(size[0]):
+        if x%2==0:
+            for y in range(size[1]):
+                snake[x,y] = start
+                start += 1
+        else:
+            for y in reversed(range(size[1])):
+                snake[x,y] = start
+                start += 1
+    end = start
+    return end, snake
+
+def index_libary(nr_patches, patch_size):
+    """ Creates a indices matrix which represent main patch indices on first axis and
+        mini-patch indices on second and third axis
+
+    Args:
+        nr_patches (int): Total number of main patches in h5 file
+        patch_size ([int,int]): division of mini-patches in 1 main patch
+
+    Returns:
+        index library (np.array) for all mini-patches of 1 painting
+    """
+    # Create zero array
+    indices = np.zeros((nr_patches, patch_size[0], patch_size[1]))
+
+    start = 0
+    for n in range(nr_patches):
+        start, indices[n,:,:] = snake_matrix(start, patch_size)
+
+    return indices.astype('uint16')
+
+def assign_indices(lst):
+    """ Function to convert main patch indices to a range starting from 0.
+        [3,3,5,7] becomes [0,0,1,2]
+    Args:
+        lst ([int]): list of main patch indices
+    Returns:
+        lst ([int]): list of converted indices
+    """
+    unique_values = sorted(set(lst))
+    value_to_index = {value: idx for idx, value in enumerate(unique_values)}
+
+    return [value_to_index[value] for value in lst]
+
+def encode_data(vae, data):
+    with torch.no_grad():
+        latent = vae.encode(data).latent_dist.sample().mul_(0.18215)
+
+    return latent
+
+############################################################
+# Classes
+############################################################
+
 class HDF5CreatePatchesDataset(Dataset):
     """ A class which creates mini-patches as a Dataset object 
         from height and rgb images directly from a Keyence h5 file
 
     """
     def __init__(self, input_filename, idx_mini_range, patch_size
-                 , inpaint=False, transform=None, down_scale_factor = 1):
+                 , inpaint=False, transform=None, latent=False,
+                 down_scale_factor = 1):
         """
         Args:
             input_filename (str): name of the input file including full path and extension
@@ -19,6 +112,7 @@ class HDF5CreatePatchesDataset(Dataset):
         self.idx_mini_range = idx_mini_range
         self.patch_size = patch_size
         self.transform = transform
+        self.latent = latent
         self.down_scale_factor = down_scale_factor
 
         # Open the input Keyence data file for reading, and read some required parameters from it
