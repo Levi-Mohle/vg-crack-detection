@@ -145,6 +145,9 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % 1 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
             plot_loss(self, skip=2)
+            if self.DDPM_param.latent:
+                self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
+                                                           self.DDPM_param.mode)    
             if self.DDPM_param.mode == "both":
                 self.visualize_reconstructs_2ch(self.last_val_batch[0], 
                                                 self.last_val_batch[1],  
