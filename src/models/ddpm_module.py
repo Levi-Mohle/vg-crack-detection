@@ -133,8 +133,11 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Reconstruct test samples
         x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
-        x = self.select_mode(batch, self.DDPM_param.mode)
-        self.last_val_batch = [x, reconstruct]
+
+        # Pick the second last batch (which is full)
+        if x.shape[0] == self.DDPM_param.batch_size:
+            x = self.select_mode(batch, self.DDPM_param.mode)
+            self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -143,7 +146,7 @@ class DenoisingDiffusionLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % 1 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
+        if (self.current_epoch % 2 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
             plot_loss(self, skip=2)
             if self.DDPM_param.latent:
                 self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
