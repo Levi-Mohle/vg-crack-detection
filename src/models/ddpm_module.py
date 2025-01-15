@@ -204,8 +204,9 @@ class DenoisingDiffusionLitModule(LightningModule):
             self.test_losses.append(losses)
             self.test_labels.append(y)
 
-        # Pick the second last batch (which is full)
-        if x.shape[0] == self.DDPM_param.batch_size:
+
+        # Pick the last full batch or
+        if (x.shape[0] == self.DDPM_param.batch_size) or (batch_idx == 0):
             x = self.select_mode(batch, self.DDPM_param.mode)
             self.last_test_batch = [x, reconstruct, y]
 
