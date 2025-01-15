@@ -336,7 +336,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
         
         img = [self.min_max_normalize(x, dim=(2,3)).cpu(), self.min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
-
+        extent = [0,4,0,4]
         for i in plot_ids:
             fig = plt.figure(constrained_layout=True, figsize=(15,7))
             gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
@@ -351,41 +351,60 @@ class DenoisingDiffusionLitModule(LightningModule):
             axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
 
             # Plot
-            im1 = ax1.imshow(img[0][i,0], vmin=0, vmax=1)
+            im1 = ax1.imshow(img[0][i,0], extent=extent, vmin=0, vmax=1)
+            ax1.set_yticks([0,1,2,3,4])
+            ax1.tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
             ax1.set_title("Original sample", fontsize =self.fs)
-            ax1.text(-0.1, 0.5, "Gray-scale", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
+            ax1.set_ylabel("Y [mm]")
+            ax1.text(-0.3, 0.5, "Gray-scale", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
             divider = make_axes_locatable(ax1)
             cax1 = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(im1, cax=cax1)
 
-            im2 = ax2.imshow(img[1][i,0], vmin=0, vmax=1)
+            im2 = ax2.imshow(img[1][i,0], extent=extent, vmin=0, vmax=1)
+            ax2.set_yticks([0,1,2,3,4])
+            ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
             ax2.set_title("Reconstructed sample", fontsize =self.fs)
             
-            im3 = ax3.imshow(img[2][i,0], vmin=0)
+            im3 = ax3.imshow(img[2][i,0], extent=extent, vmin=0)
+            ax3.set_yticks([0,1,2,3,4])
+            ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
             ax3.set_title("Anomaly map individual", fontsize =self.fs)
             divider = make_axes_locatable(ax3)
             cax3 = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(im3, cax=cax3)
 
-            im4 = ax4.imshow(img[0][i,1], vmin=0, vmax=1) 
-            ax4.text(-0.1, 0.5, "Height", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax4.transAxes)
+            im4 = ax4.imshow(img[0][i,1], extent=extent, vmin=0, vmax=1)
+            ax4.set_yticks([0,1,2,3,4])
+            ax4.set_xlabel("X [mm]")
+            ax4.set_ylabel("Y [mm]")
+            ax4.text(-0.3, 0.5, "Height", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax4.transAxes)
             divider = make_axes_locatable(ax4)
             cax4 = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(im4, cax=cax4)
 
-            im5 = ax5.imshow(reconstruct[i,1].cpu())
+            im5 = ax5.imshow(reconstruct[i,1].cpu(), extent=extent)
+            ax5.set_yticks([0,1,2,3,4])
+            ax5.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
+            ax5.set_xlabel("X [mm]")
 
-            im6 = ax6.imshow(img[2][i,1], vmin=0)
+            im6 = ax6.imshow(img[2][i,1], extent=extent, vmin=0)
+            ax6.set_yticks([0,1,2,3,4])
+            ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
+            ax6.set_xlabel("X [mm]")
             divider = make_axes_locatable(ax6)
             cax6 = divider.append_axes("right", size="5%", pad=0.1)
             plt.colorbar(im6, cax=cax6)
 
             # Span whole column
-            im7 = ax7.imshow(img[3][i,0], vmin=0)
+            im7 = ax7.imshow(img[3][i,0], extent=extent, vmin=0)
             ax7.set_title("Anomaly map combined", fontsize =self.fs)
+            ax7.set_yticks([0,1,2,3,4])
+            ax7.set_xlabel("X [mm]")
+            ax7.set_ylabel("Y [mm]")
 
-            for ax in axs:
-                ax.axis("off")
+            # for ax in axs:
+                # ax.axis("off")
 
             plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
             fig.savefig(plt_dir)
