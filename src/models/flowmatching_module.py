@@ -34,10 +34,18 @@ class FlowMatchingLitModule(LightningModule):
         self.save_hyperparameters(ignore=['unet'])
 
         self.unet              = unet
+
+        # Configure FM related parameters dict
         self.FM_param          = FM_param
 
         if self.FM_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained, local_files_only=True).to(self.device) 
+            self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
+                                                      local_files_only=True,
+                                                      use_safetensors=True
+                                                     ).to(self.device)
+            # Make sure to freeze parameters 
+            for param in self.vae.parameters():
+                param.requires_grad= False
         else:
             self.vae = None
 
@@ -72,8 +80,46 @@ class FlowMatchingLitModule(LightningModule):
             x = batch[0]
         return x
     
+    def encode_data(self, batch, mode):
+        if self.FM_param.latent:
+            if mode == "both":
+                x1 = batch[0]
+                x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
+                with torch.no_grad():
+                    x1 = self.vae.encode(x1).latent_dist.sample().mul_(0.18215)
+                    x2 = self.vae.encode(x2).latent_dist.sample().mul_(0.18215)
+                x = torch.cat((x1, x2), dim=1)
+            elif mode == "height":
+                x = torch.cat((batch[1], batch[1], batch[1]), dim=1)
+                with torch.no_grad():
+                    x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
+            elif mode == "rgb":
+                x = batch[0]
+                with torch.no_grad():
+                    x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
+        else:
+            x = self.select_mode(batch, mode)
+        return x
+    
+    def decode_data(self, z, mode):
+        if mode=="both":
+            z1, z2 = z[:,:4], z[:,4:]
+            x1 = self.vae.decode(z1/0.18215).sample
+            
+            x2 = self.vae.decode(z2/0.18215).sample
+            # Extract only 1 channel
+            x2 = x2[:,0].unsqueeze(1)
+            return torch.cat((x1,x2), dim=1)
+        elif mode=="rgb":
+            x = self.vae.decode(z/0.18215).sample
+            return x
+        elif mode=="height":
+            x = self.vae.decode(z/0.18215).sample
+            x = x[:,0].unsqueeze(1)
+            return x
+        
     def training_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.FM_param.mode)
+        x = self.encode_data(batch, self.FM_param.mode)
         if self.vae is not None:
             x = self.vae.encode(x).latent_dist.sample().mul_(0.1821)
         
@@ -82,9 +128,17 @@ class FlowMatchingLitModule(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.FM_param.mode)
+        x = self.encode_data(batch, self.FM_param.mode)
         loss = self.conditional_flow_matching_loss(x)
         self.log("val/loss", loss, prog_bar=True)
+
+        # Reconstruct test samples
+        x, reconstruct = self.reconstruction(x)
+
+        # Pick the second last batch (which is full)
+        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+            x = self.select_mode(batch, self.FM_param.mode)
+            self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -93,7 +147,21 @@ class FlowMatchingLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-
+        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+            & (self.current_epoch != 0): # Only sample every n epochs
+            plot_loss(self, skip=2)
+            if self.FM_param.latent:
+                self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
+                                                           self.FM_param.mode)    
+            if self.FM_param.mode == "both":
+                self.visualize_reconstructs_2ch(self.last_val_batch[0], 
+                                                self.last_val_batch[1],  
+                                                self.FM_param.plot_ids)
+            else:
+                self.visualize_reconstructs_1ch(self.last_val_batch[0], 
+                                                self.last_val_batch[1], 
+                                                self.last_val_batch[2])
+                
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
             chl_loss = (x - reconstruct)**2
@@ -106,7 +174,7 @@ class FlowMatchingLitModule(LightningModule):
             return chl_loss
                 
     def test_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.FM_param.mode)
+        x = self.encode_data(batch, self.FM_param.mode)
         y = batch[self.FM_param.target]
         self.shape = x.shape
         loss    = self.conditional_flow_matching_loss(x)
@@ -116,22 +184,36 @@ class FlowMatchingLitModule(LightningModule):
         losses = self.reconstruction_loss(x, reconstruct, reduction="batch")
         self.last_test_batch = [x, reconstruct, y]
 
-        self.test_losses.append(losses)
-        self.test_labels.append(y)
+        if self.FM_param.ood:
+            # Calculate reconstruction loss used for OOD-detection
+            losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
+            self.test_losses.append(losses)
+            self.test_labels.append(y)
+
+        # Pick the last full batch or
+        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+            x = self.select_mode(batch, self.FM_param.mode)
+            self.last_test_batch = [x, reconstruct, y]
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
-        # Sample from gaussian nosie
-        # x_hat = self.sample(n_samples=16)
-        
         # Visualizations
-        # self.visualize_samples(x_hat)
-        plot_loss(self)
+        # Save last batch for visualization
+        if self.FM_param.latent:
+            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode)
+            
+        plot_loss(self, skip=1)
         if self.FM_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.FM_param.plot_ids)
+            self.visualize_reconstructs_2ch(self.last_test_batch[0], 
+                                            self.last_test_batch[1], 
+                                            self.FM_param.plot_ids)
         else:
-            self.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
-        plot_histogram(self)
+            self.visualize_reconstructs_1ch(self.last_test_batch[0], 
+                                            self.last_test_batch[1], 
+                                            self.last_test_batch[2])
+
+        if self.FM_param.ood:
+            plot_histogram(self)
 
         # Clear variables
         self.train_epoch_loss.clear()

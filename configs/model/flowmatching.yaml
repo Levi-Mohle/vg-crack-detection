@@ -10,6 +10,8 @@ FM_param:
   step_size: 0.1
   warm_up: 0
   latent: false
+  plot_n_epoch: 5
+  batch_size: ${data.batch_size}
   size: 32
   solver_lib: torchdiffeq
   solver: euler
@@ -20,6 +22,7 @@ FM_param:
   mode: rgb
   wh: 1
   plot_ids: [0,1,16,17]
+  ood: false
 
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
