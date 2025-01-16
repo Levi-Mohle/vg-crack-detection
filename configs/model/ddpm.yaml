@@ -91,6 +91,7 @@ DDPM_param:
     target: 2
     reconstruct: .05
     wh: 1
+    plot_n_epoch: 5
     plot_ids: [0,1,16,17]
     latent: false
     pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'

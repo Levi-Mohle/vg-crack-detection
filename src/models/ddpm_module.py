@@ -110,12 +110,7 @@ class DenoisingDiffusionLitModule(LightningModule):
                 with torch.no_grad():
                     x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
         else:
-            if mode == "both":
-                x = torch.cat((batch[0], batch[1]), dim=1)
-            elif mode == "height":
-                x = batch[1]
-            elif mode == "rgb":
-                x = batch[0]
+            x = self.select_mode(batch,mode)
         return x
         
     def training_step(self, batch, batch_idx):
@@ -146,7 +141,8 @@ class DenoisingDiffusionLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % 2 == 0) & (self.current_epoch != 0): # Only sample once per 5 epochs
+        if (self.current_epoch % self.DDPM_param.plot_n_epoch == 0) \
+            & (self.current_epoch != 0): # Only sample once per 5 epochs
             plot_loss(self, skip=2)
             if self.DDPM_param.latent:
                 self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
