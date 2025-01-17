@@ -21,9 +21,11 @@ scheduler:
 net:
   _target_: src.models.components.deepSVDD_net.DeepSVDD
   in_channels: 8
-  rep_dim: 4096
+  pretrained: false
+  # rep_dim: 4096
 
 dSVDD_param:
+    rep_dim: 512
     R: 0.0
     mode: both
     target: 2

@@ -37,7 +37,7 @@ class DeepSVDDLitModule(LightningModule):
         # Configure dSVDD related parameters dict
         self.dSVDD_param = dSVDD_param
 
-        self.c = torch.nn.Parameter(torch.randn(self.net.rep_dim))
+        self.c = torch.nn.Parameter(torch.randn(self.dSVDD_param.rep_dim))
         self.R = self.dSVDD_param.R
 
         if self.dSVDD_param.latent:

@@ -14,7 +14,7 @@ max_epochs  = 1
 data = "impasto"
 debug = 'fdr'
 device = "cpu" 
-batch_size = 8
+batch_size = 32
 variant = "32x32"
 
 train_size = .01
@@ -31,9 +31,9 @@ if mode == "train":
                     f"experiment={experiment}",
                     f"trainer.max_epochs={max_epochs}",
                     f'data.batch_size={batch_size}',
-                    f"+trainer.limit_val_batches={val_size}",
-                    f"+trainer.limit_train_batches={train_size}",
-                    f"+trainer.limit_test_batches={test_size}",
+                    # f"+trainer.limit_val_batches={val_size}",
+                    # f"+trainer.limit_train_batches={train_size}",
+                    # f"+trainer.limit_test_batches={test_size}",
                     f"data.variant={variant}",
                     # f"debug={debug}",
                     # f"logger={logger}",

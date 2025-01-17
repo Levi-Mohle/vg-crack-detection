@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+from torchvision.models import resnet34, ResNet34_Weights
 
 class DeepSVDD(nn.Module):
     def __init__(self,
@@ -43,6 +45,45 @@ class ConvBlock(nn.Module):
     def forward(self,x):
         return self.convblock(x)
 
+class DeeperSVDD(nn.Module):
+    def __init__(self,
+                 in_channels : int,
+                 pretrained : bool
+                 ):
+        super(DeeperSVDD, self).__init__()
+
+        # Determine to use pretrained network
+        if pretrained:
+            self.resnet = resnet34(weights=ResNet34_Weights)
+        else:
+            self.resnet = resnet34()
+
+        original_conv1 =self.resnet.conv1
+        self.resnet.conv1 = nn.Conv2d(
+            in_channels,
+            original_conv1.out_channels,
+            kernel_size= original_conv1.kernel_size,
+            stride= original_conv1.stride,
+            padding=original_conv1.padding,
+            bias=original_conv1.bias
+        )
+
+        if pretrained:
+            with torch.no_grad():
+                self.resnet.conv1.weight[:, :3, :, :] = original_conv1.weight
+                self.resnet.conv1.weight[:, 3:, :, :] = original_conv1.weight.mean(dim=1, keepdim=True) 
+
+        self.resnet = nn.Sequential(*list(self.resnet.children())[:-2])
+
+        self.flatten = nn.Flatten()
+
+    def forward(self, x):
+        features = self.resnet(x)
+
+        flattened_features = self.flatten(features)
+
+        return flattened_features
+        
     
 if __name__ == "__main__":
     _ = DeepSVDD()

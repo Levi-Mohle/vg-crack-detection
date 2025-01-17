@@ -31,8 +31,10 @@ model:
     optimizer:
       lr: 1e-4
     net:
+      _target_: src.models.components.deepSVDD_net.DeeperSVDD
       in_channels: 4
-      rep_dim: 256
+      pretrained: true
+      # rep_dim: 256
     # scheduler:
     #   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
     #   _partial_: true
@@ -43,7 +45,7 @@ model:
       mode: both
       plot_n_epoch: 5
       latent: false
-      ood: false
+      ood: true
     
 trainer:
   min_epochs: 5
