@@ -130,7 +130,9 @@ class DenoisingDiffusionLitModule(LightningModule):
         x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
 
         # Pick the second last batch (which is full)
-        if x.shape[0] == self.DDPM_param.batch_size:
+        # if x.shape[0] == self.DDPM_param.batch_size:
+        if (self.current_epoch % self.DDPM_param.plot_n_epoch == 0) \
+            & (self.current_epoch != 0): # Only sample once per 5 epochs
             x = self.select_mode(batch, self.DDPM_param.mode)
             self.last_val_batch = [x, reconstruct]
 
