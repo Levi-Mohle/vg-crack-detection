@@ -1,0 +1,40 @@
+_target_: src.models.deepSVDD_module.DeepSVDDLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 1e-4
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.StepLR
+  _partial_: true
+  step_size: 1
+  gamma: 0.99
+# scheduler:
+#   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
+#   _partial_: true
+#   num_warmup_steps: 500
+#   num_training_steps: 6400
+#   num_cycles: 0.5
+
+net:
+  _target_: src.models.components.deepSVDD_net.DeepSVDD
+  in_channels: 8
+  rep_dim: 4096
+
+dSVDD_param:
+    R: 0.0
+    mode: both
+    target: 2
+    plot_n_epoch: 5
+    latent: false
+    pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+    ood: false
+    max_epochs: ${trainer.max_epochs}
+    batch_size: ${data.batch_size}
+    
+compile: false
+
+paths: 
+  log_dir: ${paths.output_dir}

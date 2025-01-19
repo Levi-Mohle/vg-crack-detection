@@ -1,0 +1,77 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: impasto
+  - override /model: deepsvdd
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["impasto", "deep Support Vector Data Discription"]
+
+seed: 12345
+
+callbacks:
+    early_stopping:
+        monitor: "val/loss"
+        patience: 15
+        mode: "min"
+    model_summary:
+      max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
+
+model:
+    optimizer:
+      lr: 1e-4
+    net:
+      in_channels: 4
+      rep_dim: 256
+    # scheduler:
+    #   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
+    #   _partial_: true
+    #   num_warmup_steps: 500
+    #   num_training_steps: 6400
+    #   num_cycles: 0.5
+    dSVDD_param:
+      mode: both
+      plot_n_epoch: 5
+      latent: false
+      ood: false
+    
+trainer:
+  min_epochs: 5
+  max_epochs: 30
+  enable_model_summary: false
+  gradient_clip_val: 0.5
+
+data:
+  batch_size: 16
+  variant: 32x32
+  rgb_transform:
+    _target_: src.data.components.transforms.diffuser_normalize
+  height_transform:
+    _target_: src.data.components.transforms.diffuser_normalize_height_idv
+
+extras:
+  print_config: false
+
+logger:
+  csv:
+      prefix: "impasto_dsvdd"
+  wandb:
+    tags: ${tags}
+    group: "impasto"
+  aim:
+    experiment: "impasto"
+  mlflow:
+    experiment_name: "impasto dsvdd"
+  tensorboard:
+    name: "impasto dsvdd"
+
