@@ -49,12 +49,12 @@ model:
       step_size: 1
       gamma: 0.99
     DDPM_param:
-      mode: rgb
+      mode: height
       target: 2
-      reconstruct: .05
+      reconstruct: .15
       wh: 1
       plot_n_epoch: 4
-      plot_ids: [0,1]
+      plot_ids: [0,1,2,3]
       latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       ood: false

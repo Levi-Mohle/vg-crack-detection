@@ -156,7 +156,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             else:
                 self.visualize_reconstructs_1ch(self.last_val_batch[0], 
                                                 self.last_val_batch[1], 
-                                                self.last_val_batch[2])
+                                                self.DDPM_param.plot_ids)
 
     def decode_data(self, z, mode):
         if mode=="both":
@@ -229,7 +229,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         else:
             self.visualize_reconstructs_1ch(self.last_test_batch[0], 
                                             self.last_test_batch[1], 
-                                            self.last_test_batch[2])
+                                            self.DDPM_param.plot_ids)
 
         if self.DDPM_param.ood:
             plot_histogram(self)
@@ -280,13 +280,13 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Convert rgb to grayscale for plotting
         if self.DDPM_param.mode == 'rgb':
-            x_gray              = rgb_to_grayscale(x)
-            reconstruct_gray    = rgb_to_grayscale(reconstruct)
+            x              = rgb_to_grayscale(x)
+            reconstruct    = rgb_to_grayscale(reconstruct)
             
         # Calculate pixel-wise squared error per channel + normalize
-        error = ((x_gray - reconstruct_gray)**2)
+        error = ((x - reconstruct)**2)
 
-        img = [x_gray.cpu(), reconstruct_gray.cpu(), error.cpu()]
+        img = [x.cpu(), reconstruct.cpu(), error.cpu()]
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
 
