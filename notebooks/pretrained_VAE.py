@@ -13,6 +13,7 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
+from notebooks.preprocess_latent_space.dataset import create_h5f_enc, append_h5f_enc
 
 
 model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
@@ -20,9 +21,9 @@ model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoder
 vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True)
 
 # %% Load the data
-lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
-                                    variant="AE512x512",
-                                    batch_size = 5,
+lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\data\input\Training_data\512x512",
+                                    variant="512x512",
+                                    batch_size = 16,
                                     rgb_transform = diffuser_normalize(),
                                     height_transform = diffuser_normalize_height_idv()
                                     )
@@ -42,7 +43,16 @@ def encode_decode(vae, rgb):
     reconstructed = reconstructed.clamp(0., 1.)
     return reconstructed
 
-reconstructed_rgb = encode_decode(vae, rgb)
+def encode(vae, rgb, height):
+    height = torch.cat((height,height,height), dim=1)
+
+    with torch.no_grad():
+        enc_rgb     = vae.encode(rgb).latent_dist.sample().mul_(0.18215)
+        enc_height  = vae.encode(height).latent_dist.sample().mul_(0.18215)
+
+    return enc_rgb, enc_height
+
+# reconstructed_rgb = encode_decode(vae, rgb)
 
 # height_stacked          = torch.cat((height,height,height), dim=1)
 # reconstructed_height    = encode_decode(vae, height_stacked)
@@ -82,5 +92,19 @@ axes[1].axis('off')
 plt.tight_layout()
 plt.show()
 
+
+# %% Save encoded dataset as h5 file
+
+output_filename_full_h5 = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto\2024-11-26_Enc_Crack512x512_test.h5"
+for rgb, height, id in test_loader:
+
+    enc_rgb, enc_height = encode(vae, rgb, height)
+
+    if not os.path.exists(output_filename_full_h5):
+        # Creating new h5 file
+        create_h5f_enc(output_filename_full_h5, enc_rgb, enc_height, id)
+    else:
+        # Appending h5 file
+        append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height, id)
 
 # %%
