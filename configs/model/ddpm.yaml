@@ -98,6 +98,10 @@ DDPM_param:
     ood: false
     max_epochs: ${trainer.max_epochs}
     batch_size: ${data.batch_size}
+    use_cond: false
+    condition_weight: 2
+    skip: 25
+    eta: 1
     
 compile: false
 

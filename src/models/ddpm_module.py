@@ -248,24 +248,52 @@ class DenoisingDiffusionLitModule(LightningModule):
         Tc_tensor = torch.tensor([Tc] * x.shape[0], device=self.device)
         # Noise the samples
         xt = self.noise_scheduler.add_noise(x, noise, Tc_tensor)
+        
         # Reconstruct the samples
-        for timestep in range(Tc, 0, -1):
-                t = torch.tensor([timestep] * x.shape[0], device=self.device)
-                e = self.model(xt, t).sample
-                
-                alpha            = self.noise_scheduler.alphas[timestep]
-                alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
-                alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
-                sigma = torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
 
-                if timestep > 1:
-                    xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) \
-                    + sigma * torch.randn_like(xt)
-                else:
-                    xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) 
+        # Use conditional DDIM
+        if self.DDPM_param.use_cond:
+            # Implementation from Mousakha et al, 2023
+
+            # Define target
+            y = x
+
+            seq = range(1 , Tc+1, self.DDPM_param.skip)
+            seq_next = [0] + list(seq[:-1])
+            for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
+                t = torch.tensor([i] * x.shape[0], device=self.device)
+                
+                e = self.unet_model(xt, t)['sample']
+                
+                alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
+                alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
+                sigma = self.DDPM_param.eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
+                
+                yt = self.noise_scheduler.add_noise(y, e, t)
+                
+                e_hat = e - self.DDPM_param.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
+                ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
+                
+                xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-sigma**2) * e_hat + sigma * torch.randn_like(xt)
+
+        else:
+            for timestep in range(Tc, 0, -1):
+                    t = torch.tensor([timestep] * x.shape[0], device=self.device)
+                    e = self.model(xt, t).sample
+                    
+                    alpha            = self.noise_scheduler.alphas[timestep]
+                    alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
+                    alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[timestep-1]
+                    sigma = torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
+
+                    if timestep > 1:
+                        xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) \
+                        + sigma * torch.randn_like(xt)
+                    else:
+                        xt = 1 / torch.sqrt(alpha) * (xt - (1-alpha)/torch.sqrt(1-alpha_prod) * e) 
             
         reconstruct = xt
-        
+
         return x, reconstruct
     
     def min_max_normalize(self, x, dim=(0,2,3)):
