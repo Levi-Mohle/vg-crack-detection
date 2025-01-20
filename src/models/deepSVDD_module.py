@@ -33,6 +33,7 @@ class DeepSVDDLitModule(LightningModule):
         self.save_hyperparameters(logger=False)
 
         self.net = net
+        self.net.to(self.device)
 
         # Configure dSVDD related parameters dict
         self.dSVDD_param = dSVDD_param
@@ -74,7 +75,8 @@ class DeepSVDDLitModule(LightningModule):
         return self.net(x)
 
     def training_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.dSVDD_param.mode)
+        # x = self.encode_data(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.dSVDD_param.mode)
         x_rep = self(x)
         # Compute distance to the representation center
         dist = torch.sum((x_rep - self.c)**2, dim=1)
@@ -83,7 +85,8 @@ class DeepSVDDLitModule(LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.dSVDD_param.mode)
+        # x = self.encode_data(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.dSVDD_param.mode)
         x_rep = self(x)
         # Compute distance to the representation center
         dist = torch.sum((x_rep - self.c)**2, dim=1)
@@ -103,7 +106,8 @@ class DeepSVDDLitModule(LightningModule):
             plot_loss(self, skip=2)
 
     def test_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.dSVDD_param.mode)
+        # x = self.encode_data(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.dSVDD_param.mode)
         y = batch[self.dSVDD_param.target]
         x_rep = self(x)
         # Compute distance to the representation center
@@ -132,11 +136,11 @@ class DeepSVDDLitModule(LightningModule):
 
     def select_mode(self, batch, mode):
         if mode == "both":
-                x = torch.cat((batch[0], batch[1]), dim=1)
+                x = torch.cat((batch[0], batch[1]), dim=1).to(torch.float)
         elif mode == "height":
-            x = batch[1]
+            x = batch[1].to(torch.float)
         elif mode == "rgb":
-            x = batch[0]
+            x = batch[0].to(torch.float)
         return x
 
     def encode_data(self, batch, mode):
