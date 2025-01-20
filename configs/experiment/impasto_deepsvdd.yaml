@@ -32,9 +32,9 @@ model:
       lr: 1e-4
     net:
       _target_: src.models.components.deepSVDD_net.DeeperSVDD
-      in_channels: 4
+      in_channels: 8
       pretrained: true
-      # rep_dim: 256
+      # rep_dim: 512
     # scheduler:
     #   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
     #   _partial_: true
@@ -43,9 +43,11 @@ model:
     #   num_cycles: 0.5
     dSVDD_param:
       mode: both
+      pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       plot_n_epoch: 5
-      latent: false
+      latent: true
       ood: true
+      rep_dim: 2048
     
 trainer:
   min_epochs: 5
@@ -55,7 +57,7 @@ trainer:
 
 data:
   batch_size: 16
-  variant: 32x32
+  variant: 512x512
   rgb_transform:
     _target_: src.data.components.transforms.diffuser_normalize
   height_transform:

@@ -263,7 +263,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
                 t = torch.tensor([i] * x.shape[0], device=self.device)
                 
-                e = self.unet_model(xt, t)['sample']
+                e = self.model(xt, t)['sample']
                 
                 alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
                 alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]

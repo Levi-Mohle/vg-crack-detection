@@ -51,7 +51,7 @@ model:
     DDPM_param:
       mode: both
       target: 2
-      reconstruct: .15
+      reconstruct: .2
       wh: 1
       plot_n_epoch: 4
       plot_ids: [0,1,2,3]

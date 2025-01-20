@@ -37,7 +37,7 @@ model:
       latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
-      reconstruct: 0.15
+      reconstruct: 0.3
       target: 2
       solver_lib: torchdiffeq
       mode: both
