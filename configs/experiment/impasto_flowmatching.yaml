@@ -37,17 +37,17 @@ model:
       latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
-      reconstruct: 0.3
+      reconstruct: 0.15
       target: 2
       solver_lib: torchdiffeq
       mode: both
-      wh: 0
-      plot_ids: [0, 1, 2]
+      wh: 1
+      plot_ids: [0, 1, 2,3]
       ood: false
   
 trainer:
   min_epochs: 5
-  max_epochs: 30
+  max_epochs: 40
   enable_model_summary: false
   gradient_clip_val: 0.5
 
