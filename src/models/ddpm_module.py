@@ -273,46 +273,63 @@ class DenoisingDiffusionLitModule(LightningModule):
         max_val = x.amax(dim=dim, keepdim=True)
         return (x - min_val) / (max_val - min_val + 1e-8)
         
-    def visualize_reconstructs_1ch(self, x, reconstruct, labels):
+    def visualize_reconstructs_1ch(self, x, reconstruct, plot_ids):
         # Convert back to [0,1] for plotting
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
 
-        # Calculate pixel-wise squared error + normalize
-        error = self.reconstruction_loss(x, reconstruct, reduction=None)
-        error = self.min_max_normalize(error)
+        # Convert rgb to grayscale for plotting
+        if self.DDPM_param.mode == 'rgb':
+            x_gray              = rgb_to_grayscale(x)
+            reconstruct_gray    = rgb_to_grayscale(reconstruct)
+            
+        # Calculate pixel-wise squared error per channel + normalize
+        error = ((x_gray - reconstruct_gray)**2)
 
-        # For plotting reasons
-        x = x.permute(0,2,3,1).cpu()
-        reconstruct = reconstruct.permute(0,2,3,1).cpu()
-        
-        img = [x, reconstruct, error]
+        img = [x_gray.cpu(), reconstruct_gray.cpu(), error.cpu()]
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
-        vmax_e = torch.max(error).item()
-        vmax_list = [1, 1, 1]
-        for i in range(4):
-            fig = plt.figure(constrained_layout=True, figsize=(11,9))
-            # create 3x1 subfigs
-            subfigs = fig.subfigures(nrows=3, ncols=1)
-            for row, subfig in enumerate(subfigs):
-                subfig.suptitle(title[row], fontsize = self.fs)
-                # create 1x3 subplots per subfig
-                axs = subfig.subplots(nrows=1, ncols=4)
-                for col, ax in enumerate(axs):
-                    im = ax.imshow(img[row][col+4*i], vmin=0, vmax=vmax_list[row])
-                    ax.axis("off")
-                    ax.set_title(f"Label: {labels[col+4*i]}")
-                    if (row == 2) & (col == 0):
-                        plt.colorbar(im, ax=ax)
+
+        fig, axes = plt.subplots(nrows=len(plot_ids), ncols=3, 
+                                 width_ratios=[1.08,1,1.08], 
+                                 figsize=(9, 3*len(plot_ids)))
+        
+        plt.subplots_adjust(wspace=0.2, hspace=-0.2)
+        extent = [0,4,0,4]
+        for i, id in enumerate(plot_ids):
+            for j in range(3):
+                if i == 0:
+                     axes[i, j].set_title(title[j], fontsize=self.fs-1)
+                # plot images
+                if j == 2:
+                     im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0)
+                else:
+                    im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0, vmax=1)
+                # plot colorbars
+                if j != 1:
+                    divider = make_axes_locatable(axes[i,j])
+                    cax = divider.append_axes("right", size="5%", pad=0.1)
+                    plt.colorbar(im, cax=cax)
+                if i == len(plot_ids) - 1:
+                     axes[i,j].set_xlabel("X [mm]")
+                else:
+                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
+
+                if j == 0:
+                     axes[i,j].set_ylabel("Y [mm]")
+                     axes[i,j].text(-0.4, 0.5, f"Sample {id}", fontsize= self.fs, rotation=90, va="center", ha="center", transform=axes[i,j].transAxes)
+                elif (i < len(plot_ids) - 1) & (j > 0):
+                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+                else:
+                     axes[i,j].tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
                 
                         
-            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
-            fig.savefig(plt_dir)
-            plt.close()
-            # Send figure as artifact to logger
-            # if self.logger.__class__.__name__ == "MLFlowLogger":
-            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
+        fig.savefig(plt_dir)
+        plt.close()
+        # Send figure as artifact to logger
+        # if self.logger.__class__.__name__ == "MLFlowLogger":
+        #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
     
     def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
         # Convert back to [0,1] for plotting
