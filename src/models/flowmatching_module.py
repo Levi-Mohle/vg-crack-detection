@@ -162,7 +162,7 @@ class FlowMatchingLitModule(LightningModule):
             else:
                 self.visualize_reconstructs_1ch(self.last_val_batch[0], 
                                                 self.last_val_batch[1], 
-                                                self.last_val_batch[2])
+                                                self.FM_param.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:

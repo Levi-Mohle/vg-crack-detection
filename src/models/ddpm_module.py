@@ -85,11 +85,11 @@ class DenoisingDiffusionLitModule(LightningModule):
 
     def select_mode(self, batch, mode):
         if mode == "both":
-                x = torch.cat((batch[0], batch[1]), dim=1)
+                x = torch.cat((batch[0], batch[1]), dim=1).to(torch.float)
         elif mode == "height":
-            x = batch[1]
+            x = batch[1].to(torch.float)
         elif mode == "rgb":
-            x = batch[0]
+            x = batch[0].to(torch.float)
         return x
         
     def encode_data(self, batch, mode):
@@ -149,6 +149,8 @@ class DenoisingDiffusionLitModule(LightningModule):
             & (self.current_epoch != 0): # Only sample once per 5 epochs
             plot_loss(self, skip=2)
             if self.DDPM_param.latent:
+                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
+                                                           self.DDPM_param.mode)    
                 self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
                                                            self.DDPM_param.mode)    
             if self.DDPM_param.mode == "both":
@@ -222,6 +224,7 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # Save last batch for visualization
         if self.DDPM_param.latent:
+            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.DDPM_param.mode)
             self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.DDPM_param.mode)
             
         plot_loss(self, skip=1)

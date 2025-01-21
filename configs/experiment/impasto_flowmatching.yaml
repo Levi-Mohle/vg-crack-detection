@@ -29,10 +29,10 @@ callbacks:
 
 model:
     optimizer:
-      lr: 1e-5
+      lr: 1e-4
     unet:
-      in_channels: 8
-      out_channels: 8
+      in_channels: 4
+      out_channels: 4
       attention_head_dim: 16
     FM_param:
       latent: true
@@ -41,9 +41,9 @@ model:
       reconstruct: 0.3
       target: 2
       solver_lib: torchdiffeq
-      mode: both
+      mode: rgb
       wh: 1
-      plot_ids: [0, 1, 2, 3]
+      plot_ids: [1, 3]
       ood: false
   
 trainer:
@@ -54,7 +54,7 @@ trainer:
 
 data:
     variant: Enc_512x512
-    crack: real
+    crack: synthetic
     batch_size: 32
     rgb_transform: null
         # _target_: src.data.components.transforms.diffuser_normalize
