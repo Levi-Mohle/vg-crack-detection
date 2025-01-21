@@ -24,6 +24,7 @@ vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
                                     variant="512x512",
+                                    crack="real",
                                     batch_size = 16,
                                     rgb_transform = diffuser_normalize(),
                                     height_transform = diffuser_normalize_height_idv()
@@ -99,8 +100,8 @@ def encode(vae, rgb, height):
 
 # %% Save encoded dataset as h5 file
 
-output_filename_full_h5 = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2024-11-26_Enc_512x512_train.h5"
-for rgb, height, id in tqdm(train_loader):
+output_filename_full_h5 = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
+for rgb, height, id in tqdm(test_loader):
 
     enc_rgb, enc_height = encode(vae, rgb, height)
 

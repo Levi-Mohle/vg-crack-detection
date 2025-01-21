@@ -55,6 +55,7 @@ class IMPASTO_DataModule(LightningDataModule):
         num_workers: int = 0,
         pin_memory: bool = False,
         variant: str = "32x32",
+        crack: str = "synthetic",
         rgb_transform: transforms.Compose = None,
         height_transform: transforms.Compose = None,
     ) -> None:
@@ -84,6 +85,7 @@ class IMPASTO_DataModule(LightningDataModule):
         self.data_dir = data_dir
 
         self.variant = variant
+        self.crack = crack
     # @property
     # def num_classes(self) -> int:
     #     """Get the number of classes.
@@ -120,7 +122,7 @@ class IMPASTO_DataModule(LightningDataModule):
                 )
             self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
-        IMPASTO_train_dir, IMPASTO_val_dir, IMPASTO_test_dir = impasto_dataset_variant(self.variant)
+        IMPASTO_train_dir, IMPASTO_val_dir, IMPASTO_test_dir = impasto_dataset_variant(self.variant, self.crack)
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
             self.data_train = HDF5PatchesDatasetCustom(hdf5_file_path   = os.path.join(self.data_dir, IMPASTO_train_dir),
