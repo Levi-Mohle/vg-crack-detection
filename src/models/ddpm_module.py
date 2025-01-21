@@ -114,14 +114,16 @@ class DenoisingDiffusionLitModule(LightningModule):
         return x
         
     def training_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.DDPM_param.mode)
+        # x = self.encode_data(batch, self.DDPM_param.mode)
+        x = self.select_mode(batch, self.DDPM_param.mode)
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.DDPM_param.mode)
+        # x = self.encode_data(batch, self.DDPM_param.mode)
+        x = self.select_mode(batch, self.DDPM_param.mode)
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("val/loss", loss, prog_bar=True)
@@ -187,7 +189,8 @@ class DenoisingDiffusionLitModule(LightningModule):
             return chl_loss
         
     def test_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.DDPM_param.mode)
+        # x = self.encode_data(batch, self.DDPM_param.mode)
+        x = self.select_mode(batch, self.DDPM_param.mode)
         y = batch[self.DDPM_param.target]
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)

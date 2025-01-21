@@ -52,12 +52,12 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-    variant: 512x512
+    variant: Enc_512x512
     batch_size: 16
-    rgb_transform:
-        _target_: src.data.components.transforms.diffuser_normalize
-    height_transform:
-        _target_: src.data.components.transforms.diffuser_normalize_height_idv
+    rgb_transform: null
+        # _target_: src.data.components.transforms.diffuser_normalize
+    height_transform: null
+        # _target_: src.data.components.transforms.diffuser_normalize_height_idv
 
 extras:
   print_config: false

@@ -120,14 +120,15 @@ class FlowMatchingLitModule(LightningModule):
             return x
         
     def training_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.FM_param.mode)
-        
+        # x = self.encode_data(batch, self.FM_param.mode)
+        x = self.select_mode(batch, self.FM_param.mode)        
         loss = self.conditional_flow_matching_loss(x)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.FM_param.mode)
+        # x = self.encode_data(batch, self.FM_param.mode)
+        x = self.select_mode(batch, self.FM_param.mode)
         loss = self.conditional_flow_matching_loss(x)
         self.log("val/loss", loss, prog_bar=True)
 
@@ -173,7 +174,8 @@ class FlowMatchingLitModule(LightningModule):
             return chl_loss
                 
     def test_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.FM_param.mode)
+        # x = self.encode_data(batch, self.FM_param.mode)
+        x = self.select_mode(batch, self.FM_param.mode)
         y = batch[self.FM_param.target]
         self.shape = x.shape
         loss    = self.conditional_flow_matching_loss(x)
