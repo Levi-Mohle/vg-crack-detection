@@ -114,10 +114,9 @@ class DeepSVDDLitModule(LightningModule):
         loss = self.compute_loss(x_rep)
         self.log("test/loss", loss, prog_bar=True)
 
-        print(y)
         if self.dSVDD_param.ood:
             # Calculate reconstruction loss used for OOD-detection
-            self.test_losses.append(dist)
+            self.test_losses.append(torch.norm(x_rep - self.center.c, dim=1))
             self.test_labels.append(y)
      
     def on_test_epoch_end(self) -> None:

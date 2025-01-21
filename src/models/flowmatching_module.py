@@ -74,11 +74,11 @@ class FlowMatchingLitModule(LightningModule):
     
     def select_mode(self, batch, mode):
         if mode == "both":
-            x = torch.cat((batch[0], batch[1]), dim=1)
+            x = torch.cat((batch[0], batch[1]), dim=1).to(torch.float)
         elif mode == "height":
-            x = batch[1]
+            x = batch[1].to(torch.float)
         elif mode == "rgb":
-            x = batch[0]
+            x = batch[0].to(torch.float)
         return x
     
     def encode_data(self, batch, mode):
@@ -151,6 +151,8 @@ class FlowMatchingLitModule(LightningModule):
             & (self.current_epoch != 0): # Only sample every n epochs
             plot_loss(self, skip=2)
             if self.FM_param.latent:
+                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
+                                                           self.FM_param.mode) 
                 self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
                                                            self.FM_param.mode)    
             if self.FM_param.mode == "both":
@@ -201,6 +203,7 @@ class FlowMatchingLitModule(LightningModule):
         # Visualizations
         # Save last batch for visualization
         if self.FM_param.latent:
+            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode) 
             self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode)
             
         plot_loss(self, skip=1)

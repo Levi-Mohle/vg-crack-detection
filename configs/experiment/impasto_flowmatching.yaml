@@ -29,10 +29,11 @@ callbacks:
 
 model:
     optimizer:
-      lr: 1e-4
+      lr: 1e-5
     unet:
       in_channels: 8
       out_channels: 8
+      attention_head_dim: 16
     FM_param:
       latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
@@ -42,7 +43,7 @@ model:
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0, 1, 2,3]
+      plot_ids: [0, 1, 2, 3]
       ood: false
   
 trainer:
@@ -53,7 +54,8 @@ trainer:
 
 data:
     variant: Enc_512x512
-    batch_size: 16
+    crack: real
+    batch_size: 32
     rgb_transform: null
         # _target_: src.data.components.transforms.diffuser_normalize
     height_transform: null
