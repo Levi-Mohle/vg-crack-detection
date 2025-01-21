@@ -17,6 +17,7 @@ class DeepSVDDLitModule(LightningModule):
     def __init__(
         self, 
         net: torch.nn.Module,
+        center: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         dSVDD_param: DictConfig,
@@ -33,11 +34,12 @@ class DeepSVDDLitModule(LightningModule):
         self.save_hyperparameters(logger=False)
 
         self.net = net
+        self.net.to(self.device)
 
         # Configure dSVDD related parameters dict
         self.dSVDD_param = dSVDD_param
 
-        self.c = torch.nn.Parameter(torch.randn(self.dSVDD_param.rep_dim))
+        self.center = center
         self.R = self.dSVDD_param.R
 
         if self.dSVDD_param.latent:
@@ -74,20 +76,22 @@ class DeepSVDDLitModule(LightningModule):
         return self.net(x)
 
     def training_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.dSVDD_param.mode)
         x_rep = self(x)
         # Compute distance to the representation center
-        dist = torch.sum((x_rep - self.c)**2, dim=1)
-        loss = torch.mean(dist)
+        loss = self.compute_loss(x_rep)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
+    def compute_loss(self, encoded_vectors):
+        dist = torch.norm(encoded_vectors - self.center.c, dim=1)
+        return dist.mean()
+        
     def validation_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.dSVDD_param.mode)
         x_rep = self(x)
         # Compute distance to the representation center
-        dist = torch.sum((x_rep - self.c)**2, dim=1)
-        loss = torch.mean(dist)
+        loss = self.compute_loss(x_rep)
         self.log("val/loss", loss, prog_bar=True)
         return loss
 
@@ -103,14 +107,14 @@ class DeepSVDDLitModule(LightningModule):
             plot_loss(self, skip=2)
 
     def test_step(self, batch, batch_idx):
-        x = self.encode_data(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.dSVDD_param.mode)
         y = batch[self.dSVDD_param.target]
         x_rep = self(x)
         # Compute distance to the representation center
-        dist = torch.sum((x_rep - self.c)**2, dim=1)
-        loss = torch.mean(dist)
+        loss = self.compute_loss(x_rep)
         self.log("test/loss", loss, prog_bar=True)
 
+        print(y)
         if self.dSVDD_param.ood:
             # Calculate reconstruction loss used for OOD-detection
             self.test_losses.append(dist)
@@ -132,11 +136,11 @@ class DeepSVDDLitModule(LightningModule):
 
     def select_mode(self, batch, mode):
         if mode == "both":
-                x = torch.cat((batch[0], batch[1]), dim=1)
+                x = torch.cat((batch[0], batch[1]), dim=1).to(torch.float)
         elif mode == "height":
-            x = batch[1]
+            x = batch[1].to(torch.float)
         elif mode == "rgb":
-            x = batch[0]
+            x = batch[0].to(torch.float)
         return x
 
     def encode_data(self, batch, mode):
