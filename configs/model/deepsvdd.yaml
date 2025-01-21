@@ -24,8 +24,11 @@ net:
   pretrained: false
   # rep_dim: 4096
 
-dSVDD_param:
+center:
+    _target_: src.models.components.deepSVDD_net.LatentCenterVector
     rep_dim: 512
+
+dSVDD_param:
     R: 0.0
     mode: both
     target: 2

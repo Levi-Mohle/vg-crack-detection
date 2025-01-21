@@ -45,6 +45,13 @@ class ConvBlock(nn.Module):
     def forward(self,x):
         return self.convblock(x)
 
+class LatentCenterVector(nn.Module):
+    def __init__(self, rep_dim):
+
+        super(LatentCenterVector, self).__init__()
+        self.c = torch.nn.Parameter(torch.randn(rep_dim))
+
+        
 class DeeperSVDD(nn.Module):
     def __init__(self,
                  in_channels : int,
