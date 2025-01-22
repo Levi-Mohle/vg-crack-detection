@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.metrics import roc_curve, roc_auc_score, confusion_matrix
 import matplotlib.pyplot as plt
 import os
+import h5py
 
 def plot_loss(self, skip):
 
@@ -120,3 +121,117 @@ def plot_histogram(self):
     #                                         run_id=self.logger.run_id)
     # Remove image from folder (saved to logger)
     # os.remove(image_path)
+
+def save_anomaly_maps(output_file_name, batch):
+    if not os.path.exists(output_file_name):
+        # Creating new h5 file
+        create_h5f_reconstruct(output_file_name, batch)
+    else:
+        # Appending h5 file
+        append_h5f_reconstruct(output_file_name, batch)
+    return 0
+
+def create_h5f_reconstruct(output_filename_full_h5, batch):    
+    """
+    Create and save h5 file to store crack and normal tiny patches in
+
+    This function creates h5 files which are structured like:
+        
+        dataset_file.h5
+        ├───meas_capture
+        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
+        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        ├───reconstructed
+        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
+        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        └───extra
+            └────OOD                  (8-bit uint array size num_images)
+
+    Args:
+        output_filename_full_h5 (str): filename + location of h5 file you want to create and save
+        rgb_cracks (torch.Tensor): rgb tiny patches containing cracks (N,3,height,width)
+        height_cracks (torch.Tensor): height tiny patches containing cracks (N,1,height,width)
+        rgb_normal (torch.Tensor): rgb tiny patches containing normal samples (N,3,height,width)
+        height_normal (torch.Tensor): height tiny patches containing normal samples (N,1,height,width)
+
+    Returns:
+        
+    """
+    with h5py.File(output_filename_full_h5, 'w') as h5f:
+        h5f.create_dataset('meas_capture/height',
+                            data = batch[0][:,3:],
+                            maxshape = (None, 1, 512, 512),
+                            dtype='float')
+        h5f.create_dataset('meas_capture/rgb',
+                            data = batch[0][:,:3],
+                            maxshape = (None, 3, 512, 512),
+                            dtype='float')
+        h5f.create_dataset('reconstructed/height',
+                            data = batch[1][:,3:],
+                            maxshape = (None, 1, 512, 512),
+                            dtype='float')
+        h5f.create_dataset('reconstructed/rgb',
+                            data = batch[1][:,:3],
+                            maxshape = (None, 3, 512, 512),
+                            dtype='float')
+        h5f.create_dataset('extra/OOD',
+                           data = batch[2],
+                           maxshape= (None,),
+                           dtype= 'float')
+        # Close the Keyence file for reading and the Keyence file for writing
+        h5f.close()   
+
+def append_h5f_reconstruct(output_filename_full_h5, batch):
+    """
+    Open and append a h5 file to store crack and normal tiny patches in
+
+    This function opens h5 files which are structured like:
+        
+        dataset_file.h5
+        ├───meas_capture
+        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
+        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        ├───reconstructed
+        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
+        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        └───extra
+            └────OOD                  (8-bit uint array size num_images)
+    Args:
+        output_filename_full_h5 (str): filename + location of h5 file you want to open and append
+        rgb_cracks (torch.Tensor): rgb tiny patches containing cracks (N,3,height,width)
+        height_cracks (torch.Tensor): height tiny patches containing cracks (N,1,height,width)
+        rgb_normal (torch.Tensor): rgb tiny patches containing normal samples (N,3,height,width)
+        height_normal (torch.Tensor): height tiny patches containing normal samples (N,1,height,width)
+
+    Returns:
+    """
+    with h5py.File(output_filename_full_h5, 'a') as hdf5:
+        rgbs        = hdf5['meas_capture/rgb']
+        heights     = hdf5['meas_capture/height']
+        r_rgbs      = hdf5['reconstructed/rgb']
+        r_heights   = hdf5['reconstructed/height']
+        OODs        = hdf5['extra/OOD']
+
+        original_size = rgbs.shape[0]
+
+        rgb         = batch[0][:,:3]
+        height      = batch[0][:,3:]
+        r_rgb       = batch[1][:,:3]
+        r_height    = batch[1][:,3:]
+        id          = batch[2]
+ 
+        rgbs.resize(original_size + rgb.shape[0], axis=0)
+        heights.resize(original_size + height.shape[0], axis=0)
+        r_rgbs.resize(original_size + r_rgb.shape[0], axis=0)
+        r_heights.resize(original_size + r_height.shape[0], axis=0)
+        OODs.resize(original_size + id.shape[0], axis=0)
+
+        rgbs[original_size:]        = rgb
+        heights[original_size:]     = height
+        r_rgbs[original_size:]      = r_rgb
+        r_heights[original_size:]   = r_height
+
+        OODs[original_size:]     = id
+
+        # Close the Keyence file for reading and the Keyence file for writing
+        hdf5.close()

@@ -3,6 +3,7 @@ from torchdiffeq import odeint
 from diffusers.models import AutoencoderKL
 import numpy as np
 import os
+from datetime import datetime
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -56,6 +57,10 @@ class FlowMatchingLitModule(LightningModule):
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
+
+        if self.FM_param.save_reconstructs:
+            time = datetime.today().strftime('%Y-%m-%d')
+            self.reconstruct_dir = os.path.join(self.image_dir, time, "_reconstructs.h5")
         
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
@@ -197,6 +202,12 @@ class FlowMatchingLitModule(LightningModule):
         if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
             x = self.select_mode(batch, self.FM_param.mode)
             self.last_test_batch = [x, reconstruct, y]
+
+        if self.FM_param.save_reconstructs:
+            if self.FM_param.latent:
+                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode).cpu()
+                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode).cpu()
+            save_anomaly_maps(self.reconstruct_dir, self.last_test_batch)
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
