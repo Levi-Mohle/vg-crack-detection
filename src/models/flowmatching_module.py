@@ -60,7 +60,7 @@ class FlowMatchingLitModule(LightningModule):
 
         if self.FM_param.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
-            self.reconstruct_dir = os.path.join(self.image_dir, time, "_reconstructs.h5")
+            self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
         
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
@@ -205,19 +205,26 @@ class FlowMatchingLitModule(LightningModule):
 
         if self.FM_param.save_reconstructs:
             if self.FM_param.latent:
+                # self.vae.to("cpu")
+                # self.last_test_batch = [self.last_test_batch[0].cpu(),
+                #                        self.last_test_batch[1].cpu(),
+                #                        self.last_test_batch[2].cpu()]
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode).cpu()
                 self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode).cpu()
+                self.last_test_batch[2] = self.last_test_batch[2].cpu()
             save_anomaly_maps(self.reconstruct_dir, self.last_test_batch)
         
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Visualizations
         # Save last batch for visualization
+
+        plot_loss(self, skip=1)
+        
         if self.FM_param.latent:
             self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode) 
             self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode)
-            
-        plot_loss(self, skip=1)
+        
         if self.FM_param.mode == "both":
             self.visualize_reconstructs_2ch(self.last_test_batch[0], 
                                             self.last_test_batch[1], 

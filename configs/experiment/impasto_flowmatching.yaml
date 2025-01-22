@@ -39,6 +39,7 @@ model:
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
       reconstruct: 0.3
+      save_reconstructs: true
       plot_n_epoch: 50
       target: 2
       solver_lib: torchdiffeq
@@ -56,7 +57,7 @@ trainer:
 data:
     variant: Enc_512x512
     crack: synthetic
-    batch_size: 32
+    batch_size: 4
     rgb_transform: null
         # _target_: src.data.components.transforms.diffuser_normalize
     height_transform: null
