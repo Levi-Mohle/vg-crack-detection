@@ -19,7 +19,7 @@ seed: 12345
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 100
+        patience: 500
         mode: "min"
     model_summary:
       max_depth: 1
@@ -53,7 +53,7 @@ model:
       target: 2
       reconstruct: .2
       wh: 1
-      plot_n_epoch: 4
+      plot_n_epoch: 20
       plot_ids: [0,1]
       latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'

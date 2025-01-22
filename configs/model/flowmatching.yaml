@@ -24,16 +24,22 @@ FM_param:
   plot_ids: [0,1,16,17]
   ood: false
 
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.OneCycleLR
+#   _partial_: true
+#   max_lr: ${model.optimizer.lr}
+#   total_steps: ${trainer.max_epochs}
+#   pct_start: ${eval:'${model.FM_param.warm_up} / ${model.scheduler.total_steps}'}
+#   anneal_strategy: cos
+#   cycle_momentum: false
+#   div_factor: ${eval:'${model.scheduler.max_lr}/1e-6'}
+#   final_div_factor: 1
 scheduler:
-  _target_: torch.optim.lr_scheduler.OneCycleLR
+  _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
   _partial_: true
-  max_lr: ${model.optimizer.lr}
-  total_steps: ${trainer.max_epochs}
-  pct_start: ${eval:'${model.FM_param.warm_up} / ${model.scheduler.total_steps}'}
-  anneal_strategy: cos
-  cycle_momentum: false
-  div_factor: ${eval:'${model.scheduler.max_lr}/1e-6'}
-  final_div_factor: 1
+  num_warmup_steps: 500
+  num_training_steps: 6400
+  num_cycles: 0.5
 
 unet:
   _target_: diffusers.models.UNet2DModel
