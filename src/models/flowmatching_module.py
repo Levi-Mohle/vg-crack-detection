@@ -189,7 +189,6 @@ class FlowMatchingLitModule(LightningModule):
         self.log("test/loss", loss, prog_bar=True)
 
         reconstruct = self.reconstruction(x)
-        losses = self.reconstruction_loss(x, reconstruct, reduction="batch")
         self.last_test_batch = [x, reconstruct, y]
 
         if self.FM_param.ood:
@@ -358,9 +357,9 @@ class FlowMatchingLitModule(LightningModule):
             reconstruct    = rgb_to_grayscale(reconstruct)
             
         # Calculate pixel-wise squared error per channel + normalize
-        error = ((x - reconstruct)**2)
+        error = ssim_for_batch(x, reconstruct)
 
-        img = [x.cpu(), reconstruct.cpu(), error.cpu()]
+        img = [x.cpu(), reconstruct.cpu(), error]
 
         title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
 
@@ -418,7 +417,7 @@ class FlowMatchingLitModule(LightningModule):
             reconstruct = torch.cat((reconstruct_gray, reconstruct[:,3:]), dim=1)
             
         # Calculate pixel-wise squared error per channel + normalize
-        error_idv = ((x - reconstruct)**2).cpu()
+        error_idv = ssim_for_batch(x, reconstruct)
         # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
