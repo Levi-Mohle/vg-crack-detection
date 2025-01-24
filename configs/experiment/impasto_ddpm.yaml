@@ -54,7 +54,7 @@ model:
       reconstruct: .2
       wh: 1
       plot_n_epoch: 20
-      plot_ids: [0,1]
+      plot_ids: [1,5,6]
       latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       ood: false
@@ -72,7 +72,7 @@ trainer:
 data:
   batch_size: 32
   variant: Enc_512x512
-  crack: synthetic
+  crack: real
   rgb_transform: null
     # _target_: src.data.components.transforms.diffuser_normalize
   height_transform: null

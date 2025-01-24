@@ -24,6 +24,7 @@ FM_param:
   wh: 1
   plot_ids: [0,1,16,17]
   ood: false
+  win_size: 3
 
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
