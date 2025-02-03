@@ -237,19 +237,18 @@ def append_h5f_reconstruct(output_filename_full_h5, batch):
         # Close the Keyence file for reading and the Keyence file for writing
         hdf5.close()
 
-def ssim_for_batch(batch, r_batch):
-    batch   = batch.numpy().cpu()
-    r_batch = r_batch.numpy().cpu()
+def ssim_for_batch(batch, r_batch, win_size):
+    batch   = batch.cpu().numpy()
+    r_batch = r_batch.cpu().numpy()
     bs = batch.shape[0]
-    ssim_batch = np.zeros(len(bs))
     ssim_batch_img = np.zeros_like(batch)
     for i in range(bs):
-        ssim,  img_ssim = structural_similarity(batch[i,0], 
-                            r_batch[i,0],
-                            win_size=3,
-                            data_range=1,
-                            full=True)
-        ssim_batch[i] = ssim
-        ssim_batch_img[i, 0] = (img_ssim - img_ssim.max()) * -1
+        for j in range(batch.shape[1]):
+            ssim,  img_ssim = structural_similarity(batch[i,j], 
+                                r_batch[i,j],
+                                win_size=win_size,
+                                data_range=1,
+                                full=True)
+            ssim_batch_img[i, j] = (img_ssim - img_ssim.max()) * -1
     
-    return ssim_batch, ssim_batch_img
+    return ssim_batch_img
