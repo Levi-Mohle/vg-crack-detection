@@ -250,7 +250,7 @@ def combine_h5_files(input_folder, output_file):
 
     print(f"Combined file created: {output_file}")
 
-def create_h5f_enc(output_filename_full_h5, rgb, height, id):    
+def create_h5f_enc(output_filename_full_h5, rgb, height, rgb_cracks=None, height_cracks=None):    
     """
     Create and save h5 file to store crack and normal tiny patches in
 
@@ -273,7 +273,15 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, id):
     Returns:
         
     """
-    
+    if (rgb_cracks != None) & (height_cracks != None):
+        id      = np.concatenate(
+                               [np.ones(height_cracks.shape[0]), 
+                                np.zeros(height.shape[0])]
+                               )
+        height  = np.concatenate([height_cracks, height], axis=0)
+        rgb     = np.concatenate([rgb_cracks, rgb], axis=0)
+        
+
     with h5py.File(output_filename_full_h5, 'w') as h5f:
         h5f.create_dataset('meas_capture/height',
                             data = height,
@@ -290,7 +298,7 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, id):
         # Close the Keyence file for reading and the Keyence file for writing
         h5f.close()   
 
-def append_h5f_enc(output_filename_full_h5, rgb, height, id):
+def append_h5f_enc(output_filename_full_h5, rgb, height, rgb_cracks=None, height_cracks=None):
     """
     Open and append a h5 file to store crack and normal tiny patches in
 
@@ -320,14 +328,27 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, id):
 
         original_size = rgbs.shape[0]
 
-        rgbs.resize(original_size + rgb.shape[0], axis=0)
-        heights.resize(original_size + height.shape[0], axis=0)
-        OODs.resize(original_size + id.shape[0], axis=0)
 
-        rgbs[original_size:]     = rgb
-        heights[original_size:]  = height
+        if (rgb_cracks != None) & (height_cracks != None):
+            i = 2
+        else:
+            i = 1
 
-        OODs[original_size:]     = id
+        rgbs.resize(original_size + i * rgb.shape[0], axis=0)
+        heights.resize(original_size + i* height.shape[0], axis=0)
+        OODs.resize(original_size + i * height.shape[0], axis=0)
+
+        ood = np.ones(height_cracks.shape[0]) 
+        id = np.zeros(height.shape[0])
+
+        if (rgb_cracks != None) & (height_cracks != None):
+            rgb[original_size:]     = np.concatenate([rgb_cracks, rgb], axis=0)
+            height[original_size:]  = np.concatenate([height_cracks, height], axis=0)
+            OODs[original_size:]     = np.concatenate([ood, id])
+        else:
+            rgb[original_size:]     = rgb
+            height[original_size:]  = height
+            OODs[original_size:]    = id
 
         # Close the Keyence file for reading and the Keyence file for writing
         hdf5.close()

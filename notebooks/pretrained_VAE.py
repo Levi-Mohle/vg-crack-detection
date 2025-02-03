@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 
 # add main folder to working directory
 wd = Path(__file__).parent.parent
@@ -39,14 +40,16 @@ test_loader = lightning_data.test_dataloader()
 #     break
 # %% Encode - Decode data
 
-def encode_decode(vae, rgb):
-    with torch.no_grad():
-        latent = vae.encode(rgb).latent_dist.sample().mul_(0.18215)
-        reconstructed = vae.decode(latent/0.18215).sample
+def encode_decode(vae, rgb, height):
+    height = torch.cat((height,height,height), dim=1)
 
-    reconstructed = (reconstructed + 1.) / 2.
-    reconstructed = reconstructed.clamp(0., 1.)
-    return reconstructed
+    with torch.no_grad():
+        enc_rgb     = vae.encode(rgb).latent_dist.sample().mul_(0.18215)
+        recon_rgb   = vae.decode(enc_rgb/0.18215).sample
+        enc_height     = vae.encode(height).latent_dist.sample().mul_(0.18215)
+        recon_height   = vae.decode(enc_height/0.18215).sample[:,0].unsqueeze(1)
+    
+    return recon_rgb, recon_height
 
 def encode(vae, rgb, height):
     height = torch.cat((height,height,height), dim=1)
@@ -101,15 +104,26 @@ def encode(vae, rgb, height):
 # %% Save encoded dataset as h5 file
 
 output_filename_full_h5 = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
-for rgb, height, id in tqdm(test_loader):
+for rgb, height, _ in tqdm(test_loader):
 
     enc_rgb, enc_height = encode(vae, rgb, height)
 
     if not os.path.exists(output_filename_full_h5):
         # Creating new h5 file
-        create_h5f_enc(output_filename_full_h5, enc_rgb, enc_height, id)
+        create_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
     else:
         # Appending h5 file
-        append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height, id)
+        append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
+# %% Check error / SSIM before and after encoding-decoding
 
-# %%
+ssim = SSIM(gaussian_kernel=False,
+            data_range=1,
+            kernel_size=5)
+
+ssim_RGB    = []
+ssim_HEIGHT = []
+for rgb, height, _ in tqdm(train_loader):
+    recon_rgb, recon_height = encode_decode(vae, rgb, height)
+
+    ssim_RGB.append(ssim(rgb, recon_rgb))
+    ssim_HEIGHT.append(ssim(height, recon_height))
