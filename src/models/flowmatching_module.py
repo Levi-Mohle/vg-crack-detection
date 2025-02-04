@@ -22,6 +22,7 @@ class FlowMatchingLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         FM_param: DictConfig,
+        OT,
         compile,
         paths: DictConfig,
     ):
@@ -39,6 +40,9 @@ class FlowMatchingLitModule(LightningModule):
 
         # Configure FM related parameters dict
         self.FM_param          = FM_param
+        
+        # Configure Optimal Transport
+        self.ot_sampler = OT
 
         if self.FM_param.latent:
             self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
@@ -251,11 +255,130 @@ class FlowMatchingLitModule(LightningModule):
         t = torch.rand(x.shape[0], device=self.device)
         noise = torch.randn_like(x)
 
-        x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
-        optimal_flow = x - (1 - sigma_min) * noise
-        predicted_flow = self(x_t, t).sample
+        if self.FM_param.method == "iCFM":
+            # indepedent Conditional Flow Matching Tong et al.
+            x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
+            ut = x - (1 - sigma_min) * noise
+            vt = self(x_t, t).sample
+        elif self.FM_param.method == "ot":
+            t, x_t, ut = self.sample_location_and_conditional_flow(noise, x)
+            vt = self(x_t, t).sample    
 
-        return (predicted_flow - optimal_flow).square().mean()
+        return (vt - ut).square().mean()
+
+    def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
+        r"""
+        Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
+        and the conditional vector field ut(x1|x0) = x1 - x0, see Eq.(15) [1]
+        with respect to the minibatch OT plan $\Pi$.
+
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        (optionally) t : Tensor, shape (bs)
+            represents the time levels
+            if None, drawn from uniform [0,1]
+        return_noise : bool
+            return the noise sample epsilon
+
+        Returns
+        -------
+        t : FloatTensor, shape (bs)
+        xt : Tensor, shape (bs, *dim)
+            represents the samples drawn from probability path pt
+        ut : conditional vector field ut(x1|x0) = x1 - x0
+        (optionally) epsilon : Tensor, shape (bs, *dim) such that xt = mu_t + sigma_t * epsilon
+
+        References
+        ----------
+        [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
+        """
+        x0, x1 = self.ot_sampler.sample_plan(x0, x1)
+        return super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+
+    def guided_sample_location_and_conditional_flow(
+        self, x0, x1, y0=None, y1=None, t=None, return_noise=False
+    ):
+        r"""
+        Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
+        and the conditional vector field ut(x1|x0) = x1 - x0, see Eq.(15) [1]
+        with respect to the minibatch OT plan $\Pi$.
+
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        y0 : Tensor, shape (bs) (default: None)
+            represents the source label minibatch
+        y1 : Tensor, shape (bs) (default: None)
+            represents the target label minibatch
+        (optionally) t : Tensor, shape (bs)
+            represents the time levels
+            if None, drawn from uniform [0,1]
+        return_noise : bool
+            return the noise sample epsilon
+
+        Returns
+        -------
+        t : FloatTensor, shape (bs)
+        xt : Tensor, shape (bs, *dim)
+            represents the samples drawn from probability path pt
+        ut : conditional vector field ut(x1|x0) = x1 - x0
+        (optionally) epsilon : Tensor, shape (bs, *dim) such that xt = mu_t + sigma_t * epsilon
+
+        References
+        ----------
+        [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
+        """
+        x0, x1, y0, y1 = self.ot_sampler.sample_plan_with_labels(x0, x1, y0, y1)
+        if return_noise:
+            t, xt, ut, eps = super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+            return t, xt, ut, y0, y1, eps
+        else:
+            t, xt, ut = super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+            return t, xt, ut, y0, y1
+        
+    def log_p_base(self, x, reduction='sum', dim=1):
+        log_p = -0.5 * torch.log(2. * self.PI) - 0.5 * x**2.
+        if reduction == 'mean':
+            return torch.mean(log_p, dim)
+        elif reduction == 'sum':
+            return torch.sum(log_p, dim)
+        else:
+            return log_p
+
+    def log_prob(self, x_1, reduction='mean'):
+        ts = torch.linspace(1., 0., int(1 / self.FM_param.step_size))
+
+        for t in ts:
+            if t == 1.:
+                x_t = x_1 * 1.
+                f_t = 0.
+            else:
+                x_t = x_t - self(x_t, t).sample * self.FM_param.step_size
+
+                self.unet.eval()
+                x = torch.FloatTensor(x_t.data)
+                x.requires_grad = True
+                e = torch.randn_like(x)
+                e_grad = torch.autograd.grad(self.unet(x).sum(), x, create_graph=True)[0]
+
+                e_grad_e = e_grad * e
+                f_t = e_grad_e.view(x.shape[0], -1).sum(dim=1)
+
+                self.unet.eval()
+
+        log_p_1 = self.log_p_base(x_t, reduction='sum') - f_t
+
+        if reduction == "mean":
+            return log_p_1.mean()
+        elif reduction == "sum":
+            return log_p_1.sum()
 
     @torch.no_grad()
     def sample(self, n_samples):

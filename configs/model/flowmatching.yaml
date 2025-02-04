@@ -7,6 +7,7 @@ optimizer:
   weight_decay: 0.0
 
 FM_param:
+  method: ot
   step_size: 0.1
   warm_up: 0
   latent: false
@@ -25,6 +26,14 @@ FM_param:
   plot_ids: [0,1,16,17]
   ood: false
   win_size: 3
+
+OT:
+  _target_: src.models.components.optimal_transport.OTPlanSampler
+  method: exact
+  reg: 0.05
+  reg_m: 1.0
+  normalize_cost: false
+
 
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR

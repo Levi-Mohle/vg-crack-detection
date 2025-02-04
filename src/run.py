@@ -5,17 +5,17 @@ src_path  = Path.cwd()  / "src"
 
 mode = "train" # ["train", "eval"]
 
-model = "svdd"
+model = "flowmatching"
 # model = "cae"
 logger      = "mlflow"
-experiment  = "impasto_deepsvdd"
+experiment  = "impasto_flowmatching"
 # experiment = "impasto_cae"
 max_epochs  = 1
 data = "impasto"
 debug = 'fdr'
 device = "cpu" 
-batch_size = 32
-variant = "32x32"
+batch_size = 16
+variant = "Enc_512x512"
 
 train_size = .01
 val_size = .1
