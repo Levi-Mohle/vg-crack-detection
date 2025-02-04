@@ -23,6 +23,7 @@ sys.path.append(str(wd))
 
 from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.dataset import append_h5f_enc, create_h5f_enc, HDF5PatchesDatasetCustom
+from notebooks.pretrained_VAE import encode
 
 # %% Load the data & model
 data_dir = r"C:\Users\lmohle\Documents\2_Coding\data\input\Training_data\512x512"
@@ -269,15 +270,6 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
     rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=0)).unsqueeze(0) * 255
 
     return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8)
-
-def encode(vae, rgb, height, device="cpu"):
-    height = torch.cat((height,height,height), dim=1)
-
-    with torch.no_grad():
-        enc_rgb     = vae.encode(rgb.to(device)).latent_dist.sample().mul_(0.18215)
-        enc_height  = vae.encode(height.to(device)).latent_dist.sample().mul_(0.18215)
-
-    return enc_rgb.cpu(), enc_height.cpu()
 
 # %% Adding cracks + encoding
 

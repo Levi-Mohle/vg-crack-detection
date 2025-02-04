@@ -36,24 +36,52 @@ train_loader = lightning_data.train_dataloader()
 val_loader = lightning_data.val_dataloader()
 test_loader = lightning_data.test_dataloader()
 
-# for i, (rgb, height, id) in enumerate(test_loader):
-#     break
 # %% Encode - Decode data
 
 def encode_decode(vae, rgb, height):
+    """
+    Encodes and subsequently decodes rgb and height images with given pre-trained vae
+
+    Args:
+        vae (AutoEncoderKL): pre-trained vae
+        rgb (Tensor) : Tensor containing rgb images [N,3,h,w]
+        height (Tensor): Tensor containing height images [N,1,h,w]
+
+    Returns:
+        recon_rgb (Tensor) : Tensor containing recontructed rgb images [N,3,h,w]
+        recon_height (Tensor): Tensor containing reconstructed height images [N,1,h,w]
+    """
+    # Duplicate height channel to fit the vae
     height = torch.cat((height,height,height), dim=1)
 
+
     with torch.no_grad():
+        # Encode
         enc_rgb     = vae.encode(rgb.to(device)).latent_dist.sample().mul_(0.18215)
         recon_rgb   = vae.decode(enc_rgb/0.18215).sample
+        # Decode
         enc_height     = vae.encode(height.to(device)).latent_dist.sample().mul_(0.18215)
         recon_height   = vae.decode(enc_height/0.18215).sample[:,0].unsqueeze(1)
     
     return recon_rgb, recon_height
 
 def encode(vae, rgb, height):
+    """
+    Encodes rgb and height images with given pre-trained vae
+
+    Args:
+        vae (AutoEncoderKL): pre-trained vae
+        rgb (Tensor) : Tensor containing rgb images [N,3,h,w]
+        height (Tensor): Tensor containing height images [N,1,h,w]
+
+    Returns:
+        enc_rgb (Tensor) : Tensor containing encoded rgb images [N,4,h/8,w/8]
+        enc_height (Tensor): Tensor containing encoded height images [N,4,h/8,w/8]
+    """
+    # Duplicate height channel to fit the vae
     height = torch.cat((height,height,height), dim=1)
 
+    # Encode
     with torch.no_grad():
         enc_rgb     = vae.encode(rgb.to(device)).latent_dist.sample().mul_(0.18215)
         enc_height  = vae.encode(height.to(device)).latent_dist.sample().mul_(0.18215)
@@ -116,12 +144,16 @@ def encode(vae, rgb, height):
 #         append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
 # %% Check error / SSIM before and after encoding-decoding
 
+# Initialize SSIM settings
 ssim = SSIM(gaussian_kernel=False,
             data_range=1,
             kernel_size=11).to(device)
 
+# Create empty lists to store SSIM scores
 ssim_RGB    = []
 ssim_HEIGHT = []
+
+# Loop to encode & decode images and comparing result with SSIM 
 for rgb, height, _ in (pbar := tqdm(test_loader)):
     recon_rgb, recon_height = encode_decode(vae, rgb, height)
 
@@ -133,5 +165,6 @@ for rgb, height, _ in (pbar := tqdm(test_loader)):
     
     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
 
+# Print mean
 print(f"The mean SSIM for RGB image: {mean_rgb:.5f}")
 print(f"The mean SSIM for height images: {mean_height:.5f}")
