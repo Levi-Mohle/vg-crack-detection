@@ -15,7 +15,7 @@ from omegaconf import DictConfig
 from src.models.support_functions.evaluation import *
 import tqdm
 
-class FlowMatchingLitModule(LightningModule):
+class ClassConditionedFlowMatchingLitModule(LightningModule):
     def __init__(
         self, 
         unet: torch.nn.Module,
@@ -43,6 +43,9 @@ class FlowMatchingLitModule(LightningModule):
         
         # Configure Optimal Transport
         self.ot_sampler = OT
+        
+        # Configure embedding for classes
+        self.embedding = torch.nn.Embedding(2, 128)
 
         if self.FM_param.latent:
             self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
@@ -78,8 +81,9 @@ class FlowMatchingLitModule(LightningModule):
         self.test_losses = []
         self.test_labels = []
 
-    def forward(self, x, t):
-        return self.unet(x, t)
+    def forward(self, x, t, y=None):
+        y = torch.t(y)
+        return self.unet(x, t, class_labels=y)
     
     def select_mode(self, batch, mode):
         if mode == "both":
@@ -132,7 +136,7 @@ class FlowMatchingLitModule(LightningModule):
         # x = self.encode_data(batch, self.FM_param.mode)
         x = self.select_mode(batch, self.FM_param.mode)   
         y = batch[self.FM_param.target]     
-        loss = self.conditional_flow_matching_loss(x)
+        loss = self.conditional_flow_matching_loss(x, y)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
@@ -140,7 +144,7 @@ class FlowMatchingLitModule(LightningModule):
         # x = self.encode_data(batch, self.FM_param.mode)
         x = self.select_mode(batch, self.FM_param.mode)
         y = batch[self.FM_param.target] 
-        loss = self.conditional_flow_matching_loss(x)
+        loss = self.conditional_flow_matching_loss(x, y)
         self.log("val/loss", loss, prog_bar=True)
 
         # Reconstruct test samples
@@ -191,7 +195,7 @@ class FlowMatchingLitModule(LightningModule):
         x = self.select_mode(batch, self.FM_param.mode)
         y = batch[self.FM_param.target]
         self.shape  = x.shape
-        loss        = self.conditional_flow_matching_loss(x)
+        loss        = self.conditional_flow_matching_loss(x, y)
         self.log("test/loss", loss, prog_bar=True)
 
         reconstruct = self.reconstruction(x)
@@ -248,7 +252,7 @@ class FlowMatchingLitModule(LightningModule):
         self.test_losses.clear()
         self.test_labels.clear()
 
-    def conditional_flow_matching_loss(self, x):
+    def conditional_flow_matching_loss(self, x, y):
         '''
         Conditional flow matching loss
         :param x: input image
@@ -262,11 +266,15 @@ class FlowMatchingLitModule(LightningModule):
             # indepedent Conditional Flow Matching Tong et al.
             x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
             ut = x - (1 - sigma_min) * noise
-            vt = self(x_t, t).sample
+            vt = self(x_t, t, y).sample
         elif self.FM_param.method == "ot":
             # Optimal Transport Flow Matching Tong et al. 
             t, x_t, ut = self.sample_location_and_conditional_flow(noise, x, t)
-            vt = self(x_t, t).sample
+            vt = self(x_t, t, y).sample
+        
+        # Classifier Free Guidance Ho et al.
+        if self.FM_param.CFG:
+            vt = (1+w)*self(x_t, t, y) - w*vt    
 
         return (vt - ut).square().mean()
     

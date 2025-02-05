@@ -5,10 +5,10 @@ src_path  = Path.cwd()  / "src"
 
 mode = "train" # ["train", "eval"]
 
-model = "flowmatching"
+model = "ccflowmatching"
 # model = "cae"
 logger      = "mlflow"
-experiment  = "impasto_flowmatching"
+experiment  = "impasto_FM_OT_CFG_32"
 # experiment = "impasto_cae"
 max_epochs  = 1
 data = "impasto"

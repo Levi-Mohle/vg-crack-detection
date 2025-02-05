@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: impasto
-  - override /model: flowmatching
+  - override /model: ccflowmatching
   - override /callbacks: default
   - override /trainer: default
 
@@ -32,11 +32,10 @@ model:
     optimizer:
       lr: 1e-5
     unet:
-      _target_: diffusers.models.UNet2DConditionModel
       in_channels: 2
       out_channels: 2
       attention_head_dim: 8
-      num_class_embeds: 128
+      num_class_embeds: 2
       class_embed_type: null
     FM_param:
       latent: false
