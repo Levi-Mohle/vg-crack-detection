@@ -32,16 +32,23 @@ model:
     optimizer:
       lr: 1e-5
     unet:
-      in_channels: 2
-      out_channels: 2
-      attention_head_dim: 8
-      num_class_embeds: 2
-      class_embed_type: null
+      image_size : 32
+      in_channels : 2
+      model_channels: 128 
+      out_channels : 2
+      num_res_blocks : 2
+      attention_resolutions : [8]
+      dropout : 0.0
+      channel_mult : [1, 1, 2, 2, 4, 4]
+      n_classes : 3
+
     FM_param:
       latent: false
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
       method: ot
+      n_classes: ${model.unet.n_classes}
+      dropout_prob: 0.3
       CFG: true
       reconstruct: 0.3
       save_reconstructs: false

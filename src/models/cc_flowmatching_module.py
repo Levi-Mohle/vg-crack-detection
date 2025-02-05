@@ -43,9 +43,6 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         
         # Configure Optimal Transport
         self.ot_sampler = OT
-        
-        # Configure embedding for classes
-        self.embedding = torch.nn.Embedding(2, 128)
 
         if self.FM_param.latent:
             self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
@@ -82,8 +79,10 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.test_labels = []
 
     def forward(self, x, t, y=None):
-        y = torch.t(y)
-        return self.unet(x, t, class_labels=y)
+        # y = torch.t(y)
+        if y != None:
+            y = y.type(torch.LongTensor)
+        return self.unet(x=x, timesteps=t, y=y)
     
     def select_mode(self, batch, mode):
         if mode == "both":
@@ -147,13 +146,13 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         loss = self.conditional_flow_matching_loss(x, y)
         self.log("val/loss", loss, prog_bar=True)
 
-        # Reconstruct test samples
-        reconstruct = self.reconstruction(x)
+        # # Reconstruct test samples
+        # reconstruct = self.reconstruction(x)
 
-        # Pick the second last batch (which is full)
-        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.FM_param.mode)
-            self.last_val_batch = [x, reconstruct]
+        # # Pick the second last batch (which is full)
+        # if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+        #     x = self.select_mode(batch, self.FM_param.mode)
+        #     self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -259,6 +258,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         '''
         sigma_min   = self.FM_param.sigma_min
         t           = torch.rand(x.shape[0], device=self.device)
+        indices     = torch.randperm(x.shape[0])[:int(self.FM_param.dropout_prob*x.shape[0])]
+        y[indices]  = self.FM_param.n_classes - 1
         noise       = torch.randn_like(x)
         w           = self.FM_param.guidance_strength
 
@@ -266,11 +267,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             # indepedent Conditional Flow Matching Tong et al.
             x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
             ut = x - (1 - sigma_min) * noise
-            vt = self(x_t, t, y).sample
+            vt = self(x_t, t, y)
         elif self.FM_param.method == "ot":
             # Optimal Transport Flow Matching Tong et al. 
             t, x_t, ut = self.sample_location_and_conditional_flow(noise, x, t)
-            vt = self(x_t, t, y).sample
+            vt = self(x_t, t, y)
         
         # Classifier Free Guidance Ho et al.
         if self.FM_param.CFG:
@@ -405,7 +406,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 x_t = x_1 * 1.
                 f_t = 0.
             else:
-                x_t = x_t - self(x_t, t).sample * self.FM_param.step_size
+                x_t = x_t - self(x_t, t) * self.FM_param.step_size
 
                 self.unet.eval()
                 x = torch.FloatTensor(x_t.data)
@@ -434,7 +435,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         x_0 = torch.randn(n_samples, self.shape[1], self.shape[2], self.shape[3], device=self.device)
 
         def f(t: float, x):
-            return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
+            return self(x, torch.full(x.shape[:1], t, device=self.device))
         
         if self.FM_param.solver_lib == 'torchdiffeq':
             if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver == 'implicit_adams':
@@ -467,7 +468,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         xt = (1-(1-sigma_min)*tstart)*e + x*tstart
         
         def f(t: float, x):
-            return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
+            return self(x, torch.full(x.shape[:1], t, device=self.device))
         
         if self.FM_param.solver_lib == 'torchdiffeq':
             if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' \
@@ -482,7 +483,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         else:
             t=tstart
             for i in range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))):
-                v = self(xt, torch.full(xt.shape[:1], t, device=self.device)).sample
+                v = self(xt, torch.full(xt.shape[:1], t, device=self.device))
                 xt = xt + self.FM_param.step_size * v
                 t += self.FM_param.step_size
             reconstruct = xt

@@ -1,52 +1,27 @@
 _target_: src.models.cc_flowmatching_module.ClassConditionedFlowMatchingLitModule
 
 unet:
-  _target_: diffusers.models.UNet2DModel
-  act_fn: silu
-  add_attention: true
-  attention_head_dim: 8
-  attn_norm_num_groups: null
-  center_input_sample: false
-  class_embed_type: null
-  block_out_channels:
-    - 128
-    - 128
-    - 256
-    - 256
-    - 512
-    - 512
-  down_block_types:
-    - DownBlock2D
-    - DownBlock2D
-    - DownBlock2D
-    - DownBlock2D
-    - AttnDownBlock2D
-    - DownBlock2D
-  up_block_types:
-    - UpBlock2D
-    - AttnUpBlock2D
-    - UpBlock2D
-    - UpBlock2D
-    - UpBlock2D
-    - UpBlock2D
-  downsample_padding: 1
-  downsample_type: conv
-  dropout: 0.0
-  flip_sin_to_cos: true
-  freq_shift: 0
-  in_channels: 3
-  layers_per_block: 2
-  mid_block_scale_factor: 1
-  norm_eps: 1.0e-05
-  norm_num_groups: 32
-  num_class_embeds: null
-  num_train_timesteps: null
-  out_channels: 3
-  resnet_time_scale_shift: default
-  sample_size: 32
-  time_embedding_type: positional
-  upsample_type: conv
-  
+  _target_: src.models.components.u_net.UNetModel
+  image_size : 512
+  in_channels : 2
+  model_channels: 64
+  out_channels : 2
+  num_res_blocks : 2
+  attention_resolutions : [4]
+  dropout : 0.0
+  channel_mult : [1, 2, 2, 4]
+  conv_resample : true
+  dims : 2
+  n_classes : null
+  use_checkpoint : false
+  use_fp16 : false
+  num_heads : 1
+  num_head_channels :  -1
+  num_heads_upsample : -1
+  use_scale_shift_norm : false
+  resblock_updown : false
+  use_new_attention_order : false
+
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
@@ -56,6 +31,8 @@ optimizer:
 FM_param:
   method: iCFM
   CFG: false
+  n_classes: null
+  dropout_prob: 0.0
   guidance_strength: 1.0
   step_size: 0.1
   warm_up: 0
