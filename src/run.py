@@ -14,8 +14,8 @@ max_epochs  = 1
 data = "impasto"
 debug = 'fdr'
 device = "cpu" 
-batch_size = 16
-variant = "Enc_512x512"
+batch_size = 32
+variant = "32x32"
 
 train_size = .01
 val_size = .1

@@ -78,8 +78,8 @@ class FlowMatchingLitModule(LightningModule):
         self.test_losses = []
         self.test_labels = []
 
-    def forward(self, x, t):
-        return self.unet(x, t)
+    def forward(self, x, t, y=None):
+        return self.unet(x, t, class_labels=y)
     
     def select_mode(self, batch, mode):
         if mode == "both":
@@ -130,15 +130,17 @@ class FlowMatchingLitModule(LightningModule):
         
     def training_step(self, batch, batch_idx):
         # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)        
-        loss = self.conditional_flow_matching_loss(x)
+        x = self.select_mode(batch, self.FM_param.mode)   
+        y = batch[self.FM_param.target]     
+        loss = self.conditional_flow_matching_loss(x, y)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         # x = self.encode_data(batch, self.FM_param.mode)
         x = self.select_mode(batch, self.FM_param.mode)
-        loss = self.conditional_flow_matching_loss(x)
+        y = batch[self.FM_param.target] 
+        loss = self.conditional_flow_matching_loss(x, y)
         self.log("val/loss", loss, prog_bar=True)
 
         # Reconstruct test samples
@@ -188,8 +190,8 @@ class FlowMatchingLitModule(LightningModule):
         # x = self.encode_data(batch, self.FM_param.mode)
         x = self.select_mode(batch, self.FM_param.mode)
         y = batch[self.FM_param.target]
-        self.shape = x.shape
-        loss    = self.conditional_flow_matching_loss(x)
+        self.shape  = x.shape
+        loss        = self.conditional_flow_matching_loss(x, y)
         self.log("test/loss", loss, prog_bar=True)
 
         reconstruct = self.reconstruction(x)
@@ -246,26 +248,58 @@ class FlowMatchingLitModule(LightningModule):
         self.test_losses.clear()
         self.test_labels.clear()
 
-    def conditional_flow_matching_loss(self, x):
+    def conditional_flow_matching_loss(self, x, y):
         '''
         Conditional flow matching loss
         :param x: input image
         '''
-        sigma_min = self.FM_param.sigma_min
-        t = torch.rand(x.shape[0], device=self.device)
-        noise = torch.randn_like(x)
+        sigma_min   = self.FM_param.sigma_min
+        t           = torch.rand(x.shape[0], device=self.device)
+        noise       = torch.randn_like(x)
+        w           = self.FM_param.guidance_strength
 
         if self.FM_param.method == "iCFM":
             # indepedent Conditional Flow Matching Tong et al.
             x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
             ut = x - (1 - sigma_min) * noise
-            vt = self(x_t, t).sample
+            vt = self(x_t, t, y).sample
         elif self.FM_param.method == "ot":
-            t, x_t, ut = self.sample_location_and_conditional_flow(noise, x)
-            vt = self(x_t, t).sample    
+            # Optimal Transport Flow Matching Tong et al. 
+            t, x_t, ut = self.sample_location_and_conditional_flow(noise, x, t)
+            vt = self(x_t, t, y).sample
+        
+        # Classifier Free Guidance Ho et al.
+        if self.FM_param.CFG:
+            vt = (1+w)*self(x_t, t, y) - w*vt    
 
         return (vt - ut).square().mean()
+    
+    def sample_xt(self, x0, x1, t, epsilon):
+        """
+        Draw a sample from the probability path N(t * x1 + (1 - t) * x0, sigma), see (Eq.14) [1].
 
+        Parameters
+        ----------
+        x0 : Tensor, shape (bs, *dim)
+            represents the source minibatch
+        x1 : Tensor, shape (bs, *dim)
+            represents the target minibatch
+        t : FloatTensor, shape (bs)
+        epsilon : Tensor, shape (bs, *dim)
+            noise sample from N(0, 1)
+
+        Returns
+        -------
+        xt : Tensor, shape (bs, *dim)
+
+        References
+        ----------
+        [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
+        """
+        mu_t = t[:, None, None, None] * x1 + (1 - t[:, None, None, None]) * x0
+        sigma_t = self.FM_param.sigma_min
+        return mu_t + sigma_t * epsilon
+    
     def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
         r"""
         Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
@@ -296,8 +330,15 @@ class FlowMatchingLitModule(LightningModule):
         ----------
         [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
         """
-        x0, x1 = self.ot_sampler.sample_plan(x0, x1)
-        return super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
+        x0, x1  = self.ot_sampler.sample_plan(x0, x1)
+        noise   = torch.randn_like(x0)
+        xt      = self.sample_xt(x0, x1, t, noise)
+        ut      = x1 - x0
+        
+        if return_noise:
+            return t, xt, ut, noise
+        else:
+            return t, xt, ut
 
     def guided_sample_location_and_conditional_flow(
         self, x0, x1, y0=None, y1=None, t=None, return_noise=False

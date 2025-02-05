@@ -12,14 +12,15 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["impasto", "conditonal flow matching"]
+tags: ["impasto", "conditonal flow matching", "optimal transport",
+        "classifier free guidance"]
 
 seed: 12345
 
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 500
+        patience: 10
         mode: "min"
     model_summary:
       max_depth: 1
@@ -31,13 +32,18 @@ model:
     optimizer:
       lr: 1e-5
     unet:
+      _target_: diffusers.models.UNet2DConditionModel
       in_channels: 2
       out_channels: 2
       attention_head_dim: 8
+      num_class_embeds: 128
+      class_embed_type: null
     FM_param:
       latent: false
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
+      method: ot
+      CFG: true
       reconstruct: 0.3
       save_reconstructs: false
       plot_n_epoch: 50
@@ -56,13 +62,13 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-    variant: Enc_512x512
+    variant: 32x32
     crack: synthetic
-    batch_size: 16
-    rgb_transform: null
-        # _target_: src.data.components.transforms.diffuser_normalize
-    height_transform: null
-        # _target_: src.data.components.transforms.diffuser_normalize_height_idv
+    batch_size: 32
+    rgb_transform: 
+        _target_: src.data.components.transforms.diffuser_to_grayscale
+    height_transform:
+        _target_: src.data.components.transforms.diffuser_normalize_height_idv
 
 extras:
   print_config: false
