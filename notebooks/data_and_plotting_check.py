@@ -1,6 +1,7 @@
 # %%
 import sys
 import torch
+import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -18,16 +19,21 @@ from src.data.components.transforms import *
 
 
 # %% Load the data
-lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
+lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
                                     batch_size = 32,
+                                    variant = "512x512",
                                     rgb_transform = diffuser_normalize(),
                                     height_transform = diffuser_normalize_height_idv()
                                     )
 lightning_data.setup()
 test_loader = lightning_data.test_dataloader()
+
+img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
+
 # %% Run for 1 batch
 avg_diff_gray   = torch.zeros(7)
 avg_diff_height = torch.zeros(7)
+
 for i, (gray, height, id) in enumerate(test_loader):
     avg_diff_gray[i]    = gray.max() - gray.min()
     avg_diff_height[i]  = height.max() - height.min()
@@ -86,26 +92,31 @@ def visualize_reconstructs_1ch(x, plot_ids, fs=16):
                      axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
                 else:
                      axes[i,j].tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-                     
             
+            plt_dir = os.path.join(img_dir, f"test_{i}")
+            fig.savefig(plt_dir)
+            plt.close()
 
 def visualize_reconstructs_2ch(x, plot_ids, fs=12):
         # Convert back to [0,1] for plotting
-        # x = (x + 1) / 2
-        # reconstruct = (reconstruct + 1) / 2
+        x = (x + 1) / 2
+        
+        x_gray = rgb_to_grayscale(x[:,:3])
+        x = torch.cat((x_gray, x[:,3:]), dim=1)
+
         Blur = GaussianBlur(kernel_size=9)
         reconstruct = Blur(x)
-
+            
         # Calculate pixel-wise squared error per channel + normalize
-        error_idv = (x - reconstruct)**2
-        #error_idv = self.min_max_normalize(error_idv, dim=(2,3))
+
+        error_idv = ((x - reconstruct)**2)
+        # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
-        # error_comb = self.reconstruction_loss(x, reconstruct, reduction=None)
-        error_comb = error_idv[:,0] + error_idv[:,1] #self.min_max_normalize(error_comb, dim=(2,3))
-        print(error_comb.shape)
+        error_comb = ((x - reconstruct)**2)[:,1:]
+        # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
+        
         img = [x, reconstruct, error_idv, error_comb]
-
         extent = [0,4,0,4]
         for i in plot_ids:
             fig = plt.figure(constrained_layout=True, figsize=(15,7))
@@ -167,12 +178,16 @@ def visualize_reconstructs_2ch(x, plot_ids, fs=12):
             plt.colorbar(im6, cax=cax6)
 
             # Span whole column
-            im7 = ax7.imshow(img[3][i], extent=extent, vmin=0)
+            im7 = ax7.imshow(img[3][i,0], extent=extent, vmin=0)
             ax7.set_title("Anomaly map combined", fontsize =fs)
             ax7.set_yticks([0,1,2,3,4])
             ax7.set_xlabel("X [mm]")
             ax7.set_ylabel("Y [mm]")
 
+            plt_dir = os.path.join(img_dir, f"test_{i}")
+            fig.savefig(plt_dir)
+            plt.close()
+
 x = torch.cat((gray,height), dim=1)
-visualize_reconstructs_1ch(gray, [0,1,2,5,6])
+visualize_reconstructs_2ch(x, [0])
 # %%

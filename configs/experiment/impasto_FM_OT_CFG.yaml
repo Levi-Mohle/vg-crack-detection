@@ -23,7 +23,7 @@ callbacks:
         patience: 10
         mode: "min"
     model_summary:
-      max_depth: 1
+        max_depth: 1
     model_checkpoint:
         mode: "min"
         monitor: "val/loss"
@@ -37,27 +37,27 @@ model:
       model_channels: 128 
       out_channels : 8
       num_res_blocks : 2
-      attention_resolutions : [8]
+      attention_resolutions : [16]
       dropout : 0.0
       channel_mult : [1, 1, 2, 2, 4, 4]
       n_classes : 3
 
     FM_param:
-      latent: false
+      latent: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
       method: ot
       n_classes: ${model.unet.n_classes}
-      dropout_prob: 0.3
+      dropout_prob: 0.1
       CFG: true
       reconstruct: 0.3
       save_reconstructs: false
-      plot_n_epoch: 50
+      plot_n_epoch: 2
       target: 2
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0,1,5,6]
+      plot_ids: [0]
       ood: false
       win_size: 5
   
@@ -70,7 +70,7 @@ trainer:
 data:
     variant: Enc_mix_512x512
     crack: synthetic
-    batch_size: 32
+    batch_size: 16
     rgb_transform: null
         # _target_: src.data.components.transforms.diffuser_to_grayscale
     height_transform: null

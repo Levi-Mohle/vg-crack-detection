@@ -24,11 +24,11 @@ vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device
 
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
-                                    variant="512x512",
+                                    variant="Enc_512x512",
                                     crack="synthetic",
-                                    batch_size = 16,
-                                    rgb_transform = diffuser_normalize(),
-                                    height_transform = diffuser_normalize_height_idv()
+                                    batch_size = 4,
+                                    # rgb_transform = diffuser_normalize(),
+                                    # height_transform = diffuser_normalize_height_idv()
                                     )
 lightning_data.setup()
 
@@ -36,9 +36,10 @@ train_loader = lightning_data.train_dataloader()
 val_loader = lightning_data.val_dataloader()
 test_loader = lightning_data.test_dataloader()
 
+img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
 # %% Encode - Decode data
 
-def encode_decode(vae, rgb, height):
+def encode_decode(vae, rgb, height, device="cpu"):
     """
     Encodes and subsequently decodes rgb and height images with given pre-trained vae
 
@@ -51,21 +52,16 @@ def encode_decode(vae, rgb, height):
         recon_rgb (Tensor) : Tensor containing recontructed rgb images [N,3,h,w]
         recon_height (Tensor): Tensor containing reconstructed height images [N,1,h,w]
     """
-    # Duplicate height channel to fit the vae
-    height = torch.cat((height,height,height), dim=1)
-
-
+    vae.to(device)
     with torch.no_grad():
         # Encode
-        enc_rgb     = vae.encode(rgb.to(device)).latent_dist.sample().mul_(0.18215)
-        recon_rgb   = vae.decode(enc_rgb/0.18215).sample
+        enc_rgb, enc_height = encode(vae, rgb, height, device)  
         # Decode
-        enc_height     = vae.encode(height.to(device)).latent_dist.sample().mul_(0.18215)
-        recon_height   = vae.decode(enc_height/0.18215).sample[:,0].unsqueeze(1)
+        recon_rgb, recon_height = decode(vae, enc_rgb, enc_height, device)
     
-    return recon_rgb, recon_height
+    return recon_rgb.cpu(), recon_height.cpu()
 
-def encode(vae, rgb, height):
+def encode(vae, rgb, height, device="cpu"):
     """
     Encodes rgb and height images with given pre-trained vae
 
@@ -80,22 +76,51 @@ def encode(vae, rgb, height):
     """
     # Duplicate height channel to fit the vae
     height = torch.cat((height,height,height), dim=1)
+    
+    vae.to(device)
 
     # Encode
     with torch.no_grad():
         enc_rgb     = vae.encode(rgb.to(device)).latent_dist.sample().mul_(0.18215)
         enc_height  = vae.encode(height.to(device)).latent_dist.sample().mul_(0.18215)
 
-    return enc_rgb.cpu(), enc_height.cpu()
+    return enc_rgb, enc_height
 
-# reconstructed_rgb = encode_decode(vae, rgb)
+def decode(vae, enc_rgb, enc_height, device="cpu"):
+    """
+    Decodes rgb and height images with given pre-trained vae
 
-# height_stacked          = torch.cat((height,height,height), dim=1)
-# reconstructed_height    = encode_decode(vae, height_stacked)
+    Args:
+        vae (AutoEncoderKL): pre-trained vae
+        enc_rgb (Tensor) : Tensor containing encoded rgb images [N,4,h/8,w/8]
+        enc_height (Tensor): Tensor containing encoded height images [N,4,h/8,w/8]
+
+    Returns:
+        rgb (Tensor) : Tensor containing rgb images [N,3,h,w]
+        height (Tensor): Tensor containing height images [N,1,h,w]
+    """
+    vae.to(device)
+    
+    # Decode
+    recon_rgb      = vae.decode(enc_rgb.to(device)/0.18215).sample
+    recon_height   = vae.decode(enc_height.to(device)/0.18215).sample[:,0].unsqueeze(1)
+
+    return recon_rgb, recon_height
+
+def undo_norm(x):
+    x = (x + 1.) / 2.
+    x = x.clamp(0., 1.)
+    return x
 # %% Plot results rgb
 
-# rgb2 = (rgb + 1.) / 2.
-# rgb2 = rgb2.clamp(0., 1.)
+# for rgb, height, _ in train_loader:
+#     recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
+    
+#     recon_rgb = undo_norm(recon_rgb)
+#     recon_height = undo_norm(recon_height)
+#     break
+
+# rgb2 = undo_norm(rgb)
 
 # i = 3
 # fig, axes = plt.subplots(1, 2, figsize=(12,8))
@@ -103,17 +128,17 @@ def encode(vae, rgb, height):
 # axes[0].set_title(f"Original mini patch", fontsize=16)
 # axes[0].axis('off')
 
-# axes[1].imshow(reconstructed_rgb[i].permute(1,2,0))
+# axes[1].imshow(recon_rgb[i].permute(1,2,0))
 # axes[1].set_title(f"Reconstructed", fontsize=16)
 # axes[1].axis('off')
 
-# plt.tight_layout()
-# plt.show()
+# plt_dir = os.path.join(img_dir, "test_rgb")
+# fig.savefig(plt_dir)
+# plt.close()
 
-# %% Plot results height
+# # %% Plot results height
 
-# height2 = (height + 1.) / 2.
-# height2 = height2.clamp(0., 1.)
+# height2 = undo_norm(height)
 
 # i, j = 3, 2
 # fig, axes = plt.subplots(1, 2, figsize=(12,8))
@@ -121,12 +146,46 @@ def encode(vae, rgb, height):
 # axes[0].set_title(f"Original mini patch", fontsize=16)
 # axes[0].axis('off')
 
-# axes[1].imshow(reconstructed_height[i,j])
+# axes[1].imshow(recon_height[i,0])
 # axes[1].set_title(f"Reconstructed", fontsize=16)
 # axes[1].axis('off')
 
-# plt.tight_layout()
-# plt.show()
+# plt_dir = os.path.join(img_dir, "test_height")
+# fig.savefig(plt_dir)
+# plt.close()
+
+# ONLY DECODING
+
+for rgb, height, _ in train_loader:
+    recon_rgb, recon_height = decode(vae, rgb.float(), height.float(), device)
+    
+    recon_rgb = undo_norm(recon_rgb)
+    recon_height = undo_norm(recon_height)
+    break
+
+i = 3
+fig, axes = plt.subplots(1, 1, figsize=(12,8))
+
+axes[0].imshow(recon_rgb[i].permute(1,2,0))
+axes[0].set_title(f"Reconstructed", fontsize=16)
+axes[0].axis('off')
+
+plt_dir = os.path.join(img_dir, "test_rgb")
+fig.savefig(plt_dir)
+plt.close()
+
+# %% Plot results height
+
+i, j = 3, 2
+fig, axes = plt.subplots(1, 1, figsize=(12,8))
+
+axes[0].imshow(recon_height[i,0])
+axes[0].set_title(f"Reconstructed", fontsize=16)
+axes[0].axis('off')
+
+plt_dir = os.path.join(img_dir, "test_height")
+fig.savefig(plt_dir)
+plt.close()
 
 
 # %% Save encoded dataset as h5 file

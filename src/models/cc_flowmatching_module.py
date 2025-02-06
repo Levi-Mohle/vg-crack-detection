@@ -146,13 +146,16 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         loss = self.conditional_flow_matching_loss(x, y)
         self.log("val/loss", loss, prog_bar=True)
 
-        # # Reconstruct test samples
-        # reconstruct = self.reconstruction(x)
-
-        # # Pick the second last batch (which is full)
-        # if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-        #     x = self.select_mode(batch, self.FM_param.mode)
-        #     self.last_val_batch = [x, reconstruct]
+         # Only sample every n epochs
+        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+            & (self.current_epoch != 0):
+            # Pick the second last batch (which is full)
+            if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+                # Reconstruct test samples
+                reconstruct = self.reconstruction(x)
+                
+                x = self.select_mode(batch, self.FM_param.mode)
+                self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
