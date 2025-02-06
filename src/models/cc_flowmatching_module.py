@@ -79,7 +79,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.test_labels = []
 
     def forward(self, x, t, y=None):
-        # y = torch.t(y)
+        # Convert class labels to Long Tensor for embedding
         if y != None:
             y = y.type(torch.LongTensor)
         return self.unet(x=x, timesteps=t, y=y)
@@ -258,11 +258,15 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         '''
         sigma_min   = self.FM_param.sigma_min
         t           = torch.rand(x.shape[0], device=self.device)
+        
+        # Randomly change class labels to n + 1 for Classifier Free Guidance
         indices     = torch.randperm(x.shape[0])[:int(self.FM_param.dropout_prob*x.shape[0])]
         y[indices]  = self.FM_param.n_classes - 1
-        noise       = torch.randn_like(x)
         w           = self.FM_param.guidance_strength
 
+        # Generate noise
+        noise       = torch.randn_like(x)
+        
         if self.FM_param.method == "iCFM":
             # indepedent Conditional Flow Matching Tong et al.
             x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
@@ -699,4 +703,4 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         return {"optimizer": optimizer}
     
 if __name__ == "__main__":
-    _ = FlowMatchingLitModule(None, None, None, None, None)
+    _ = ClassConditionedFlowMatchingLitModule(None, None, None, None, None)

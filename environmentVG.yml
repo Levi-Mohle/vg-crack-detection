@@ -1,0 +1,43 @@
+name: VanGogh
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - matplotlib
+  - numpy
+  - scipy
+  - scikit-learn
+  - scikit-image
+  - pandas
+  - h5py
+  - pylint
+  
+  # Machine learning based crack detection
+  - pytorch=2.*
+  - torchvision=0.*
+  - lightning=2.*
+  - torchmetrics=0.*
+  - hydra-core=1.*
+  - rich=13.*
+  - pre-commit=3.*
+  - pillow
+  - diffusers
+
+  - pip:
+    - opencv-contrib-python
+    - pytest
+    - pmtiles
+    - jsonref
+    - jsonschema-fill-default
+
+    # Machine learning based crack detection
+    - hydra-optuna-sweeper
+    - hydra-colorlog
+    - rootutils
+    - POT
+    - einops
+    - torchdiffeq
+    - accelerate
+
