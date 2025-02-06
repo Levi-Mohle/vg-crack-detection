@@ -36,7 +36,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.save_hyperparameters(logger=False)
         self.save_hyperparameters(ignore=['unet'])
 
-        self.unet              = unet
+        self.unet              = unet.to(self.device)
 
         # Configure FM related parameters dict
         self.FM_param          = FM_param
@@ -81,7 +81,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
     def forward(self, x, t, y=None):
         # Convert class labels to Long Tensor for embedding
         if y != None:
-            y = y.type(torch.LongTensor)
+            y = y.type(torch.LongTensor).to(self.device)
         return self.unet(x=x, timesteps=t, y=y)
     
     def select_mode(self, batch, mode):
@@ -470,9 +470,10 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         e = torch.rand_like(x, device=self.device)
         
         xt = (1-(1-sigma_min)*tstart)*e + x*tstart
+        y = torch.zeros(x.shape[0], device=self.device)
         
         def f(t: float, x):
-            return self(x, torch.full(x.shape[:1], t, device=self.device))
+            return self(x, torch.full(x.shape[:1], t, device=self.device), y)
         
         if self.FM_param.solver_lib == 'torchdiffeq':
             if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' \
@@ -487,7 +488,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         else:
             t=tstart
             for i in range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))):
-                v = self(xt, torch.full(xt.shape[:1], t, device=self.device))
+                v = self(xt, torch.full(xt.shape[:1], t, device=self.device), y)
                 xt = xt + self.FM_param.step_size * v
                 t += self.FM_param.step_size
             reconstruct = xt

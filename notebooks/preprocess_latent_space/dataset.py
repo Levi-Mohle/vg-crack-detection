@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 import cv2
 import h5py
 import os
+import torch
 # from vg.fileio import keyence
 # from vg.utils import log
 
@@ -278,9 +279,9 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, rgb_cracks=None, height
                                [np.ones(height_cracks.shape[0]), 
                                 np.zeros(height.shape[0])]
                                )
-        height  = np.concatenate([height_cracks, height], axis=0)
-        rgb     = np.concatenate([rgb_cracks, rgb], axis=0)
-        
+        height  = torch.concat([height_cracks, height], axis=0)
+        rgb     = torch.concat([rgb_cracks, rgb], axis=0)
+                
 
     with h5py.File(output_filename_full_h5, 'w') as h5f:
         h5f.create_dataset('meas_capture/height',
@@ -328,7 +329,6 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, rgb_cracks=None, height
 
         original_size = rgbs.shape[0]
 
-
         if (rgb_cracks != None) & (height_cracks != None):
             i = 2
         else:
@@ -338,16 +338,16 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, rgb_cracks=None, height
         heights.resize(original_size + i* height.shape[0], axis=0)
         OODs.resize(original_size + i * height.shape[0], axis=0)
 
-        ood = np.ones(height_cracks.shape[0]) 
         id = np.zeros(height.shape[0])
 
         if (rgb_cracks != None) & (height_cracks != None):
-            rgb[original_size:]     = np.concatenate([rgb_cracks, rgb], axis=0)
-            height[original_size:]  = np.concatenate([height_cracks, height], axis=0)
+            ood = np.ones(height_cracks.shape[0]) 
+            rgbs[original_size:]     = torch.concat([rgb_cracks, rgb])
+            heights[original_size:]  = torch.concat([height_cracks, height])
             OODs[original_size:]     = np.concatenate([ood, id])
         else:
-            rgb[original_size:]     = rgb
-            height[original_size:]  = height
+            rgbs[original_size:]     = rgb
+            heights[original_size:]  = height
             OODs[original_size:]    = id
 
         # Close the Keyence file for reading and the Keyence file for writing

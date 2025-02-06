@@ -144,27 +144,27 @@ def encode(vae, rgb, height):
 #         append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
 # %% Check error / SSIM before and after encoding-decoding
 
-# Initialize SSIM settings
-ssim = SSIM(gaussian_kernel=False,
-            data_range=1,
-            kernel_size=11).to(device)
+# # Initialize SSIM settings
+# ssim = SSIM(gaussian_kernel=False,
+#             data_range=1,
+#             kernel_size=11).to(device)
 
-# Create empty lists to store SSIM scores
-ssim_RGB    = []
-ssim_HEIGHT = []
+# # Create empty lists to store SSIM scores
+# ssim_RGB    = []
+# ssim_HEIGHT = []
 
-# Loop to encode & decode images and comparing result with SSIM 
-for rgb, height, _ in (pbar := tqdm(test_loader)):
-    recon_rgb, recon_height = encode_decode(vae, rgb, height)
+# # Loop to encode & decode images and comparing result with SSIM 
+# for rgb, height, _ in (pbar := tqdm(test_loader)):
+#     recon_rgb, recon_height = encode_decode(vae, rgb, height)
 
-    ssim_RGB.append(ssim(rgb.to(device), recon_rgb))
-    ssim_HEIGHT.append(ssim(height.to(device), recon_height))
+#     ssim_RGB.append(ssim(rgb.to(device), recon_rgb))
+#     ssim_HEIGHT.append(ssim(height.to(device), recon_height))
 
-    mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
-    mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
+#     mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
+#     mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
     
-    pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
+#     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
 
-# Print mean
-print(f"The mean SSIM for RGB image: {mean_rgb:.5f}")
-print(f"The mean SSIM for height images: {mean_height:.5f}")
+# # Print mean
+# print(f"The mean SSIM for RGB image: {mean_rgb:.5f}")
+# print(f"The mean SSIM for height images: {mean_height:.5f}")
