@@ -26,7 +26,7 @@ from notebooks.preprocess_latent_space.dataset import append_h5f_enc, create_h5f
 from notebooks.pretrained_VAE import encode
 
 # %% Load the data & model
-data_dir = r"C:\Users\lmohle\Documents\2_Coding\data\input\Training_data\512x512"
+data_dir = r"/data/storage_rtx2080/repos/lightning-hydra-template/data/impasto/512x512"
 IMPASTO_train_dir = "2024-11-26_512x512_train.h5"
 data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir))
 
@@ -36,7 +36,7 @@ dataloader_train = DataLoader(
                                 shuffle=True,
                             )
 
-device = "cpu" 
+device = "cuda" 
 model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
 
 vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
@@ -274,17 +274,17 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
 # %% Adding cracks + encoding
 
 # Get binary shape masks
-MPEG_path   = r"C:\Users\lmohle\Documents\2_Coding\data\Datasets\MPEG400"
+MPEG_path   = r"/data/storage_rtx2080/datasets/MPEG400"
 cat_name    = 'brick'
 masks       = get_shapes(MPEG_path, cat_name, plot=False)
 
-output_dir = r"C:\Users\lmohle\Documents\2_Coding\data\input\Training_data\512x512"
+output_dir = data_dir
 output_filename = r"2024-11-26_Enc_synthetic_mix_512x512_train.h5"
 output_filename_full_h5 = os.path.join(output_dir, output_filename)
 for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
     
     # Add, transform and encode synthetic cracks
-    if i % 4 == 0:
+    if i % 2 == 0:
         height_cracks, rgb_cracks = add_cracks_with_lifted_edges_V2(height, rgb, 
                                                                     masks=masks, 
                                                                     decay_rate=2)
@@ -316,7 +316,4 @@ for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
                        height       = enc_height,
                        height_cracks= enc_height_cracks,
                        )
-    break
-
-# %%
 
