@@ -54,18 +54,18 @@ model:
       guidance_strength: 0.5
       reconstruct: 0.3
       save_reconstructs: false
-      plot_n_epoch: 20
+      plot_n_epoch: 30
       target: 2
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0,1,2,3,4,5,6]
+      plot_ids: [0,1]
       ood: false
       win_size: 5
   
 trainer:
   min_epochs: 5
-  max_epochs: 100
+  max_epochs: 150
   enable_model_summary: false
   gradient_clip_val: 0.5
 

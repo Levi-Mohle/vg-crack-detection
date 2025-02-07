@@ -153,15 +153,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.log("val/loss", loss, prog_bar=True)
 
          # Only sample every n epochs
-        # if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
-        #     & (self.current_epoch != 0):
-        #     # Pick the second last batch (which is full)
-        #     if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-        #         # Reconstruct test samples
-        #         reconstruct = self.reconstruction(x)
-                
-        #         x = self.select_mode(batch, self.FM_param.mode)
-        #         self.last_val_batch = [x, reconstruct]
+        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+            & (self.current_epoch != 0):
+            # Pick the second last batch (which is full)
+            if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+                self.last_val_batch = x
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -173,19 +169,21 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
             plot_loss(self, skip=2)
-            # if self.FM_param.latent:
-            #     self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-            #                                                self.FM_param.mode) 
-            #     self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
-            #                                                self.FM_param.mode)    
-            # if self.FM_param.mode == "both":
-            #     self.visualize_reconstructs_2ch(self.last_val_batch[0], 
-            #                                     self.last_val_batch[1],  
-            #                                     self.FM_param.plot_ids)
-            # else:
-            #     self.visualize_reconstructs_1ch(self.last_val_batch[0], 
-            #                                     self.last_val_batch[1], 
-            #                                     self.FM_param.plot_ids)
+            
+            reconstructs = self.get_labeled_reconstructions(self.last_val_batch)
+            self.last_val_batch = [self.last_val_batch, reconstructs]
+            
+            if self.FM_param.latent:
+                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
+                                                           self.FM_param.mode) 
+                for i in range(2): 
+                    self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.FM_param.mode)
+                    
+            if self.FM_param.mode == "both":
+                class_reconstructs_2ch(self, 
+                                       self.last_val_batch[0],
+                                       self.last_val_batch[1], 
+                                       self.FM_param.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
@@ -215,14 +213,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         # Pick the last full batch or
         if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            # Reconstruct twice: with both 0 and 1 label
-            reconstructs = []
-            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                    device=self.device))
-                                )
-            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                    device=self.device))
-                                )                  
+            reconstructs = self.get_labeled_reconstructions(x)     
             self.last_test_batch = [x, reconstructs, y]
 
         if self.FM_param.save_reconstructs:
@@ -337,7 +328,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 t = t * torch.ones(x_1.shape[0], device=device)
                 y_unconditional = (unknown_class * torch.ones(x_1.shape[0])).type(torch.LongTensor).to(device)
                 return (1-w) * self.model(x, t, y_unconditional) + w * self.model(x, t, y)
-
+        
         wrapped_vf = WrappedModel(self.vf)
         
         solver = ODESolver(velocity_model=wrapped_vf)
@@ -349,7 +340,15 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                 y = y)
 
         return sol
-    
+
+    def get_labeled_reconstructions(self, x):
+        reconstructs = []
+        reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                device=self.device)))
+        reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                device=self.device)))
+        return reconstructs
+        
     def min_max_normalize(self, x, dim=(0,2,3)):
         min_val = x.amin(dim=dim, keepdim=True)
         max_val = x.amax(dim=dim, keepdim=True)
