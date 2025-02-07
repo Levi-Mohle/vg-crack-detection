@@ -20,7 +20,7 @@ seed: 12345
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 10
+        patience: 20
         mode: "min"
     model_summary:
         max_depth: 1
@@ -50,27 +50,28 @@ model:
       n_classes: ${model.unet.n_classes}
       dropout_prob: 0.1
       CFG: true
+      guidance_strength: 1.0
       reconstruct: 0.3
       save_reconstructs: false
-      plot_n_epoch: 2
+      plot_n_epoch: 20
       target: 2
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0]
+      plot_ids: [0,1,2,3,4,5,6]
       ood: false
       win_size: 5
   
 trainer:
   min_epochs: 5
-  max_epochs: 40
+  max_epochs: 100
   enable_model_summary: false
   gradient_clip_val: 0.5
 
 data:
     variant: Enc_mix_512x512
     crack: synthetic
-    batch_size: 16
+    batch_size: 32
     rgb_transform: null
         # _target_: src.data.components.transforms.diffuser_to_grayscale
     height_transform: null

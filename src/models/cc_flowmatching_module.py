@@ -147,15 +147,15 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.log("val/loss", loss, prog_bar=True)
 
          # Only sample every n epochs
-        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
-            & (self.current_epoch != 0):
-            # Pick the second last batch (which is full)
-            if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-                # Reconstruct test samples
-                reconstruct = self.reconstruction(x)
+        # if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+        #     & (self.current_epoch != 0):
+        #     # Pick the second last batch (which is full)
+        #     if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+        #         # Reconstruct test samples
+        #         reconstruct = self.reconstruction(x)
                 
-                x = self.select_mode(batch, self.FM_param.mode)
-                self.last_val_batch = [x, reconstruct]
+        #         x = self.select_mode(batch, self.FM_param.mode)
+        #         self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -167,19 +167,19 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
             plot_loss(self, skip=2)
-            if self.FM_param.latent:
-                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-                                                           self.FM_param.mode) 
-                self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
-                                                           self.FM_param.mode)    
-            if self.FM_param.mode == "both":
-                self.visualize_reconstructs_2ch(self.last_val_batch[0], 
-                                                self.last_val_batch[1],  
-                                                self.FM_param.plot_ids)
-            else:
-                self.visualize_reconstructs_1ch(self.last_val_batch[0], 
-                                                self.last_val_batch[1], 
-                                                self.FM_param.plot_ids)
+            # if self.FM_param.latent:
+            #     self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
+            #                                                self.FM_param.mode) 
+            #     self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
+            #                                                self.FM_param.mode)    
+            # if self.FM_param.mode == "both":
+            #     self.visualize_reconstructs_2ch(self.last_val_batch[0], 
+            #                                     self.last_val_batch[1],  
+            #                                     self.FM_param.plot_ids)
+            # else:
+            #     self.visualize_reconstructs_1ch(self.last_val_batch[0], 
+            #                                     self.last_val_batch[1], 
+            #                                     self.FM_param.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
