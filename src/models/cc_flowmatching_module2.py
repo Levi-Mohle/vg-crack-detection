@@ -335,7 +335,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.LongTensor, **extras):
                 # Define label vector for unconditional case
                 t = t * torch.ones(x_1.shape[0], device=device)
-                y_unconditional = (unknown_class * torch.ones(x_1.shape[0], device=device)).type(torch.LongTensor)
+                y_unconditional = (unknown_class * torch.ones(x_1.shape[0])).type(torch.LongTensor).to(device)
                 return (1-w) * self.model(x, t, y_unconditional) + w * self.model(x, t, y)
 
         wrapped_vf = WrappedModel(self.vf)

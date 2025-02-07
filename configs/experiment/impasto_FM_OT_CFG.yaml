@@ -29,6 +29,7 @@ callbacks:
         monitor: "val/loss"
 
 model:
+    _target_: src.models.cc_flowmatching_module2.ClassConditionedFlowMatchingLitModule
     optimizer:
       lr: 1e-5
     unet:
@@ -50,7 +51,7 @@ model:
       n_classes: ${model.unet.n_classes}
       dropout_prob: 0.1
       CFG: true
-      guidance_strength: 1.0
+      guidance_strength: 0.5
       reconstruct: 0.3
       save_reconstructs: false
       plot_n_epoch: 20
@@ -71,7 +72,7 @@ trainer:
 data:
     variant: Enc_mix_512x512
     crack: synthetic
-    batch_size: 32
+    batch_size: 16
     rgb_transform: null
         # _target_: src.data.components.transforms.diffuser_to_grayscale
     height_transform: null
