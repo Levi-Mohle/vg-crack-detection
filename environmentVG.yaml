@@ -40,4 +40,5 @@ dependencies:
     - einops
     - torchdiffeq
     - accelerate
+    - flow_matching
 

@@ -258,7 +258,7 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
 
 # %% Load the data & model
 data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
-IMPASTO_train_dir = "2024-11-26_512x512_val.h5"
+IMPASTO_train_dir = "2025-01-07_Real_Crack512x512_test.h5"
 data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir))
 
 dataloader_train = DataLoader(
@@ -270,7 +270,8 @@ dataloader_train = DataLoader(
 device = "cuda" 
 model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
 
-vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
+with torch.no_grad():
+    vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
 
 # %% Adding cracks + encoding
 
@@ -280,12 +281,12 @@ cat_name    = 'brick'
 masks       = get_shapes(MPEG_path, cat_name, plot=False)
 
 output_dir = data_dir
-output_filename = r"2024-11-26_Enc_synthetic_mix_512x512_val.h5"
+output_filename = r"2025-01-07_Real_Crack512x512_test2.h5"
 output_filename_full_h5 = os.path.join(output_dir, output_filename)
 for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
     
     # Add, transform and encode synthetic cracks
-    if i % 2 == 0:
+    if i % 1000 == 0:
         height_cracks, rgb_cracks = add_cracks_with_lifted_edges_V2(height, rgb, 
                                                                     masks=masks, 
                                                                     decay_rate=2)

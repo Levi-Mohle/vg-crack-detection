@@ -156,36 +156,36 @@ def undo_norm(x):
 
 # ONLY DECODING
 
-for rgb, height, _ in train_loader:
-    recon_rgb, recon_height = decode(vae, rgb.float(), height.float(), device)
+# for rgb, height, _ in train_loader:
+#     recon_rgb, recon_height = decode(vae, rgb.float(), height.float(), device)
     
-    recon_rgb = undo_norm(recon_rgb)
-    recon_height = undo_norm(recon_height)
-    break
+#     recon_rgb = undo_norm(recon_rgb)
+#     recon_height = undo_norm(recon_height)
+#     break
 
-i = 3
-fig, axes = plt.subplots(1, 1, figsize=(12,8))
+# i = 3
+# fig, axes = plt.subplots(1, 1, figsize=(12,8))
 
-axes[0].imshow(recon_rgb[i].permute(1,2,0))
-axes[0].set_title(f"Reconstructed", fontsize=16)
-axes[0].axis('off')
+# axes[0].imshow(recon_rgb[i].permute(1,2,0))
+# axes[0].set_title(f"Reconstructed", fontsize=16)
+# axes[0].axis('off')
 
-plt_dir = os.path.join(img_dir, "test_rgb")
-fig.savefig(plt_dir)
-plt.close()
+# plt_dir = os.path.join(img_dir, "test_rgb")
+# fig.savefig(plt_dir)
+# plt.close()
 
-# %% Plot results height
+# # %% Plot results height
 
-i, j = 3, 2
-fig, axes = plt.subplots(1, 1, figsize=(12,8))
+# i, j = 3, 2
+# fig, axes = plt.subplots(1, 1, figsize=(12,8))
 
-axes[0].imshow(recon_height[i,0])
-axes[0].set_title(f"Reconstructed", fontsize=16)
-axes[0].axis('off')
+# axes[0].imshow(recon_height[i,0])
+# axes[0].set_title(f"Reconstructed", fontsize=16)
+# axes[0].axis('off')
 
-plt_dir = os.path.join(img_dir, "test_height")
-fig.savefig(plt_dir)
-plt.close()
+# plt_dir = os.path.join(img_dir, "test_height")
+# fig.savefig(plt_dir)
+# plt.close()
 
 
 # %% Save encoded dataset as h5 file
