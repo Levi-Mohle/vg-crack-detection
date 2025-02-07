@@ -200,19 +200,24 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         loss        = self.conditional_flow_matching_loss(x, y)
         self.log("test/loss", loss, prog_bar=True)
 
-        reconstruct = self.reconstruction(x)
-        self.last_test_batch = [x, reconstruct, y]
-
         if self.FM_param.ood:
             # Calculate reconstruction loss used for OOD-detection
-            losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
-            self.test_losses.append(losses)
-            self.test_labels.append(y)
+            # losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
+            # self.test_losses.append(losses)
+            # self.test_labels.append(y)
+            pass
 
         # Pick the last full batch or
         if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.FM_param.mode)
-            self.last_test_batch = [x, reconstruct, y]
+            # Reconstruct twice: with both 0 and 1 label
+            reconstructs = []
+            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                    device=self.device))
+                                )
+            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                    device=self.device))
+                                )                  
+            self.last_test_batch = [x, reconstructs, y]
 
         if self.FM_param.save_reconstructs:
             if self.FM_param.latent:
@@ -233,17 +238,15 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         plot_loss(self, skip=1)
         
         if self.FM_param.latent:
-            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode) 
-            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode)
+            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode)
+            for i in range(2): 
+                self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.FM_param.mode)
         
         if self.FM_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], 
-                                            self.last_test_batch[1], 
-                                            self.FM_param.plot_ids)
-        else:
-            self.visualize_reconstructs_1ch(self.last_test_batch[0], 
-                                            self.last_test_batch[1], 
-                                            self.FM_param.plot_ids)
+            class_reconstructs_2ch(self, 
+                                   self.last_test_batch[0],
+                                   self.last_test_batch[1], 
+                                   self.FM_param.plot_ids)
 
         if self.FM_param.ood:
             plot_histogram(self)
@@ -466,14 +469,13 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         return samples
     
     @torch.no_grad()
-    def reconstruction(self, x):
+    def reconstruction(self, x, y):
         
         sigma_min = self.FM_param.sigma_min
         tstart = 1 - self.FM_param.reconstruct
         e = torch.rand_like(x, device=self.device)
         
         xt = (1-(1-sigma_min)*tstart)*e + x*tstart
-        y = torch.zeros(x.shape[0], device=self.device)
         
         def f(t: float, x):
             return self(x, torch.full(x.shape[:1], t, device=self.device), y)
@@ -503,83 +505,10 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         return reconstruct
     
-    @torch.no_grad()
-    def visualize_samples(self, x):
-        # Create figure
-        grid = make_grid(x, nrow=int(np.sqrt(x.shape[0])))
-        plt.figure(figsize=(12,12))
-        plt.imshow(grid.permute(1,2,0).cpu().squeeze(), cmap='gray')
-        plt.axis('off')
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_epoch_sample.png")
-        plt.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-        # os.remove(image_path)
-    
     def min_max_normalize(self, x, dim=(0,2,3)):
         min_val = x.amin(dim=dim, keepdim=True)
         max_val = x.amax(dim=dim, keepdim=True)
         return (x - min_val) / (max_val - min_val + 1e-8)
-        
-    def visualize_reconstructs_1ch(self, x, reconstruct, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
-
-        # Convert rgb to grayscale for plotting
-        if self.FM_param.mode == 'rgb':
-            x              = rgb_to_grayscale(x)
-            reconstruct    = rgb_to_grayscale(reconstruct)
-            
-        # Calculate pixel-wise squared error per channel + normalize
-        error = ssim_for_batch(x, reconstruct)
-
-        img = [x.cpu(), reconstruct.cpu(), error]
-
-        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
-
-        fig, axes = plt.subplots(nrows=len(plot_ids), ncols=3, 
-                                 width_ratios=[1.08,1,1.08], 
-                                 figsize=(9, 3*len(plot_ids)))
-        
-        plt.subplots_adjust(wspace=0.2, hspace=-0.2)
-        extent = [0,4,0,4]
-        for i, id in enumerate(plot_ids):
-            for j in range(3):
-                if i == 0:
-                     axes[i, j].set_title(title[j], fontsize=self.fs-1)
-                # plot images
-                if j == 2:
-                     im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0)
-                else:
-                    im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0, vmax=1)
-                # plot colorbars
-                if j != 1:
-                    divider = make_axes_locatable(axes[i,j])
-                    cax = divider.append_axes("right", size="5%", pad=0.1)
-                    plt.colorbar(im, cax=cax)
-                if i == len(plot_ids) - 1:
-                     axes[i,j].set_xlabel("X [mm]")
-                else:
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-
-                if j == 0:
-                     axes[i,j].set_ylabel("Y [mm]")
-                     axes[i,j].text(-0.4, 0.5, f"Sample {id}", fontsize= self.fs, rotation=90, va="center", ha="center", transform=axes[i,j].transAxes)
-                elif (i < len(plot_ids) - 1) & (j > 0):
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-                else:
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-                
-                        
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
-        fig.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        # if self.logger.__class__.__name__ == "MLFlowLogger":
-        #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
     
     def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
         # Convert back to [0,1] for plotting
