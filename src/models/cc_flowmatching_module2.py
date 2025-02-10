@@ -45,13 +45,32 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.vf              = unet.to(self.device)
 
         # Configure FM related parameters dict
-        self.FM_param          = FM_param
+        self.n_classes          = FM_param.n_classes
+        self.latent             = FM_param.latent
+        self.pretrained         = FM_param.pretrained
+        self.step_size          = FM_param.step_size
+        self.method             = FM_param.method
+        self.dropout_prob       = FM_param.dropout_prob
+        self.CFG                = FM_param.CFG
+        self.guidance_strength  = FM_param.guidance_strength
+        self.reconstruct        = FM_param.reconstruct
+        self.batch_size         = FM_param.batch_size
+        self.save_reconstructs  = FM_param.save_reconstructs
+        self.plot_n_epoch       = FM_param.plot_n_epoch
+        self.target             = FM_param.target
+        self.solver_lib         = FM_param.solver_lib
+        self.solver             = FM_param.solver
+        self.mode               = FM_param.mode
+        self.wh                 = FM_param.wh
+        self.plot_ids           = FM_param.plot_ids
+        self.ood                = FM_param.ood
+        self.win_size           = FM_param.win_size
 
         # instantiate an affine path object
         self.path = AffineProbPath(scheduler=CondOTScheduler())
 
-        if self.FM_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
+        if self.latent:
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -68,7 +87,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
 
-        if self.FM_param.save_reconstructs:
+        if self.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
             self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
         
@@ -86,7 +105,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
     def forward(self, x, t, y=None):
         # Convert class labels to Long Tensor for embedding
-        if y != None:
+        if self.n_classes != None:
             y = y.type(torch.LongTensor).to(self.device)
         return self.vf(x=x, timesteps=t, y=y)
     
@@ -97,10 +116,16 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             x = batch[1].to(torch.float)
         elif mode == "rgb":
             x = batch[0].to(torch.float)
-        return x
+        
+        # Whether to use class information or not
+        if self.n_classes != None:
+            y = batch[self.target]
+        else:
+            y = None
+        return x, y
     
     def encode_data(self, batch, mode):
-        if self.FM_param.latent:
+        if self.latent:
             if mode == "both":
                 x1 = batch[0]
                 x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
@@ -117,7 +142,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 with torch.no_grad():
                     x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
         else:
-            x = self.select_mode(batch, mode)
+            x, _ = self.select_mode(batch, mode)
         return x
     
     def decode_data(self, z, mode):
@@ -138,29 +163,27 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             return x
         
     def training_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)   
-        y = batch[self.FM_param.target]     
+        # x = self.encode_data(batch, self.mode)
+        x, y  = self.select_mode(batch, self.mode)     
         loss = self.conditional_flow_matching_loss(x, y)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)
-        y = batch[self.FM_param.target] 
+        # x = self.encode_data(batch, self.mode)
+        x, y = self.select_mode(batch, self.mode)
         loss = self.conditional_flow_matching_loss(x, y)
         self.log("val/loss", loss, prog_bar=True)
 
          # Only sample every n epochs
-        # if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+        # if (self.current_epoch % self.plot_n_epoch == 0) \
         #     & (self.current_epoch != 0):
         #     # Pick the second last batch (which is full)
-        #     if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+        #     if (x.shape[0] == self.batch_size) or (batch_idx == 0):
         #         # Reconstruct test samples
         #         reconstruct = self.reconstruction(x)
                 
-        #         x = self.select_mode(batch, self.FM_param.mode)
+        #         x, _ = self.select_mode(batch, self.mode)
         #         self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
@@ -170,22 +193,22 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+        if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
             plot_loss(self, skip=2)
-            # if self.FM_param.latent:
+            # if self.latent:
             #     self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-            #                                                self.FM_param.mode) 
+            #                                                self.mode) 
             #     self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
-            #                                                self.FM_param.mode)    
-            # if self.FM_param.mode == "both":
+            #                                                self.mode)    
+            # if self.mode == "both":
             #     self.visualize_reconstructs_2ch(self.last_val_batch[0], 
             #                                     self.last_val_batch[1],  
-            #                                     self.FM_param.plot_ids)
+            #                                     self.plot_ids)
             # else:
             #     self.visualize_reconstructs_1ch(self.last_val_batch[0], 
             #                                     self.last_val_batch[1], 
-            #                                     self.FM_param.plot_ids)
+            #                                     self.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
@@ -193,20 +216,19 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         elif reduction == 'batch':
             chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
 
-        if self.FM_param.mode == "both":
-            return (chl_loss[:,0] + self.FM_param.wh * chl_loss[:,1]).unsqueeze(1)
+        if self.mode == "both":
+            return (chl_loss[:,0] + self.wh * chl_loss[:,1]).unsqueeze(1)
         else:
             return chl_loss
                 
     def test_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)
-        y = batch[self.FM_param.target]
+        # x = self.encode_data(batch, self.mode)
+        x, y = self.select_mode(batch, self.mode)
         self.shape  = x.shape
         loss        = self.conditional_flow_matching_loss(x, y)
         self.log("test/loss", loss, prog_bar=True)
 
-        if self.FM_param.ood:
+        if self.ood:
             # Calculate reconstruction loss used for OOD-detection
             # losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
             # self.test_losses.append(losses)
@@ -214,7 +236,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             pass
 
         # Pick the last full batch or
-        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
             # Reconstruct twice: with both 0 and 1 label
             reconstructs = []
             reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
@@ -225,14 +247,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                 )                  
             self.last_test_batch = [x, reconstructs, y]
 
-        if self.FM_param.save_reconstructs:
-            if self.FM_param.latent:
+        if self.save_reconstructs:
+            if self.latent:
                 # self.vae.to("cpu")
                 # self.last_test_batch = [self.last_test_batch[0].cpu(),
                 #                        self.last_test_batch[1].cpu(),
                 #                        self.last_test_batch[2].cpu()]
-                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode).cpu()
-                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode).cpu()
+                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode).cpu()
+                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode).cpu()
                 self.last_test_batch[2] = self.last_test_batch[2].cpu()
             save_anomaly_maps(self.reconstruct_dir, self.last_test_batch)
         
@@ -243,18 +265,18 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         plot_loss(self, skip=1)
         
-        if self.FM_param.latent:
-            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode)
+        if self.latent:
+            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
             for i in range(2): 
-                self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.FM_param.mode)
+                self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
         
-        if self.FM_param.mode == "both":
+        if self.mode == "both":
             class_reconstructs_2ch(self, 
                                    self.last_test_batch[0],
                                    self.last_test_batch[1], 
-                                   self.FM_param.plot_ids)
+                                   self.plot_ids)
 
-        if self.FM_param.ood:
+        if self.ood:
             plot_histogram(self)
 
         # Clear variables
@@ -270,9 +292,10 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         '''
         t           = torch.rand(x_1.shape[0], device=self.device)
         
-        # Randomly change class labels to n + 1 for Classifier Free Guidance
-        indices     = torch.randperm(x_1.shape[0])[:int(self.FM_param.dropout_prob*x_1.shape[0])]
-        y[indices]  = self.FM_param.n_classes - 1
+        if self.n_classes != None:
+            # Randomly change class labels to n + 1 for Classifier Free Guidance
+            indices     = torch.randperm(x_1.shape[0])[:int(self.dropout_prob*x_1.shape[0])]
+            y[indices]  = self.n_classes - 1
 
         # Generate noise
         x_0       = torch.randn_like(x_1, device=self.device)
@@ -295,13 +318,18 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         '''
         x_0 = torch.randn(n_samples, self.shape[1], self.shape[2], self.shape[3], device=self.device)
         
-        # Configure guidance_strength for Classifier Free Guidance
-        w = self.FM_param.guidance_strength
+        if self.n_classes!= None:
+            # Configure guidance_strength for Classifier Free Guidance
+            w = self.guidance_strength
+            unknown_class = self.n_classes - 1
+            y_unconditional = (unknown_class * torch.ones(x_0.shape[0], device=self.device)).type(torch.LongTensor)
+        else:
+            w = 0
+            y_unconditional = None
 
         class WrappedModel(ModelWrapper):
             def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.Tensor, **extras):
                 # Define label vector for unconditional case
-                y_unconditional = (self.FM_param.n_classes - 1) * torch.ones(x_0.shape[0], device=self.device)
                 return (1-w) * self.model(x, t, y_unconditional) + w * self.model(x, t, y)
 
         wrapped_vf = WrappedModel(self.vf)
@@ -309,7 +337,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         solver = ODESolver(velocity_model=wrapped_vf)
         sol    = solver.sample(x_init=x_0,
                                 method="midpoint",
-                                step_size=self.FM_param.step_size,
+                                step_size=self.step_size,
                                 return_intermediates=False)
 
         return sol
@@ -320,22 +348,26 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # Required for class embedding
         y = y.type(torch.LongTensor).to(self.device)
 
-        tstart = 1 - self.FM_param.reconstruct
+        tstart = 1 - self.reconstruct
         T = torch.linspace(tstart, 1, 10).to(self.device)
 
         x_0 = torch.rand_like(x_1, device=self.device)
         x_t = x_1 * tstart + x_0 * (1-tstart)
         
-        # Configure guidance_strength for Classifier Free Guidance
-        w = self.FM_param.guidance_strength
-        unknown_class = self.FM_param.n_classes - 1
+        if self.n_classes!= None:
+            # Configure guidance_strength for Classifier Free Guidance
+            w = self.guidance_strength
+            unknown_class = self.n_classes - 1
+            y_unconditional = (unknown_class * torch.ones(x_1.shape[0], device=device)).type(torch.LongTensor)
+        else:
+            w = 0
+            y_unconditional = None
 
         device = self.device
         class WrappedModel(ModelWrapper):
             def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.LongTensor, **extras):
                 # Define label vector for unconditional case
                 t = t * torch.ones(x_1.shape[0], device=device)
-                y_unconditional = (unknown_class * torch.ones(x_1.shape[0], device=device)).type(torch.LongTensor)
                 return (1-w) * self.model(x, t, y_unconditional) + w * self.model(x, t, y)
 
         wrapped_vf = WrappedModel(self.vf)
@@ -344,7 +376,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         sol    = solver.sample(time_grid=T,
                                 x_init=x_t,
                                 method="midpoint",
-                                step_size=self.FM_param.step_size,
+                                step_size=self.step_size,
                                 return_intermediates=False,
                                 y = y)
 

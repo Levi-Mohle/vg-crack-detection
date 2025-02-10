@@ -25,13 +25,13 @@ unet:
 optimizer:
   _target_: torch.optim.AdamW
   _partial_: true
-  lr: 0.0002
+  lr: 0.0001
   weight_decay: 0.0
 
 FM_param:
   method: iCFM
   CFG: false
-  n_classes: null
+  n_classes: ${model.unet.n_classes}
   dropout_prob: 0.0
   guidance_strength: 1.0
   step_size: 0.1
@@ -39,11 +39,9 @@ FM_param:
   latent: false
   plot_n_epoch: 5
   batch_size: ${data.batch_size}
-  size: 32
   solver_lib: torchdiffeq
   solver: euler
   pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
-  sigma_min: 1e-4
   reconstruct: 1
   save_reconstructs: false
   target: 1
