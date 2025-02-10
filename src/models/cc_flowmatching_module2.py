@@ -185,10 +185,10 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 
         #         x, _ = self.select_mode(batch, self.mode)
         #         self.last_val_batch = [x, reconstruct]
-        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+        if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0):
             # Pick the second last batch (which is full)
-            if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
+            if (x.shape[0] == self.batch_size) or (batch_idx == 0):
                 self.last_val_batch = x
 
     def on_train_epoch_end(self) -> None:
