@@ -30,7 +30,6 @@ optimizer:
 
 FM_param:
   method: iCFM
-  CFG: false
   n_classes: ${model.unet.n_classes}
   dropout_prob: 0.0
   guidance_strength: 1.0

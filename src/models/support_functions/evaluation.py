@@ -75,11 +75,8 @@ def plot_confusion_matrix(y_scores, y_true, thresholds):
         print(cm_df)
         print("##############################################")
 
-def plot_histogram(self):
-
-    y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses])
-    y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels])
-
+def plot_histogram(self, y_score, y_true):
+    
     auc_score = roc_auc_score(y_true, y_score)
     if auc_score < 0.2:
         auc_score = 1. - auc_score
@@ -246,7 +243,7 @@ def ssim_for_batch(batch, r_batch, win_size=5):
     batch   = batch.cpu().numpy()
     r_batch = r_batch.cpu().numpy()
     bs = batch.shape[0]
-    ssim_batch     = np.zeros_like((batch.shape[0],batch.shape[1]))
+    ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
     ssim_batch_img = np.zeros_like(batch)
     for i in range(bs):
         for j in range(batch.shape[1]):
@@ -255,14 +252,13 @@ def ssim_for_batch(batch, r_batch, win_size=5):
                                 win_size=win_size,
                                 data_range=1,
                                 full=True)
-            ssim_batch[i,j] = ssim
-            ssim_batch_img[i, j] = (img_ssim - img_ssim.max()) * -1
-            # ssim_batch_img[i, j] = img_ssim
+            ssim_batch_img[i, j] = img_ssim * -1
+            ssim_batch[i, j]     = np.sum(ssim_batch_img[i, j] > 0)
     
     return ssim_batch, ssim_batch_img
 
 def rgb_to_gray(x):
-     # Convert first 3 channels (rbg) to gray-scale
+     # Convert first 3 channels (rgb) to gray-scale
      x_gray = rgb_to_grayscale(x[:,:3])
      # Concatentate result with height channel
      x = torch.cat((x_gray, x[:,3:]), dim=1)
@@ -285,10 +281,12 @@ def class_reconstructs_2ch(self, x, reconstructs, plot_ids, fs=12):
         # reconstructs[i] = self.min_max_normalize(reconstruct, dim=(2,3)).cpu()
 
         # Calculate SSIM between original sample and all reconstructed labels
-        _, ssim_img = ssim_for_batch(x, reconstructs[i], self.FM_param.win_size)
-        ssim_orig_vs_reconstruct.append(ssim_img)
+        _, ssim_img = ssim_for_batch(x, reconstructs[i], self.win_size)
+        ssim_orig_vs_reconstruct.append((ssim_img > -0.1).astype(int))
 
-    _, ssim_l0_vs_l1 = ssim_for_batch(reconstructs[0], reconstructs[1], self.FM_param.win_size)
+        print(np.sum(ssim_img > -0.1, axis=(2,3)))
+
+    _, ssim_l0_vs_l1 = ssim_for_batch(reconstructs[0], reconstructs[1], self.win_size)
 
     extent = [0,4,0,4]
     for i in plot_ids:

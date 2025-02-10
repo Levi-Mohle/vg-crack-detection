@@ -20,7 +20,7 @@ seed: 12345
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 20
+        patience: 50
         mode: "min"
     model_summary:
         max_depth: 1
@@ -48,9 +48,7 @@ model:
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       step_size: 0.01
       method: ot
-      n_classes: ${model.unet.n_classes}
       dropout_prob: 0.1
-      CFG: true
       guidance_strength: 0.5
       reconstruct: 0.3
       save_reconstructs: false
@@ -59,13 +57,13 @@ model:
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0,1]
-      ood: false
+      plot_ids: [0,1,2,3,12,13]
+      ood: true
       win_size: 5
   
 trainer:
   min_epochs: 5
-  max_epochs: 150
+  max_epochs: 500
   enable_model_summary: false
   gradient_clip_val: 0.5
 
