@@ -235,10 +235,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         if self.ood:
             # Calculate reconstruction loss used for OOD-detection
-            # losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
-            # self.test_losses.append(losses)
-            # self.test_labels.append(y)
-            pass
+            y_0_label = torch.ones(x.shape[0], device=self.device)
+            reconstruction  = self.reconstruction(x, y_0_label)
+            losses, _       = ssim_for_batch(x, reconstruction)
+            self.test_losses.append(losses[:,1]) # Only pick SSIM for height for now
+            self.test_labels.append(y)
 
         # Pick the last full batch or
         if (x.shape[0] == self.batch_size) or (batch_idx == 0):
