@@ -13,7 +13,7 @@ import cv2
 import h5py
 import os
 import torch
-# from vg.fileio import keyence
+# import keyence
 # from vg.utils import log
 
 # --------------------------------------------------------------------------------------------------
@@ -699,7 +699,7 @@ class HDF5PatchesDatasetReconstructs(Dataset):
             └────OOD                  (8-bit uint array size num_images)
     
     """
-    def __init__(self, hdf5_file_path, rgb_transform=None, height_transform=None):
+    def __init__(self, hdf5_file_path, cfg=False, rgb_transform=None, height_transform=None):
         """
         Args:
             hdf5_file (str): name of the input file including full path and extension
@@ -713,12 +713,18 @@ class HDF5PatchesDatasetReconstructs(Dataset):
         self.rgb_transform      = rgb_transform
         self.height_transform   = height_transform
 
+        self.cfg = cfg
+
         # Assign data from h5 file
         self.rgb        = self.h5_file['meas_capture/rgb']
         self.height     = self.h5_file['meas_capture/height']
-        self.r_rgb      = self.h5_file['reconstructed/rgb']
-        self.r_height   = self.h5_file['reconstructed/height']
+        self.r0_rgb      = self.h5_file['reconstructed_0/rgb']
+        self.r0_height   = self.h5_file['reconstructed_0/height']
         self.target     = self.h5_file['extra/OOD']
+        
+        if self.cfg:
+            self.r1_rgb      = self.h5_file['reconstructed_1/rgb']
+            self.r1_height   = self.h5_file['reconstructed_1/height']
 
     def __len__(self):
         return self.target.shape[0]
@@ -726,17 +732,28 @@ class HDF5PatchesDatasetReconstructs(Dataset):
     def __getitem__(self, idx):
         rgb         = self.rgb[idx][:]
         height      = self.height[idx][:]
-        r_rgb       = self.r_rgb[idx][:]
-        r_height    = self.r_height[idx][:]
+        r0_rgb       = self.r0_rgb[idx][:]
+        r0_height    = self.r0_height[idx][:]
         target      = self.target[idx]
+
+        if self.cfg:
+            r1_rgb      = self.r1_rgb[idx][:]
+            r1_height   = self.r1_height[idx][:]
 
         if self.rgb_transform:
             rgb     = self.rgb_transform(rgb.transpose(1,2,0))
-            r_rgb   = self.rgb_transform(r_rgb.transpose(1,2,0))
+            r0_rgb   = self.rgb_transform(r0_rgb.transpose(1,2,0))
+            if self.cfg:
+                r1_rgb   = self.rgb_transform(r1_rgb.transpose(1,2,0))
             
         if self.height_transform:
             height      = self.height_transform(height.transpose(1,2,0))
-            r_height    = self.height_transform(r_height.transpose(1,2,0))
+            r0_height    = self.height_transform(r0_height.transpose(1,2,0))
+            if self.cfg:
+                r1_height    = self.height_transform(r1_height.transpose(1,2,0))
 
-        return rgb, height, r_rgb, r_height, target
+        if self.cfg:
+            return rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target
+        else:
+            return rgb, height, r0_rgb, r0_height, target
     

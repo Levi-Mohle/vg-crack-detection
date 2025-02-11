@@ -59,6 +59,10 @@ def rescale_diffuser_height_idv(x):
     x = (x - x.min()) / (x.max() - x.min() + 1e-8)
     return x * 2 - 1
 
+def inverse_norm(x):
+     x = (x+1)/2
+     return x 
+
 #################################################################################
 # Transforms
 #################################################################################
@@ -120,4 +124,21 @@ def diffuser_normalize_height_idv():
                                     rescale_diffuser_height_idv,
                                         ])
     return transform
+
+# Revert normalization
+
+def revert_normalize_rgb():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    inverse_norm,
+                                    transforms.Grayscale()
+                                        ])
+    return transform
+
+def revert_normalize_height():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    inverse_norm,
+                                        ])
+    return transform
+
+
 
