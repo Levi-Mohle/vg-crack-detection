@@ -258,17 +258,18 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
 
 # %% Load the data & model
 data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
-IMPASTO_train_dir = "2025-01-07_Real_Crack512x512_test.h5"
+IMPASTO_train_dir = "2025-01-07_Real_Cracks512x512_test.h5"
 data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir))
 
 dataloader_train = DataLoader(
                                 dataset=data_train,
                                 batch_size= 1,
-                                shuffle=True,
+                                shuffle=False,
                             )
 
 device = "cuda" 
 model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
+add_cracks = False
 
 with torch.no_grad():
     vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
@@ -281,12 +282,14 @@ cat_name    = 'brick'
 masks       = get_shapes(MPEG_path, cat_name, plot=False)
 
 output_dir = data_dir
-output_filename = r"2025-01-07_Real_Crack512x512_test2.h5"
+output_filename = r"2025-01-07_Enc_Real_Crack512x512_test.h5"
 output_filename_full_h5 = os.path.join(output_dir, output_filename)
 for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
-    
+
+    # id = None # Uncomment if you want to ignore original labels
     # Add, transform and encode synthetic cracks
-    if i % 1000 == 0:
+    if (i % 2 == 0) & add_cracks:
+        print("adding cracks")
         height_cracks, rgb_cracks = add_cracks_with_lifted_edges_V2(height, rgb, 
                                                                     masks=masks, 
                                                                     decay_rate=2)
@@ -294,7 +297,7 @@ for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
         height_cracks   = rescale_diffuser_height_idv(height_cracks)
         enc_rgb_cracks, enc_height_cracks   = encode(vae, rgb_cracks, height_cracks)
     else:
-        enc_rgb_cracks = None
+        enc_rgb_cracks    = None
         enc_height_cracks = None
     
     # Transform and encode normal samples
@@ -309,6 +312,7 @@ for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
                        rgb_cracks   = enc_rgb_cracks,
                        height       = enc_height,
                        height_cracks= enc_height_cracks,
+                       target       = id
                        )
     else:
         # Appending h5 file
@@ -317,5 +321,6 @@ for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):
                        rgb_cracks   = enc_rgb_cracks,
                        height       = enc_height,
                        height_cracks= enc_height_cracks,
+                       target       = id
                        )
 

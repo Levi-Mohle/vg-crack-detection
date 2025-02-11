@@ -254,9 +254,13 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 #                        self.last_test_batch[1].cpu(),
                 #                        self.last_test_batch[2].cpu()]
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode).cpu()
-                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode).cpu()
+                if self.n_classes != None:
+                    for i in range(2): 
+                        self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode).cpu()
+                else:
+                    self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode).cpu()
                 self.last_test_batch[2] = self.last_test_batch[2].cpu()
-            save_anomaly_maps(self.reconstruct_dir, self.last_test_batch)
+            save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=True)
 
         
             
@@ -267,7 +271,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         plot_loss(self, skip=1)
         
-        if self.latent:
+        if self.latent and not(self.save_reconstructs):
             self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
             for i in range(2): 
                 self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
@@ -275,7 +279,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         if self.mode == "both":
             class_reconstructs_2ch(self, 
                                    self.last_test_batch[0],
-                                   self.last_test_batch[1], 
+                                   self.last_test_batch[1],
+                                   self.last_test_batch[2],
                                    self.plot_ids)
 
         if self.ood:

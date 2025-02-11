@@ -21,13 +21,15 @@ from src.models.support_functions.evaluation import ssim_for_batch
 
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
-                                    batch_size = 16,
+                                    batch_size = 18,
                                     variant = "Enc_mix_512x512",
+                                    crack="real",
                                     # rgb_transform = diffuser_normalize(),
                                     # height_transform = diffuser_normalize_height_idv()
                                     )
 lightning_data.setup()
 test_loader = lightning_data.test_dataloader()
 
-for _,_, label in test_loader:
+for x,_, label in test_loader:
     print(label)
+    break
