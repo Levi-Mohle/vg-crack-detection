@@ -54,28 +54,41 @@ def plot_loss_VQGAN(self, skip, fs=16):
 
 def plot_confusion_matrix(y_scores, y_true, thresholds):
 
-        accuracies = []
+        np.append(thresholds, -np.inf)
+
+        best_accuracy = 0
+        best_threshold = None
+
         for th in thresholds:
-            y_pred = (y_scores >= th).astype(int)
-            acc = (y_pred == y_true).sum() / len(y_true)
-            accuracies.append(acc)
+            y_pred      = (y_scores > th).astype(int)
+            accuracy    = np.mean(y_pred == y_true)
 
-        best_index = np.argmax(accuracies) 
-        best_th = thresholds[best_index]
-        best_acc = accuracies[best_index]
-        y_pred = (y_scores >= best_th).astype(int)
+            if accuracy > best_accuracy:
+                best_y_pred     = y_pred
+                best_accuracy   = accuracy
+                best_threshold  = th
 
-        cm = confusion_matrix(y_true, y_pred)
+        cm = confusion_matrix(y_true, best_y_pred)
         name_true = ["No crack true", "Crack true"]
         name_pred = ["No crack pred", "Crack pred"]
         cm_df = DataFrame(cm, index=name_true, columns=name_pred)
 
         print("##############################################")
-        print(f"Confusion Matrix for best accuracy {best_acc:.3f}:")
+        print(f"Confusion Matrix for best accuracy {best_accuracy:.3f}:")
         print(cm_df)
+        print("")
+        print(f"Given best threshold value: {best_threshold}")
         print("##############################################")
 
-def plot_histogram(self, y_score, y_true):
+def classify_metrics(y_score, y_true):
+    auc_score           = roc_auc_score(y_true, y_score)
+    _, _, thresholds    = roc_curve(y_true, y_score)
+
+    # Print
+    print(f"AUC score: {auc_score:.3f}")
+    plot_confusion_matrix(y_score, y_true, thresholds)
+
+def plot_histogram(y_score, y_true, self=None, fs=16):
     
     auc_score = roc_auc_score(y_true, y_score)
     if auc_score < 0.2:
@@ -96,15 +109,15 @@ def plot_histogram(self, y_score, y_true):
     axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
     axes[0].hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
     axes[0].legend()
-    axes[0].set_title('Outlier Detection', fontsize = self.fs)
-    axes[0].set_ylabel('Counts', fontsize = self.fs)
-    axes[0].set_xlabel('Loss', fontsize = self.fs)
+    axes[0].set_title('Outlier Detection', fontsize = fs)
+    axes[0].set_ylabel('Counts', fontsize = fs)
+    axes[0].set_xlabel('Loss', fontsize = fs)
 
     # plot roc
     axes[1].plot(fpr, tpr)
-    axes[1].set_title('ROC', fontsize = self.fs)
-    axes[1].set_ylabel('True Positive Rate', fontsize = self.fs)
-    axes[1].set_xlabel('False Positive Rate', fontsize = self.fs)
+    axes[1].set_title('ROC', fontsize = fs)
+    axes[1].set_ylabel('True Positive Rate', fontsize = fs)
+    axes[1].set_xlabel('False Positive Rate', fontsize = fs)
     axes[1].legend([f"AUC {auc_score:.2f}"], fontsize = 12)
     axes[1].set_box_aspect(1)
 
@@ -113,10 +126,10 @@ def plot_histogram(self, y_score, y_true):
     plt.tight_layout()
     fig.subplots_adjust(hspace=0.3)
     
-    plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
-    fig.savefig(plt_dir)
-    
-    plt.close()
+    if self != None:
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
+        fig.savefig(plt_dir)
+        plt.close()
     
     # Logging plot as figure to mlflow
     # if self.logger.__class__.__name__ == "MLFlowLogger":

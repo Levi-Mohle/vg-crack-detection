@@ -8,9 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torch.utils.data import DataLoader
-from torchvision.transforms.functional import rgb_to_grayscale
 from skimage.metrics import structural_similarity
-from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 from torchvision.transforms import transforms
 import skimage.morphology as morhpology
 from tqdm import tqdm
@@ -35,7 +33,7 @@ reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
 
 # Plot some mini-patches
 dataloader = DataLoader(reconstruct_dataset, batch_size=16, shuffle=False)
-# %%
+# %% Load 1 batch of data
 
 for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
     x = torch.concat([rgb, height], dim=1)
@@ -43,12 +41,7 @@ for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
                     torch.concat([r1_rgb, r1_height], dim=1)]
     break
 
-# rgb         = rgb.numpy()
-# r_rgb       = r_rgb.numpy()
-# height      = height.numpy()
-# r_height    = r_height.numpy()
-
-# %%
+# %% Visualize reconstructs
 def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12):
 
     ssim_orig_vs_reconstruct = []
@@ -161,5 +154,112 @@ def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12)
         cax12 = divider.append_axes("right", size="5%", pad=0.1)
         plt.colorbar(im12, cax=cax12)
 
-class_reconstructs_2ch(x, reconstructs, target, plot_ids=[3])
+class_reconstructs_2ch(x, reconstructs, target, plot_ids=[1])
+
+# %% Get classification metrics
+
+def OOD_proxy(batch, r_batch, win_size=5):
+    batch   = batch.cpu().numpy()
+    r_batch = r_batch.cpu().numpy()
+    bs = batch.shape[0]
+    ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
+    ssim_batch_img = np.zeros_like(batch)
+    for i in range(bs):
+        for j in range(batch.shape[1]):
+            ssim,  img_ssim = structural_similarity(batch[i,j], 
+                                r_batch[i,j],
+                                win_size=win_size,
+                                data_range=1,
+                                full=True)
+            ssim_batch_img[i, j] = img_ssim * -1
+            ssim_batch[i, j]     = np.sum(ssim_batch_img[i, j] > -.7)
+    
+    OOD_mask = (ssim_batch_img[:,0] > -0.7) & (ssim_batch_img[:,1] > -0.95)
+    ssim_comb = np.sum(OOD_mask, axis=(1,2))
+    return ssim_comb, ssim_batch, ssim_batch_img
+
+# %% Post processing SSIM results
+
+def filter_eccentricity(image):
+    regions = skimage.measure.regionprops(skimage.measure.label(image))
+    filtered_mask = np.zeros_like(image, dtype=np.uint8)
+    for region in regions:
+        if region.eccentricity > 0.85:
+            filtered_mask[region.coords[:,0], region.coords[:,1]] = 1
+    return filtered_mask
+
+def post_process_ssim(ssim_img):
+    ssim_filt = np.zeros_like(ssim_img)
+
+    for idx in range(ssim_img.shape[0]):
+        for i in range(ssim_img.shape[1]):
+
+            # Thresholding
+            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
+
+            # # Variation denoising
+            # ssim_filt[idx, i] = skimage.restoration.denoise_tv_chambolle(ssim_img[idx,i],
+            #                                                              weight=0.1 
+            #                                                             )
+            # # Gaussian filter to remove noise
+            # ssim_filt[idx,i] = skimage.filters.gaussian(ssim_filt[idx,i],
+            #                                             sigma=1.5 )
+            
+            # Morphology filters
+            ssim_filt[idx,i] = skimage.morphology.erosion(ssim_filt[idx,i],
+                                                            )
+            
+            # ssim_filt[idx,i] = filter_eccentricity(ssim_filt[idx,i]
+            #                                                 )
+            
+        ssim_filt[idx,i] = ((ssim_filt[idx,0] == 1) & 
+                            (ssim_filt[idx,1] == 1)).astype(int)
+        
+        ssim_filt[idx,i] = skimage.morphology.opening(ssim_filt[idx,i])
+
+    ssim_sum = np.sum(ssim_filt[:,i], axis=(1,2))
+                
+    return ssim_filt, ssim_sum
+
+def OOD_proxy_filtered(x1, x2):
+    _, ssim_img     = ssim_for_batch(x1, x2)
+    y               = post_process_ssim(ssim_img)
+    return y
+
+def classify(dataloader):
+    targets     = []
+    predictions = []
+    for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
+
+        x   = torch.concat([rgb,height], dim=1)
+        r0  = torch.concat([r0_rgb,r0_height], dim=1)
+        r1  = torch.concat([r1_rgb,r1_height], dim=1)
+
+        # ssim, _, _ = OOD_proxy(r0, r1)
+        _, ssim = OOD_proxy_filtered(x, r0)
+
+        predictions.append(ssim)
+        targets.append(target)
+
+    y_true  = np.concatenate([t.numpy() for t in targets])
+    y_score = np.concatenate([t for t in predictions])
+
+    # classify_metrics(y_score, y_true)
+    plot_histogram(y_score, y_true)
+
+def plotting(x, y, idx=0):
+    z = np.concatenate([x, y], axis=1)
+    fig, axes = plt.subplots(2,1)
+    for i, ax in enumerate(axes.flatten()):
+        ax.imshow(z[idx,i])
+        ax.axis("off")
+    plt.show()
+
+# Plotting post process results
+# _, ssim_img     = ssim_for_batch(x, reconstructs[1])
+# y, _            = post_process_ssim(ssim_img)
+# plotting(ssim_img, y, idx=9)
+
+# Classifying
+classify(dataloader)
 # %%
