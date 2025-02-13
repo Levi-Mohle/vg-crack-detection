@@ -1,17 +1,19 @@
 import os
-import sys
-from pathlib import Path
 import numpy as np
 import random
 import matplotlib.pyplot as plt
 import cv2 as cv
 from PIL import Image
 import PIL.ImageOps 
-from torch.utils.data import DataLoader
 import torch
 from skimage import morphology, measure
 from skimage.transform import resize, rotate
 from skimage.color import rgb2hsv, hsv2rgb 
+from tqdm import tqdm
+
+from src.data.components.transforms import *
+from notebooks.preprocess_latent_space.latent_space import encode_2ch
+from notebooks.preprocess_latent_space.dataset import append_h5f_enc, create_h5f_enc
 
 def crop_mask(bin_mask, margin=10):
     """
@@ -171,7 +173,7 @@ def get_grad_mask(mask, flap_height, decay_rate, seed=None):
 
     return grad_mask
 
-def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay_rate=2, seed=None):
+def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay_rate=2, seed=None):
     """
     Adds a crack with lifted edge on top of a mini-patch, by adding a shape from the mask list
     to the height map, overlayed with a gradient of exponentially increasing values. On the rgb image the edge pixels 
@@ -191,7 +193,7 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
         
     """
     # Get shape
-    _, _, img_h, img_w= height.shape
+    bs, _, img_h, img_w= height.shape
 
     # Operations not possible on uint16, so conversion is required
     height = height.to(torch.float)
@@ -206,7 +208,8 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
         torch.manual_seed(seed)
 
     # Pick a mask
-    mask = random.choice(masks)
+    # mask = random.choice(masks)
+    mask = random.sample(masks, bs)
     # Pick random transformation for the shape
     angle = random.choice([-90,180,90,0])
     x, y = random.sample([300,350,400,450], 2)
@@ -241,4 +244,61 @@ def add_cracks_with_lifted_edges_V2(height, rgb, masks, flap_height= None, decay
     hsv[:, x_start:x_start+mask_h,y_start:y_start+mask_w][2, mask2] *= 0.2
     rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=0)).unsqueeze(0) * 255
 
-    return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8)
+    return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), mask
+
+def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True):
+    """
+    Adds p percentage of synthetic cracks to the dataset provided with the dataloader. New data gets immediately
+    encoded useing a vae. Saves new dataset as h5 file as given filename
+
+    Args:
+        dataloader : dataloader containing the original dataset
+        masks (np.ndarray) : 2D arrays containing shapes for the cracks
+        p (float) : perctage of cracks that should be added to the dataset
+        filename (str) : output filename of the h5 file
+        add_cracks (bool) : boolean value to turn on/off adding any cracks
+        vae (AutoEncoderKL): pre-trained vae
+
+    Returns:
+        
+    """
+    for i, (rgb, height, id) in tqdm(enumerate(dataloader)):
+
+        # id = None # Uncomment if you want to ignore original labels
+        # Add, transform and encode synthetic cracks
+        every_n_samples = int(1/p)
+        if (i % every_n_samples == 0) & add_cracks:
+            height_cracks, rgb_cracks, _ = Create_cracks_with_lifted_edges(height, rgb, 
+                                                                            masks=masks, 
+                                                                            decay_rate=2)
+            rgb_cracks      = normalize_rgb(rgb_cracks)
+            height_cracks   = rescale_diffuser_height_idv(height_cracks)
+
+            rgb_cracks, height_cracks   = encode_2ch(vae, rgb_cracks, height_cracks)
+        else:
+            rgb_cracks    = None
+            height_cracks = None
+        
+        # Transform and encode normal samples
+        rgb                 = normalize_rgb(rgb)
+        height              = rescale_diffuser_height_idv(height)
+        rgb, height         = encode_2ch(vae, rgb, height)
+        
+        if not os.path.exists(filename):
+            # Creating new h5 file
+            create_h5f_enc(filename, 
+                        rgb          = rgb,
+                        rgb_cracks   = rgb_cracks,
+                        height       = height,
+                        height_cracks= height_cracks,
+                        target       = id
+                        )
+        else:
+            # Appending h5 file
+            append_h5f_enc(filename, 
+                        rgb          = rgb,
+                        rgb_cracks   = rgb_cracks,
+                        height       = height,
+                        height_cracks= height_cracks,
+                        target       = id
+                        )

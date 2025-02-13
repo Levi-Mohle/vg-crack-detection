@@ -16,6 +16,7 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.dataset import create_h5f_enc, append_h5f_enc
+from notebooks.preprocess_latent_space.latent_space import *
 
 device = "cuda" 
 model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
@@ -38,74 +39,6 @@ test_loader = lightning_data.test_dataloader()
 
 img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
 # %% Encode - Decode data
-
-def encode_decode(vae, rgb, height, device="cpu"):
-    """
-    Encodes and subsequently decodes rgb and height images with given pre-trained vae
-
-    Args:
-        vae (AutoEncoderKL): pre-trained vae
-        rgb (Tensor) : Tensor containing rgb images [N,3,h,w]
-        height (Tensor): Tensor containing height images [N,1,h,w]
-
-    Returns:
-        recon_rgb (Tensor) : Tensor containing recontructed rgb images [N,3,h,w]
-        recon_height (Tensor): Tensor containing reconstructed height images [N,1,h,w]
-    """
-    vae.to(device)
-    with torch.no_grad():
-        # Encode
-        enc_rgb, enc_height = encode(vae, rgb, height, device)  
-        # Decode
-        recon_rgb, recon_height = decode(vae, enc_rgb, enc_height, device)
-    
-    return recon_rgb.cpu(), recon_height.cpu()
-
-def encode(vae, rgb, height, device="cpu"):
-    """
-    Encodes rgb and height images with given pre-trained vae
-
-    Args:
-        vae (AutoEncoderKL): pre-trained vae
-        rgb (Tensor) : Tensor containing rgb images [N,3,h,w]
-        height (Tensor): Tensor containing height images [N,1,h,w]
-
-    Returns:
-        enc_rgb (Tensor) : Tensor containing encoded rgb images [N,4,h/8,w/8]
-        enc_height (Tensor): Tensor containing encoded height images [N,4,h/8,w/8]
-    """
-    # Duplicate height channel to fit the vae
-    height = torch.cat((height,height,height), dim=1)
-    
-    vae.to(device)
-
-    # Encode
-    with torch.no_grad():
-        enc_rgb     = vae.encode(rgb.to(device)).latent_dist.sample().mul_(0.18215)
-        enc_height  = vae.encode(height.to(device)).latent_dist.sample().mul_(0.18215)
-
-    return enc_rgb, enc_height
-
-def decode(vae, enc_rgb, enc_height, device="cpu"):
-    """
-    Decodes rgb and height images with given pre-trained vae
-
-    Args:
-        vae (AutoEncoderKL): pre-trained vae
-        enc_rgb (Tensor) : Tensor containing encoded rgb images [N,4,h/8,w/8]
-        enc_height (Tensor): Tensor containing encoded height images [N,4,h/8,w/8]
-
-    Returns:
-        rgb (Tensor) : Tensor containing rgb images [N,3,h,w]
-        height (Tensor): Tensor containing height images [N,1,h,w]
-    """
-    vae.to(device)
-    
-    # Decode
-    recon_rgb      = vae.decode(enc_rgb.to(device)/0.18215).sample
-    recon_height   = vae.decode(enc_height.to(device)/0.18215).sample[:,0].unsqueeze(1)
-
-    return recon_rgb, recon_height
 
 def undo_norm(x):
     x = (x + 1.) / 2.
