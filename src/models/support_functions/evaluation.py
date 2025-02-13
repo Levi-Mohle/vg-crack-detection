@@ -72,7 +72,7 @@ def plot_confusion_matrix(y_scores, y_true, thresholds):
         name_true = ["No crack true", "Crack true"]
         name_pred = ["No crack pred", "Crack pred"]
         cm_df = DataFrame(cm, index=name_true, columns=name_pred)
-
+        
         print("##############################################")
         print(f"Confusion Matrix for best accuracy {best_accuracy:.3f}:")
         print(cm_df)
@@ -106,6 +106,8 @@ def plot_histogram(y_score, y_true, self=None, fs=16):
     fig, axes= plt.subplots(2,1, figsize=(10, 10))
     
     # plot histograms of scores in same plot
+    print(f"AUC score: {auc_score:.3f}")
+    
     axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
     axes[0].hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
     axes[0].legend()

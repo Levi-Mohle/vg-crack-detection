@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torch.utils.data import DataLoader
@@ -23,8 +24,8 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 
 # %% Load data
 
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
-# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
 
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      cfg= True,
@@ -188,8 +189,12 @@ def filter_eccentricity(image):
             filtered_mask[region.coords[:,0], region.coords[:,1]] = 1
     return filtered_mask
 
-def post_process_ssim(ssim_img):
+def post_process_ssim(x, ssim_img):
     ssim_filt = np.zeros_like(ssim_img)
+
+    # Sobel filter
+    sobel = skimage.filters.sobel(x[:,1].numpy())
+    sobel = (sobel > .02).astype(int)
 
     for idx in range(ssim_img.shape[0]):
         for i in range(ssim_img.shape[1]):
@@ -212,10 +217,18 @@ def post_process_ssim(ssim_img):
             # ssim_filt[idx,i] = filter_eccentricity(ssim_filt[idx,i]
             #                                                 )
             
-        ssim_filt[idx,i] = ((ssim_filt[idx,0] == 1) & 
-                            (ssim_filt[idx,1] == 1)).astype(int)
+        ssim_filt[idx,i] = ((ssim_filt[idx,0]   == 1) & 
+                            (ssim_filt[idx,1]   == 1) &
+                            (sobel[idx]         == 1)
+                            ).astype(int)
         
+        # Opening (Erosion + Dilation) to remove noise + connect shapes
         ssim_filt[idx,i] = skimage.morphology.opening(ssim_filt[idx,i])
+
+        # ssim_filt[idx,i] = skimage.morphology.dilation(ssim_filt[idx,i])
+        # ssim_filt[idx,i] = skimage.morphology.dilation(ssim_filt[idx,i])
+    
+    
 
     ssim_sum = np.sum(ssim_filt[:,i], axis=(1,2))
                 
@@ -223,7 +236,7 @@ def post_process_ssim(ssim_img):
 
 def OOD_proxy_filtered(x1, x2):
     _, ssim_img     = ssim_for_batch(x1, x2)
-    y               = post_process_ssim(ssim_img)
+    y               = post_process_ssim(x1, ssim_img)
     return y
 
 def classify(dataloader):
@@ -249,17 +262,45 @@ def classify(dataloader):
 
 def plotting(x, y, idx=0):
     z = np.concatenate([x, y], axis=1)
-    fig, axes = plt.subplots(2,1)
+    fig, axes = plt.subplots(2,2)
     for i, ax in enumerate(axes.flatten()):
         ax.imshow(z[idx,i])
         ax.axis("off")
     plt.show()
 
+def get_rectangle(mask):
+    rows, cols = np.where(mask>0)
+    xmin, xmax = cols.min(), cols.max()
+    ymin, ymax = rows.min(), rows.max()
+    w = xmax - xmin
+    h = ymax - ymin
+    rect = patches.Rectangle((xmin,ymin), w, h, linewidth=2, edgecolor='r', facecolor="none")
+    return rect
+
+def plotting_lifted_edge(x, recon, y, idx=0):
+    fig, axes = plt.subplots(1,4, figsize=(12,6))
+    axes[0].imshow(x[idx,1])
+    rect = get_rectangle(y[idx,1])
+    axes[0].add_patch(rect)
+    
+    axes[1].imshow(recon[idx,1])
+    axes[2].imshow(y[idx,1])
+
+    sobel = skimage.filters.sobel(x[idx,1].numpy())
+    sobel = (sobel > .02).astype(int)
+    axes[3].imshow(sobel)
+    for i, ax in enumerate(axes.flatten()):
+        ax.axis("off")
+    plt.show()
+
+    return sobel
+
 # Plotting post process results
-# _, ssim_img     = ssim_for_batch(x, reconstructs[1])
-# y, _            = post_process_ssim(ssim_img)
-# plotting(ssim_img, y, idx=9)
+_, ssim_img     = ssim_for_batch(x, reconstructs[1])
+y, _            = post_process_ssim(x, ssim_img)
+# plotting(ssim_img, y, idx=0)
+sobel = plotting_lifted_edge(x, ssim_img, y, idx=9)
 
 # Classifying
-classify(dataloader)
+# classify(dataloader)
 # %%
