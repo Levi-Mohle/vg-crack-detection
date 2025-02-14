@@ -140,21 +140,17 @@ def revert_normalize_height():
                                         ])
     return transform
 
-# Test for random flips
-def flip_rgb():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.RandomHorizontalFlip(p=0.5),
-                                    transforms.RandomVerticalFlip(p=0.5),
-                                    ])
-    return transform
+class Augmentation:
+    def __init__(self, p=0.5) -> None:
+        self.p = p
 
-def flip_height():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    normalize_height,
-                                    transforms.RandomHorizontalFlip(p=0.5),
-                                    transforms.RandomVerticalFlip(p=0.5),
-                                    ])
-    return transform
+    def __call__(self, rgb, height):
+        if random.random() < self.p:
+            rgb     = TF.hflip(rgb)
+            height  = TF.hflip(height)
 
+        if random.random() < self.p:
+            rgb     = TF.vflip(rgb)
+            height  = TF.vflip(height)
 
-
+        return rgb, height

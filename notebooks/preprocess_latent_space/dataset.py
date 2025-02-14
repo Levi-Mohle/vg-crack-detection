@@ -652,10 +652,10 @@ class HDF5PatchesDatasetCustom(Dataset):
             └────OOD                  (8-bit uint array size num_images)
     
     """
-    def __init__(self, hdf5_file_path, rgb_transform=None, height_transform=None):
+    def __init__(self, hdf5_file_path, transform=None):
         """
         Args:
-            hdf5_file (str): name of the input file including full path and extension
+            hdf5_file_path (str): name of the input file including full path and extension
             transform (torchvision.transform): transformations to be applied on input
         """
 
@@ -663,8 +663,9 @@ class HDF5PatchesDatasetCustom(Dataset):
         self.hdf5_file_path = hdf5_file_path
         self.h5_file = h5py.File(self.hdf5_file_path, 'r')
 
-        self.rgb_transform      = rgb_transform
-        self.height_transform   = height_transform
+        # self.rgb_transform      = rgb_transform
+        # self.height_transform   = height_transform
+        self.transform = transform
 
         # Assign data from h5 file
         self.rgb = self.h5_file['meas_capture/rgb']
@@ -679,11 +680,8 @@ class HDF5PatchesDatasetCustom(Dataset):
         height  = self.height[idx][:]
         target  = self.target[idx]
 
-        if self.rgb_transform:
-            rgb     = self.rgb_transform(rgb.transpose(1,2,0))
-            
-        if self.height_transform:
-            height  = self.height_transform(height.transpose(1,2,0))
+        if self.transform:
+            rgb, height = self.transform(rgb, height)
 
         return rgb, height, target
     
