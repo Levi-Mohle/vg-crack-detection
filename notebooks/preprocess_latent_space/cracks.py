@@ -7,9 +7,10 @@ from PIL import Image
 import PIL.ImageOps 
 import torch
 from skimage import morphology, measure
-from skimage.transform import resize, rotate
+from skimage.transform import resize
 from skimage.color import rgb2hsv, hsv2rgb 
 from tqdm import tqdm
+import torchvision.transforms.v2 as transforms
 
 from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.latent_space import encode_2ch
@@ -124,7 +125,7 @@ def get_shapes(MPEG_path, cat_name, plot=False):
     
     return all_masks
 
-def get_grad_mask(mask, flap_height, decay_rate, seed=None):
+def get_grad_mask(masks, flap_height, decay_rate, seed=None):
     """
     Applies an exponential gradient to the given mask in a random direction
 
@@ -139,37 +140,48 @@ def get_grad_mask(mask, flap_height, decay_rate, seed=None):
         
     """
     # Get mask shape
-    mask_h, mask_w = mask.shape
+    bs, mask_h, mask_w = masks.shape
 
     # If defined, fix the seed
     if seed is not None:
         random.seed(seed)
         torch.manual_seed(seed)
 
-    # Pick random gradient angle
-    angle_grad = random.uniform(0, 2*np.pi)
+    
     x = np.linspace(0, 1, mask_w)
     y = np.linspace(0, 1, mask_h)
     xv, yv = np.meshgrid(x,y)
 
-    # Rotate gradient
-    lin_grad = np.cos(angle_grad) * xv + np.sin(angle_grad) * yv
+    exp_grads = np.zeros((bs, mask_h, mask_w))
+    for i in range(bs):
+        # Pick random gradient angle
+        angle_grad = random.uniform(0, 2*np.pi)
+        
+        # Rotate gradient
+        lin_grad = np.cos(angle_grad) * xv + np.sin(angle_grad) * yv
 
-    # Normalize to range [0,1]
-    lin_grad -= lin_grad.min()
-    lin_grad /= lin_grad.max()
+        # Normalize to range [0,1]
+        lin_grad -= lin_grad.min()
+        lin_grad /= lin_grad.max()
 
-    # Apply exponentional 
-    exp_grad = np.exp(decay_rate * lin_grad)
+        # Apply exponentional 
+        exp_grad = np.exp(decay_rate * lin_grad)
 
-    # Normalize to range [0,flap_height]
-    exp_grad -= exp_grad.min()
-    exp_grad /= exp_grad.max()
-    exp_grad *= flap_height
+        # Normalize to range [0,flap_height]
+        exp_grad        -= exp_grad.min()
+        exp_grad        /= exp_grad.max()
+        exp_grads[i]    = exp_grad * flap_height[i].item()
     
+    exp_grads = torch.tensor(exp_grads)
     # Apply gradient to mask
-    grad_mask = mask * exp_grad
-    grad_mask -= grad_mask.min()
+    grad_mask = masks * exp_grads
+
+    # Find second smallest value + subtract for smooth gradient
+    reshape_mask    = grad_mask.view(bs,-1)
+    sort_mask, _    = torch.sort(reshape_mask, dim=1)
+    min_vals        = sort_mask[:, 1]
+
+    grad_mask -= min_vals.view(bs,1,1)
 
     return grad_mask
 
@@ -200,7 +212,7 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
     
     # If not defined, take average height * factor to add (maximum)
     if flap_height is None:
-        flap_height = (height.mean() - height.min()).item() * 3
+        flap_height = (height.mean(dim=(2,3)) - height.amin(dim=(2,3))) * 3
 
     # If defined, fix the seed
     if seed is not None:
@@ -208,43 +220,46 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
         torch.manual_seed(seed)
 
     # Pick a mask
-    # mask = random.choice(masks)
-    mask = random.sample(masks, bs)
+    batch_masks = random.sample(masks, bs)
+    batch_masks = torch.tensor(batch_masks)
     # Pick random transformation for the shape
-    angle = random.choice([-90,180,90,0])
-    x, y = random.sample([300,350,400,450], 2)
-    mask = rotate(mask, angle)
-    mask = (resize(mask, (x, y))>0).astype(np.uint8)
-
+    transform = transforms.Compose([
+                    transforms.RandomRotation(degrees=[-180,180]),
+                    transforms.RandomResize(min_size=300, max_size=450)
+                ])
+    transformed_masks = transform(batch_masks)
     # Get mask shape
-    mask_h, mask_w = mask.shape
+    _, mask_h, mask_w = transformed_masks.shape
 
     # Generate random top-left corner coordinates for mask
     x_start = random.randint(0, img_h - mask_h)
     y_start = random.randint(0, img_w - mask_w)
 
     # Apply exponential gradient to mask
-    grad_mask = get_grad_mask(mask, flap_height, decay_rate, seed)
+    grad_masks = get_grad_mask(transformed_masks, flap_height, decay_rate, seed)
 
     # Apply gradient mask to height map
     cracked_height = height.clone()
-    cracked_height[0,0, x_start:x_start+mask_h,y_start:y_start+mask_w] += torch.tensor(grad_mask)
+    cracked_height[:,0, x_start:x_start+mask_h,y_start:y_start+mask_w] += grad_masks
 
     # Change RGB to black pixels if difference > threshold
-    np_mask = mask.astype(np.uint8)
-    edge_mask = morphology.binary_dilation(\
-        morphology.binary_dilation(\
-        morphology.binary_dilation(\
-        (cv.Canny(image=np_mask, threshold1=0, threshold2=1) > 0).astype(np.uint8)))) 
-    mask2 = grad_mask * edge_mask >= grad_mask.max() * 0.7
+    np_masks     = (grad_masks > 0).numpy().astype(np.uint8)
+    edge_masks   = np.zeros_like(np_masks)
+    for i in range(bs):
+        edge_masks[i] = morphology.binary_dilation(\
+                        morphology.binary_dilation(\
+                            morphology.binary_dilation(\
+                            (cv.Canny(image=np_masks[i], threshold1=0, threshold2=1) > 0).astype(np.uint8)))) 
+    edge_masks = torch.tensor(edge_masks)
+    mask2 = grad_masks * edge_masks >= torch.amax(grad_masks, dim=(1,2), keepdim=True) * 0.7
 
     # Apply rgb mask
     rgb_cracked = rgb.clone().numpy()
-    hsv = rgb2hsv(rgb_cracked[0], channel_axis=0) # Conversion to hsv to decrease value channel
-    hsv[:, x_start:x_start+mask_h,y_start:y_start+mask_w][2, mask2] *= 0.2
-    rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=0)).unsqueeze(0) * 255
+    hsv = rgb2hsv(rgb_cracked, channel_axis=1) # Conversion to hsv to decrease value channel
+    hsv[:, :, x_start:x_start+mask_h,y_start:y_start+mask_w][:,2][mask2.numpy()]*= 0.2
+    rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=1)) * 255
 
-    return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), mask
+    return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), transformed_masks
 
 def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True):
     """
