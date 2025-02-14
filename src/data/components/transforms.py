@@ -140,5 +140,21 @@ def revert_normalize_height():
                                         ])
     return transform
 
+# Test for random flips
+def flip_rgb():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    transforms.RandomHorizontalFlip(p=0.5),
+                                    transforms.RandomVerticalFlip(p=0.5),
+                                    ])
+    return transform
+
+def flip_height():
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    normalize_height,
+                                    transforms.RandomHorizontalFlip(p=0.5),
+                                    transforms.RandomVerticalFlip(p=0.5),
+                                    ])
+    return transform
+
 
 

@@ -16,26 +16,41 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from src.models.support_functions.evaluation import ssim_for_batch
-# %% Functions
 
 
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
-                                    batch_size = 16,
-                                    variant = "512x512_local",
-                                    rgb_transform = diffuser_normalize(),
-                                    height_transform = diffuser_normalize_height_idv()
+                                    batch_size         = 16,
+                                    variant            = "512x512_local",
+                                    rgb_transform      = flip_rgb(),
+                                    height_transform   = flip_height()
                                     )
 lightning_data.setup()
-test_loader = lightning_data.test_dataloader()
+loader = lightning_data.test_dataloader()
 
 img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
 
-# %% Run for 1 batch
+# %% Plot a batch
+
+for i, (rgb, height, id) in enumerate(loader):
+     break
+
+fig, axes = plt.subplots(4,4)
+for i, ax in enumerate(axes.flatten()):
+    # ax.imshow(rgb_cracks[i].permute(1,2,0))
+    ax.imshow(rgb[i].permute(1,2,0))
+    ax.axis("off")
+
+fig, axes = plt.subplots(4,4)
+for i, ax in enumerate(axes.flatten()):
+    # ax.imshow(rgb_cracks[i].permute(1,2,0))
+    ax.imshow(height[i,0])
+    ax.axis("off")
+# %% Check range of values
 avg_diff_gray   = torch.zeros(7)
 avg_diff_height = torch.zeros(7)
 
-for i, (gray, height, id) in enumerate(test_loader):
+for i, (gray, height, id) in enumerate(loader):
     avg_diff_gray[i]    = gray.max() - gray.min()
     avg_diff_height[i]  = height.max() - height.min()
 print(f"mean diff gray: {torch.mean(avg_diff_gray):.2f}")
