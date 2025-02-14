@@ -5,7 +5,8 @@ num_workers: 0
 pin_memory: False
 variant: 32x32
 crack: real
-rgb_transform:
-  _target_: src.data.components.transforms.diffuser_normalize
-height_transform:
-  _target_: src.data.components.transforms.diffuser_normalize_height
+transform: null
+# rgb_transform:
+#   _target_: src.data.components.transforms.diffuser_normalize
+# height_transform:
+#   _target_: src.data.components.transforms.diffuser_normalize_height

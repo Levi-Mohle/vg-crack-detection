@@ -71,10 +71,11 @@ data:
     variant: Enc_mix_512x512
     crack: synthetic
     batch_size: 16
-    rgb_transform: null
-        # _target_: src.data.components.transforms.diffuser_to_grayscale
-    height_transform: null
-        # _target_: src.data.components.transforms.diffuser_normalize_height_idv
+    transform: src.data.components.transforms.Augmentation
+    # rgb_transform: null
+    #     # _target_: src.data.components.transforms.diffuser_to_grayscale
+    # height_transform: null
+    #     # _target_: src.data.components.transforms.diffuser_normalize_height_idv
 
 extras:
   print_config: false
