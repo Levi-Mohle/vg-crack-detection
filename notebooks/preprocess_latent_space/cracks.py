@@ -130,7 +130,7 @@ def get_grad_mask(masks, flap_height, decay_rate, seed=None):
     Applies an exponential gradient to the given mask in a random direction
 
     Args:
-        mask (np.array) : 2D binary mask containing a shape
+        masks (np.array) : 2D binary mask containing a shape
         flap_height (int) : maximum height value to be added to the existing height map
         decay_rate (float) : Rate of decay for gradient on flap
         seed (int) : fixed seed
@@ -147,7 +147,7 @@ def get_grad_mask(masks, flap_height, decay_rate, seed=None):
         random.seed(seed)
         torch.manual_seed(seed)
 
-    
+    # Create gradients in different random directions
     x = np.linspace(0, 1, mask_w)
     y = np.linspace(0, 1, mask_h)
     xv, yv = np.meshgrid(x,y)
