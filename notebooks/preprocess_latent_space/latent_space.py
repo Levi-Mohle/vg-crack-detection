@@ -13,11 +13,10 @@ def encode_decode(vae, rgb, height, device="cpu"):
         recon_rgb (Tensor) : Tensor containing recontructed rgb images [N,3,h,w]
         recon_height (Tensor): Tensor containing reconstructed height images [N,1,h,w]
     """
-    with torch.no_grad():
-        # Encode
-        enc_rgb, enc_height = encode_2ch(vae, rgb, height, device)  
-        # Decode
-        recon_rgb, recon_height = decode_2ch(vae, enc_rgb, enc_height, device)
+    # Encode
+    enc_rgb, enc_height = encode_2ch(vae, rgb, height, device)  
+    # Decode
+    recon_rgb, recon_height = decode_2ch(vae, enc_rgb, enc_height, device)
     
     return recon_rgb.cpu(), recon_height.cpu()
 
@@ -32,7 +31,8 @@ def encode_(vae,x,device):
     Returns:
         z (Tensor) : Tensor containing encoded rgb images [N,4,h/8,w/8]
     """
-    z = vae.encode(x.to(device)).latent_dist.sample().mul_(0.18215)
+    with torch.no_grad():
+        z = vae.encode(x.to(device)).latent_dist.sample().mul_(0.18215)
     return z
 
 def encode_2ch(vae, rgb, height, device="cpu"):
@@ -54,9 +54,8 @@ def encode_2ch(vae, rgb, height, device="cpu"):
     vae.to(device)
 
     # Encode
-    with torch.no_grad():
-        enc_rgb     = encode_(vae, rgb, device)
-        enc_height  = encode_(vae, height, device)
+    enc_rgb     = encode_(vae, rgb, device)
+    enc_height  = encode_(vae, height, device)
 
     return enc_rgb, enc_height
 
@@ -71,7 +70,8 @@ def decode_(vae,z,device):
     Returns:
         x (Tensor) : Tensor containing 3 channel images [N,3,h,w]
     """
-    xhat = vae.encode(z.to(device)/0.18215).sample
+    with torch.no_grad():
+        xhat = vae.decode(z.to(device)/0.18215).sample
     return xhat
 
 def decode_2ch(vae, enc_rgb, enc_height, device="cpu"):

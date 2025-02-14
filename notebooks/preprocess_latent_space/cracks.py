@@ -185,7 +185,8 @@ def get_grad_mask(masks, flap_height, decay_rate, seed=None):
 
     return grad_mask
 
-def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay_rate=2, seed=None):
+def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay_rate=2, seed=None
+                                    ,get_seg_map=False):
     """
     Adds a crack with lifted edge on top of a mini-patch, by adding a shape from the mask list
     to the height map, overlayed with a gradient of exponentially increasing values. On the rgb image the edge pixels 
@@ -232,15 +233,19 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
     _, mask_h, mask_w = transformed_masks.shape
 
     # Generate random top-left corner coordinates for mask
-    x_start = random.randint(0, img_h - mask_h)
-    y_start = random.randint(0, img_w - mask_w)
+    x_start = np.random.randint(0, img_h - mask_h, size=bs)
+    y_start = np.random.randint(0, img_w - mask_w, size=bs)
 
     # Apply exponential gradient to mask
     grad_masks = get_grad_mask(transformed_masks, flap_height, decay_rate, seed)
 
     # Apply gradient mask to height map
     cracked_height = height.clone()
-    cracked_height[:,0, x_start:x_start+mask_h,y_start:y_start+mask_w] += grad_masks
+    segmentation_masks = torch.zeros((bs, 1, img_h, img_w))
+    for i, (x, y) in enumerate(zip(x_start, y_start)):
+        cracked_height[i,0, x:x+mask_h,y:y+mask_w] += grad_masks[i]
+        segmentation_masks[i, 0, x:x+mask_h,y:y+mask_w] = transformed_masks[i]
+    
 
     # Change RGB to black pixels if difference > threshold
     np_masks     = (grad_masks > 0).numpy().astype(np.uint8)
@@ -258,8 +263,8 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
     hsv = rgb2hsv(rgb_cracked, channel_axis=1) # Conversion to hsv to decrease value channel
     hsv[:, :, x_start:x_start+mask_h,y_start:y_start+mask_w][:,2][mask2.numpy()]*= 0.2
     rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=1)) * 255
-
-    return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), transformed_masks
+ 
+    return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), segmentation_masks
 
 def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True):
     """
