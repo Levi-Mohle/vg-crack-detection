@@ -20,7 +20,7 @@ seed: 12345
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 50
+        patience: 75
         mode: "min"
     model_summary:
         max_depth: 1
@@ -71,7 +71,8 @@ data:
     variant: Enc_mix_512x512
     crack: synthetic
     batch_size: 16
-    transform: src.data.components.transforms.Augmentation
+    transform: 
+        _target_: src.data.components.transforms.Augmentation
     # rgb_transform: null
     #     # _target_: src.data.components.transforms.diffuser_to_grayscale
     # height_transform: null

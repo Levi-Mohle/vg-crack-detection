@@ -261,7 +261,8 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
     # Apply rgb mask
     rgb_cracked = rgb.clone().numpy()
     hsv = rgb2hsv(rgb_cracked, channel_axis=1) # Conversion to hsv to decrease value channel
-    hsv[:, :, x_start:x_start+mask_h,y_start:y_start+mask_w][:,2][mask2.numpy()]*= 0.2
+    for i, (x, y) in enumerate(zip(x_start, y_start)):
+        hsv[i, :, x:x+mask_h,y:y+mask_w][2, mask2[i].numpy()]*= 0.2
     rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=1)) * 255
  
     return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), segmentation_masks

@@ -140,7 +140,7 @@ def revert_normalize_height():
                                         ])
     return transform
 
-class Augmentation:
+class Augmentation():
     def __init__(self, p=0.5) -> None:
         self.p = p
 
