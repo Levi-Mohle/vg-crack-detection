@@ -45,8 +45,8 @@ model:
 
     FM_param:
       latent: true
-      # pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
-      pretrained: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
+      pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
+      # pretrained: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
       step_size: 0.01
       method: ot
       dropout_prob: 0.1

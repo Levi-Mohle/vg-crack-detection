@@ -287,7 +287,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
             y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels])
             y_true = y_true.astype(int)
-            plot_histogram(self, y_score, y_true)
+            plot_histogram(y_score, y_true, self=self)
 
         # Clear variables
         self.train_epoch_loss.clear()

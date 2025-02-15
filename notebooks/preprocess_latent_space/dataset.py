@@ -290,11 +290,11 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
 
     with h5py.File(output_filename_full_h5, 'w') as h5f:
         h5f.create_dataset('meas_capture/height',
-                            data = height,
+                            data = height.cpu().numpy(),
                             maxshape = (None, 4, 64, 64),
                             dtype='float32')
         h5f.create_dataset('meas_capture/rgb',
-                            data = rgb,
+                            data = rgb.cpu().numpy(),
                             maxshape = (None, 4, 64, 64),
                             dtype='float32')
         h5f.create_dataset('extra/OOD',
@@ -350,8 +350,8 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
 
         if (rgb_cracks != None) & (height_cracks != None):
             ood = np.ones(height_cracks.shape[0]) 
-            rgbs[original_size:]     = torch.concat([rgb_cracks, rgb])
-            heights[original_size:]  = torch.concat([height_cracks, height])
+            rgbs[original_size:]     = torch.concat([rgb_cracks, rgb]).cpu().numpy()
+            heights[original_size:]  = torch.concat([height_cracks, height]).cpu().numpy()
             OODs[original_size:]     = np.concatenate([ood, id])
         else:
             rgbs[original_size:]     = rgb
