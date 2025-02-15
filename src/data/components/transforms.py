@@ -140,11 +140,15 @@ def revert_normalize_height():
                                         ])
     return transform
 
-class Augmentation():
+class Augmentation(transforms.Transform):
     def __init__(self, p=0.5) -> None:
+        super().__init__()
         self.p = p
 
-    def __call__(self, rgb, height):
+    def forward(self, rgb, height):
+        rgb     = torch.tensor(rgb)
+        height  = torch.tensor(height)
+
         if random.random() < self.p:
             rgb     = TF.hflip(rgb)
             height  = TF.hflip(height)

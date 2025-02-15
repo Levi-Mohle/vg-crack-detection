@@ -267,7 +267,7 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
  
     return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), segmentation_masks
 
-def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True):
+def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True, device="cpu"):
     """
     Adds p percentage of synthetic cracks to the dataset provided with the dataloader. New data gets immediately
     encoded useing a vae. Saves new dataset as h5 file as given filename
@@ -285,7 +285,8 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
     """
     for i, (rgb, height, id) in enumerate(tqdm(dataloader)):
 
-        # id = None # Uncomment if you want to ignore original labels
+        id = None # Uncomment if you want to ignore original labels
+
         # Add, transform and encode synthetic cracks
         every_n_samples = int(1/p)
         if (i % every_n_samples == 0) & add_cracks:
@@ -296,7 +297,7 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
             rgb_cracks      = normalize_rgb(rgb_cracks)
             height_cracks   = rescale_diffuser_height_idv(height_cracks)
 
-            rgb_cracks, height_cracks   = encode_2ch(vae, rgb_cracks, height_cracks)
+            rgb_cracks, height_cracks   = encode_2ch(vae, rgb_cracks, height_cracks, device=device)
         else:
             rgb_cracks    = None
             height_cracks = None
@@ -304,7 +305,7 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
         # Transform and encode normal samples
         rgb                 = normalize_rgb(rgb)
         height              = rescale_diffuser_height_idv(height)
-        rgb, height         = encode_2ch(vae, rgb, height)
+        rgb, height         = encode_2ch(vae, rgb, height, device=device)
         
         if not os.path.exists(filename):
             # Creating new h5 file

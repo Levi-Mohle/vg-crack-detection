@@ -8,18 +8,18 @@ mode = "train" # ["train", "eval"]
 model = "ccflowmatching"
 # model = "cae"
 logger      = "mlflow"
-experiment  = "impasto_FM_local"
+experiment  = "impasto_FM_OT_CFG"
 # experiment = "impasto_cae"
 max_epochs  = 1
 data = "impasto"
 debug = 'fdr'
 device = "cpu" 
 batch_size = 16
-variant = "512x512"
+variant = "512x512_local"
 
 train_size = .005
-val_size = .1
-test_size = .1
+val_size = .2
+test_size = .2
 
 ckpt_path = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2025-01-08_17-04-12\checkpoints\last.ckpt"
 
@@ -34,11 +34,12 @@ if mode == "train":
                     f"+trainer.limit_val_batches={val_size}",
                     f"+trainer.limit_train_batches={train_size}",
                     f"+trainer.limit_test_batches={test_size}",
-                    # f"data.variant={variant}",
+                    f"data.variant={variant}",
                     # f"debug={debug}",
                     # f"logger={logger}",
                     ],
                     cwd=src_path)
+    
 elif mode == "eval":
     subprocess.run(["python", "eval.py",
                     # f"data={data}",

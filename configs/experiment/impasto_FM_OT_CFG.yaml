@@ -45,7 +45,8 @@ model:
 
     FM_param:
       latent: true
-      pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
+      # pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
+      pretrained: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
       step_size: 0.01
       method: ot
       dropout_prob: 0.1
@@ -57,7 +58,7 @@ model:
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0,1,2,3,12,13]
+      plot_ids: [0,1]
       ood: true
       win_size: 5
   

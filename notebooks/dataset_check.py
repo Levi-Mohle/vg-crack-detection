@@ -22,11 +22,14 @@ from notebooks.preprocess_latent_space.cracks import *
 data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
 IMPASTO_train_dir = "2024-11-26_Enc_synthetic_mix_512x512_train.h5"
 # IMPASTO_train_dir = "2024-11-26_512x512_val.h5"
-data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir))
+# IMPASTO_train_dir = "AE512x512_val.h5"
+data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir),
+                                      transform     = Augmentation())
 
 dataloader_train = DataLoader(  dataset    = data_train,
                                 batch_size = 16,
-                                shuffle    =False,
+                                shuffle    = False,
+                                
                             )
 
 print(dataloader_train.__len__())
@@ -35,3 +38,5 @@ for rgb, height, target in dataloader_train:
     print(height.shape)
     print(target.shape)
     break
+
+# %%
