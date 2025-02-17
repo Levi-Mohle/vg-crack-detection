@@ -259,10 +259,11 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         
         dataset_file.h5
         ├───meas_capture
-        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
-        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        |   ├────height               (float32 array size num_images x num_rows x num_cols x 1)
+        |   └────rgb                  (float32 array size num_images x num_rows x num_cols x 3)
         └───extra
-            └────OOD                  (8-bit uint array size num_images)
+            ├────OOD                  (8-bit uint array size num_images)
+            └────segmentation_mask    (float32 array size num_images x num_rows x num_cols x 1)
 
     Args:
         output_filename_full_h5 (str): filename + location of h5 file you want to create and save
@@ -270,6 +271,7 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         height_cracks (torch.Tensor): height tiny patches containing cracks (N,1,height,width)
         rgb_normal (torch.Tensor): rgb tiny patches containing normal samples (N,3,height,width)
         height_normal (torch.Tensor): height tiny patches containing normal samples (N,1,height,width)
+        segmentation (torch.Tensor): binary segmentation mask (N,1,height,width)
 
     Returns:
         
@@ -321,10 +323,11 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         
         dataset_file.h5
         ├───meas_capture
-        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
-        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        |   ├────height               (float32 array size num_images x num_rows x num_cols x 1)
+        |   └────rgb                  (float32 array size num_images x num_rows x num_cols x 3)
         └───extra
-            └────OOD                  (8-bit uint array size num_images)
+            ├────OOD                  (8-bit uint array size num_images)
+            └────segmentation_mask    (float32 array size num_images x num_rows x num_cols x 1)
             
     Args:
         output_filename_full_h5 (str): filename + location of h5 file you want to open and append
@@ -332,7 +335,7 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         height_cracks (torch.Tensor): height tiny patches containing cracks (N,1,height,width)
         rgb_normal (torch.Tensor): rgb tiny patches containing normal samples (N,3,height,width)
         height_normal (torch.Tensor): height tiny patches containing normal samples (N,1,height,width)
-        tiny_size (np.ndarray): tiny patch size in pixels (heigh, width)
+        segmentation (torch.Tensor): binary segmentation mask (N,1,height,width)
 
     Returns:
     """

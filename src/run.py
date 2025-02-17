@@ -5,19 +5,19 @@ src_path  = Path.cwd()  / "src"
 
 mode = "train" # ["train", "eval"]
 
-model = "ccflowmatching"
+model = "segmentation"
 # model = "cae"
 logger      = "mlflow"
-experiment  = "impasto_FM_OT_CFG"
+experiment  = "impasto_segmentation"
 # experiment = "impasto_cae"
 max_epochs  = 1
 data = "impasto"
 debug = 'fdr'
 device = "cpu" 
 batch_size = 16
-variant = "512x512_local"
+variant = "Enc_mix_seg_512x512"
 
-train_size = .005
+train_size = .5
 val_size = .2
 test_size = .2
 

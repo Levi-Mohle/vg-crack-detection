@@ -286,9 +286,10 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
         masks (np.ndarray) : 2D arrays containing shapes for the cracks
         p (float) : perctage of cracks that should be added to the dataset
         filename (str) : output filename of the h5 file
-        add_cracks (bool) : boolean value to turn on/off adding any cracks
         vae (AutoEncoderKL): pre-trained vae
-
+        add_cracks (bool) : boolean value to turn on/off adding any cracks
+        segmentation (bool) : boolean value to turn on/off adding segmentation masks
+        
     Returns:
         
     """
@@ -315,11 +316,15 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
         else:
             rgb_cracks    = None
             height_cracks = None
-        
+            if segmentation:
+                seg_masks = torch.zeros((height.shape[0],3,height.shape[2], height.shape[3]))
+                seg_masks = encode_(vae, seg_masks, device=device)
+
         # Transform and encode normal samples
         rgb                 = normalize_rgb(rgb)
         height              = rescale_diffuser_height_idv(height)
         rgb, height         = encode_2ch(vae, rgb, height, device=device)
+
         
         if not os.path.exists(filename):
             # Creating new h5 file
