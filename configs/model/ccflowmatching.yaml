@@ -46,6 +46,7 @@ FM_param:
   target: 1
   mode: rgb
   wh: 1
+  plot: false
   plot_ids: [0,1,16,17]
   ood: false
   win_size: 3

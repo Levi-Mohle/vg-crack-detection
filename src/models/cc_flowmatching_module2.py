@@ -61,6 +61,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.solver             = FM_param.solver
         self.mode               = FM_param.mode
         self.wh                 = FM_param.wh
+        self.plot               = FM_param.plot
         self.plot_ids           = FM_param.plot_ids
         self.ood                = FM_param.ood
         self.win_size           = FM_param.win_size
@@ -248,7 +249,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 
                 # Convert rgb channels to grayscale and revert normalization to [0,1]
                 x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
-                _, ood_score    = OOD_score(x0=x0, x1=x0, x1=x1)
+                _, ood_score    = OOD_score(x0=x0, x1=x0, x2=x1)
 
                 # Append scores
                 self.test_losses.append(ood_score)
@@ -279,22 +280,22 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         plot_loss(self, skip=1)
         
-        if self.latent and not(self.save_reconstructs):
-            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
-            for i in range(2): 
-                self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
-        
-        if self.mode == "both":
-            class_reconstructs_2ch(self, 
-                                   self.last_test_batch[0],
-                                   self.last_test_batch[1],
-                                   self.last_test_batch[2],
-                                   self.plot_ids)
+        if self.plot:
+            if self.latent and not(self.save_reconstructs):
+                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
+                for i in range(2): 
+                    self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
+            
+            if self.mode == "both":
+                class_reconstructs_2ch(self, 
+                                    self.last_test_batch[0],
+                                    self.last_test_batch[1],
+                                    self.last_test_batch[2],
+                                    self.plot_ids)
 
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
-            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels])
-            y_true = y_true.astype(int)
+            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
             plot_histogram(y_score, y_true, self=self)
 
         # Clear variables

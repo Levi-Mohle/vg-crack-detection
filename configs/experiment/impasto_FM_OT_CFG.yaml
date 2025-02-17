@@ -58,6 +58,7 @@ model:
       solver_lib: torchdiffeq
       mode: both
       wh: 1
+      plot: false
       plot_ids: [0,1,9,10,11]
       ood: true
       win_size: 5
