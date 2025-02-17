@@ -25,8 +25,8 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 # %% Load data
 
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
-# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
-input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
+# input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
 
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      cfg= True,
@@ -34,7 +34,7 @@ reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      height_transform= revert_normalize_height())
 
 # Plot some mini-patches
-dataloader = DataLoader(reconstruct_dataset, batch_size=16, shuffle=False)
+dataloader = DataLoader(reconstruct_dataset, batch_size=18, shuffle=False)
 # %% Load 1 batch of data
 
 for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
@@ -250,9 +250,10 @@ def classify(dataloader):
         r1  = torch.concat([r1_rgb,r1_height], dim=1)
 
         # ssim, _, _ = OOD_proxy(r0, r1)
-        _, ssim = OOD_proxy_filtered(x, r0)
+        # _, ssim = OOD_proxy_filtered(x, r0)
+        _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
 
-        predictions.append(ssim)
+        predictions.append(ood_score)
         targets.append(target)
 
     y_true  = np.concatenate([t.numpy() for t in targets])

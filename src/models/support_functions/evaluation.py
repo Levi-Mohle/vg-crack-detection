@@ -485,15 +485,15 @@ def post_process_ssim(x0, ssim_img):
             # Morphology filters
             ssim_filt[idx,i] = erosion(ssim_filt[idx,i])
 
-    # Boolean masks: if pixel is present in ssim height, ssim rgb
-    # and sobel filter, it is accounted as crack pixel  
-    ano_maps[idx] = ((ssim_filt[idx,0]   == 1) & 
-                     (ssim_filt[idx,1]   == 1) &
-                     (sobel_filt[idx]    == 1)
-                    ).astype(int)
-    
-    # Opening (Erosion + Dilation) to remove noise + connect shapes
-    ano_maps[idx] = opening(ano_maps[idx])
+        # Boolean masks: if pixel is present in ssim height, ssim rgb
+        # and sobel filter, it is accounted as crack pixel  
+        ano_maps[idx] = ((ssim_filt[idx,0]   == 1) & 
+                        (ssim_filt[idx,1]   == 1) &
+                        (sobel_filt[idx]    == 1)
+                        ).astype(int)
+        
+        # Opening (Erosion + Dilation) to remove noise + connect shapes
+        ano_maps[idx] = opening(ano_maps[idx])
     
     # Calculate OOD-score, based on total number of crack pixels
     ood_score = np.sum(ano_maps, axis=(1,2))
