@@ -9,7 +9,8 @@ import torch
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
-from torchvision.transforms import GaussianBlur
+from skimage.filters import sobel
+from skimage.morphology import opening, erosion
 
 def plot_loss(self, skip):
 
@@ -315,7 +316,7 @@ def ssim_for_batch(batch, r_batch, win_size=5):
     
     return ssim_batch, ssim_batch_img
 
-def rgb_to_gray(x):
+def to_gray_0_1(x):
      # Convert first 3 channels (rgb) to gray-scale
      x_gray = rgb_to_grayscale(x[:,:3])
      # Concatentate result with height channel
@@ -449,3 +450,76 @@ def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, fs=12):
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}_target_{target[i]}.png")
         fig.savefig(plt_dir)
         plt.close()
+
+def post_process_ssim(x0, ssim_img):
+    """
+    Given the input sample x0 and anomaly maps produced with SSIM,
+    this function filters the anomaly maps of noise and non-crack 
+    related artifacts. It derives an OOD-score from the filtered map.
+
+    Args:
+        x0 (2D tensor) : input sample. 2 channels contain grayscale
+                            and height (Bx2xHxW)
+        ssim_img (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        
+    Returns:
+        ano_maps (2D tensor) : filtered anomaly map (Bx1xHxW)
+        ood_score (1D tensor) : out-of-distribution scores (Bx1)
+    """
+    # Create empty tensor for filtered ssim and anomaly maps
+    ssim_filt = np.zeros_like(ssim_img)
+    ano_maps  = np.squeeze(np.zeros_like(ssim_img), axis=1)
+
+    # Sobel filter on height map
+    sobel_filt = sobel(x0[:,1].numpy())
+    sobel_filt = (sobel_filt > .02).astype(int)
+
+    # Loop over images in batch and both channels. Necessary since
+    # skimage has no batch processing
+    for idx in range(ssim_img.shape[0]):
+        for i in range(ssim_img.shape[1]):
+
+            # Thresholding
+            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
+            
+            # Morphology filters
+            ssim_filt[idx,i] = erosion(ssim_filt[idx,i])
+
+    # Boolean masks: if pixel is present in ssim height, ssim rgb
+    # and sobel filter, it is accounted as crack pixel  
+    ano_maps[idx] = ((ssim_filt[idx,0]   == 1) & 
+                     (ssim_filt[idx,1]   == 1) &
+                     (sobel_filt[idx]    == 1)
+                    ).astype(int)
+    
+    # Opening (Erosion + Dilation) to remove noise + connect shapes
+    ano_maps[idx] = opening(ano_maps[idx])
+    
+    # Calculate OOD-score, based on total number of crack pixels
+    ood_score = np.sum(ano_maps, axis=(1,2))
+                
+    return ano_maps, ood_score
+
+def OOD_score(x0, x1, x2):
+    """
+    Given the original sample x0 and its reconstructions x1 and x2, 
+    this function returns the filtered anomaly map and OOD-score to be
+    used in classification. If comparison is made between x0 and x1 or x2,
+    provide x1 = x0.
+
+    Args:
+        x0 (2D tensor) : input sample (Bx2xHxW)
+        x1 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        x2 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        
+
+    Returns:
+        ano_maps (2D tensor) : filtered anomaly map (Bx1xHxW)
+        ood_score (1D tensor) : out-of-distribution scores (Bx1)
+    
+    """
+    # Obtain SSIM between x1 and x2
+    _, ssim_img             = ssim_for_batch(x1, x2)
+    # Calculate anomaly maps and OOD-score
+    ano_maps, ood_score    = post_process_ssim(x0, ssim_img)
+    return ano_maps, ood_score

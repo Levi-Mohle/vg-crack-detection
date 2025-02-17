@@ -243,12 +243,15 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
             if self.ood:
                 # Calculate reconstruction loss used for OOD-detection
-                x_dec           = self.decode_data(x, self.mode)
-                reconstruct_dec = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
-                x_post, reconstructs_post = self.post_process(x_dec, reconstruct_dec)
-                losses, _       = ssim_for_batch(x_post, reconstructs_post)
+                x0 = self.decode_data(x, self.mode)
+                x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
+                
+                # Convert rgb channels to grayscale and revert normalization to [0,1]
+                x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
+                _, ood_score    = OOD_score(x0=x0, x1=x0, x1=x1)
 
-                self.test_losses.append(losses[:,1]) # Only pick SSIM for height for now
+                # Append scores
+                self.test_losses.append(ood_score)
                 self.test_labels.append(y)
                 
         
@@ -326,20 +329,6 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         return (vt - ut).square().mean()
 
-    def post_process(self, x, reconstructs):
-        
-        x = rgb_to_gray(x)
-
-        # if len(reconstructs) > 1:
-        #     for i, reconstruct in enumerate(reconstructs):
-        #         reconstructs[i] = rgb_to_gray(reconstruct)
-        # else:
-        #     reconstructs = rgb_to_gray(reconstructs)
-        reconstructs = rgb_to_gray(reconstructs) # TODO FIX!
-
-        return x, reconstructs
-        
-        
     @torch.no_grad()
     def sample(self, n_samples, y):
         '''
