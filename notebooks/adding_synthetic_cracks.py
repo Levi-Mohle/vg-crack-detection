@@ -18,8 +18,8 @@ from notebooks.preprocess_latent_space.cracks import *
 from notebooks.preprocess_latent_space.latent_space import *
 
 # %% Load the data & model
-data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
-# data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+# data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
+data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
 # IMPASTO_train_dir = "2024-11-26_512x512_train.h5"
 IMPASTO_train_dir = "2024-11-26_512x512_val.h5"
 data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir))
@@ -29,9 +29,9 @@ dataloader_train = DataLoader(  dataset    = data_train,
                                 shuffle    =False,
                             )
 
-device      = "cuda" 
-model_dir  = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
-# model_dir   = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
+device      = "cpu" 
+# model_dir  = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
+model_dir   = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
 
 with torch.no_grad():
     vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
@@ -39,8 +39,8 @@ with torch.no_grad():
 # %% Adding cracks + encoding
 
 # Get binary shape masks
-MPEG_path   = r"/data/storage_crack_detection/datasets/MPEG400"
-# MPEG_path   = r"C:\Users\lmohle\Documents\2_Coding\data\Datasets\MPEG400"
+# MPEG_path   = r"/data/storage_crack_detection/datasets/MPEG400"
+MPEG_path   = r"C:\Users\lmohle\Documents\2_Coding\data\Datasets\MPEG400"
 cat_name    = 'brick'
 masks       = get_shapes(MPEG_path, cat_name, plot=False)
 
@@ -53,7 +53,8 @@ add_synthetic_cracks_to_h5(dataloader   = dataloader_train,
                            p            = 1, 
                            filename     = output_filename_full_h5, 
                            vae          = vae,
-                           add_cracks   = True, 
+                           add_cracks   = True,
+                           segmentation = True, 
                            device       = device
                            )
 

@@ -251,7 +251,7 @@ def combine_h5_files(input_folder, output_file):
 
     print(f"Combined file created: {output_file}")
 
-def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks=None, height_cracks=None):    
+def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks=None, height_cracks=None, segmentation=None):    
     """
     Create and save h5 file to store crack and normal tiny patches in
 
@@ -288,6 +288,10 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
     if target != None:
         id = target
 
+    if segmentation!=None:
+        zero_masks  = torch.zeros_like(height)
+        seg_masks   = torch.concat([segmentation, zero_masks], axis=0)
+
     with h5py.File(output_filename_full_h5, 'w') as h5f:
         h5f.create_dataset('meas_capture/height',
                             data = height.cpu().numpy(),
@@ -297,6 +301,11 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
                             data = rgb.cpu().numpy(),
                             maxshape = (None, 4, 64, 64),
                             dtype='float32')
+        if segmentation!=None:
+            h5f.create_dataset('extra/segmentation_mask',
+                            data = seg_masks.cpu().numpy(),
+                            maxshape = (None, 4, 64, 64),
+                            dtype='float32')    
         h5f.create_dataset('extra/OOD',
                            data = id,
                            maxshape= (None,),
@@ -304,7 +313,7 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         # Close the Keyence file for reading and the Keyence file for writing
         h5f.close()   
 
-def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks=None, height_cracks=None):
+def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks=None, height_cracks=None, segmentation=None):
     """
     Open and append a h5 file to store crack and normal tiny patches in
 
@@ -331,6 +340,8 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         rgbs     = hdf5['meas_capture/rgb']
         heights  = hdf5['meas_capture/height']
         OODs     = hdf5['extra/OOD']
+        if segmentation!=None:
+            seg_masks = hdf5['extra/segmentation_masks']
 
         original_size = rgbs.shape[0]
 
@@ -342,6 +353,11 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         rgbs.resize(original_size + i * rgb.shape[0], axis=0)
         heights.resize(original_size + i* height.shape[0], axis=0)
         OODs.resize(original_size + i * height.shape[0], axis=0)
+        if segmentation!=None:
+            zero_masks  = torch.zeros_like(height)
+            seg_mask    = torch.concat([segmentation, zero_masks], axis=0)
+            seg_masks.resize(original_size + i* segmentation.shape[0], axis=0)
+            seg_masks[original_size:] = seg_mask.cpu().numpy()
 
         if target != None:
             id = target

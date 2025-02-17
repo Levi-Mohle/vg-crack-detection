@@ -14,7 +14,7 @@ import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as TF
 
 from src.data.components.transforms import *
-from notebooks.preprocess_latent_space.latent_space import encode_2ch
+from notebooks.preprocess_latent_space.latent_space import encode_2ch, encode_
 from notebooks.preprocess_latent_space.dataset import append_h5f_enc, create_h5f_enc
 
 def crop_mask(bin_mask, margin=10):
@@ -277,7 +277,7 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
  
     return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), segmentation_masks
 
-def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True, device="cpu"):
+def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True, segmentation=False, device="cpu"):
     """
     Adds p percentage of synthetic cracks to the dataset provided with the dataloader. New data gets immediately
     encoded useing a vae. Saves new dataset as h5 file as given filename
@@ -300,13 +300,19 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
         # Add, transform and encode synthetic cracks
         every_n_samples = int(1/p)
         if (i % every_n_samples == 0) & add_cracks:
-            height_cracks, rgb_cracks, _ = Create_cracks_with_lifted_edges(height, rgb, 
-                                                                            masks=masks, 
-                                                                            decay_rate=2)
+            height_cracks, rgb_cracks, seg_masks = \
+                Create_cracks_with_lifted_edges(height, rgb, 
+                                                masks=masks, 
+                                                decay_rate=2)
             rgb_cracks      = normalize_rgb(rgb_cracks)
             height_cracks   = rescale_diffuser_height_idv(height_cracks)
 
-            rgb_cracks, height_cracks   = encode_2ch(vae, rgb_cracks, height_cracks, device=device)
+            rgb_cracks, height_cracks = encode_2ch(vae, rgb_cracks, height_cracks, device=device)
+            if segmentation:
+                seg_masks = torch.cat((seg_masks,seg_masks,seg_masks), dim=1)
+                seg_masks = encode_(vae, seg_masks, device=device)
+            else:
+                seg_masks = None
         else:
             rgb_cracks    = None
             height_cracks = None
@@ -323,6 +329,7 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
                         rgb_cracks   = rgb_cracks,
                         height       = height,
                         height_cracks= height_cracks,
+                        segmentation = seg_masks,
                         target       = id
                         )
         else:
@@ -332,5 +339,6 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
                         rgb_cracks   = rgb_cracks,
                         height       = height,
                         height_cracks= height_cracks,
+                        segmentation = seg_masks,
                         target       = id
                         )
