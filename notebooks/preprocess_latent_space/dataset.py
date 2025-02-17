@@ -341,7 +341,7 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         heights  = hdf5['meas_capture/height']
         OODs     = hdf5['extra/OOD']
         if segmentation!=None:
-            seg_masks = hdf5['extra/segmentation_masks']
+            seg_masks = hdf5['extra/segmentation_mask']
 
         original_size = rgbs.shape[0]
 

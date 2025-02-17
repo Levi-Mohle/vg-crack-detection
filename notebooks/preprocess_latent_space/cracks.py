@@ -186,8 +186,7 @@ def get_grad_mask(masks, flap_height, decay_rate, seed=None):
 
     return grad_mask
 
-def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay_rate=2, seed=None
-                                    ,get_seg_map=False):
+def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay_rate=2, seed=None):
     """
     Adds a crack with lifted edge on top of a mini-patch, by adding a shape from the mask list
     to the height map, overlayed with a gradient of exponentially increasing values. On the rgb image the edge pixels 
