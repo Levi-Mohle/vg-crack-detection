@@ -201,19 +201,20 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                                                     device=self.device)))
                                 
             self.last_val_batch = [x, reconstructs, y]
-            
-            if self.latent:
-                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-                                                           self.mode) 
-                for i in range(2): 
-                    self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
-                    
-            if self.mode == "both":
-                class_reconstructs_2ch(self, 
-                                       self.last_val_batch[0],
-                                       self.last_val_batch[1],
-                                       self.last_val_batch[2], 
-                                       self.plot_ids)
+
+            if self.plot:
+                if self.latent:
+                    self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
+                                                               self.mode) 
+                    for i in range(2): 
+                        self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
+                        
+                if self.mode == "both":
+                    class_reconstructs_2ch(self, 
+                                           self.last_val_batch[0],
+                                           self.last_val_batch[1],
+                                           self.last_val_batch[2], 
+                                           self.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
