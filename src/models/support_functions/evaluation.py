@@ -331,12 +331,12 @@ def min_max_normalize(self, x, dim=(0,2,3)):
     return (x - min_val) / (max_val - min_val + 1e-8)
         
 def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, fs=12):
-    x = rgb_to_gray(x).cpu()
+    x = to_gray_0_1(x).cpu()
     # x = self.min_max_normalize(x, dim=(2,3)).cpu()
     
     ssim_orig_vs_reconstruct = []
     for i, reconstruct in enumerate(reconstructs):
-        reconstructs[i] = rgb_to_gray(reconstruct).cpu()
+        reconstructs[i] = to_gray_0_1(reconstruct).cpu()
         # reconstructs[i] = self.min_max_normalize(reconstruct, dim=(2,3)).cpu()
 
         # Calculate SSIM between original sample and all reconstructed labels
@@ -468,10 +468,10 @@ def post_process_ssim(x0, ssim_img):
     """
     # Create empty tensor for filtered ssim and anomaly maps
     ssim_filt = np.zeros_like(ssim_img)
-    ano_maps  = np.squeeze(np.zeros_like(ssim_img), axis=1)
+    ano_maps  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
 
     # Sobel filter on height map
-    sobel_filt = sobel(x0[:,1].numpy())
+    sobel_filt = sobel(x0[:,1].cpu().numpy())
     sobel_filt = (sobel_filt > .02).astype(int)
 
     # Loop over images in batch and both channels. Necessary since

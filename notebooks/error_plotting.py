@@ -25,7 +25,8 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 # %% Load data
 
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
+input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
 
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      cfg= True,
@@ -155,7 +156,7 @@ def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12)
         cax12 = divider.append_axes("right", size="5%", pad=0.1)
         plt.colorbar(im12, cax=cax12)
 
-class_reconstructs_2ch(x, reconstructs, target, plot_ids=[1])
+# class_reconstructs_2ch(x, reconstructs, target, plot_ids=[1])
 
 # %% Get classification metrics
 
@@ -299,8 +300,8 @@ def plotting_lifted_edge(x, recon, y, idx=0):
 _, ssim_img     = ssim_for_batch(x, reconstructs[1])
 y, _            = post_process_ssim(x, ssim_img)
 # plotting(ssim_img, y, idx=0)
-sobel = plotting_lifted_edge(x, ssim_img, y, idx=9)
+# sobel = plotting_lifted_edge(x, ssim_img, y, idx=9)
 
 # Classifying
-# classify(dataloader)
+classify(dataloader)
 # %%
