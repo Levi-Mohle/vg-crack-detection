@@ -11,6 +11,7 @@ from skimage.transform import resize
 from skimage.color import rgb2hsv, hsv2rgb 
 from tqdm import tqdm
 import torchvision.transforms.v2 as transforms
+import torchvision.transforms.functional as TF
 
 from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.latent_space import encode_2ch
@@ -239,8 +240,18 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
     # Apply exponential gradient to mask
     grad_masks = get_grad_mask(transformed_masks, flap_height, decay_rate, seed)
 
+    # Clone and randomly flip images as data augmentation
+    cracked_height  = height.clone()
+    rgb_cracked     = rgb.clone()
+    if random.random() < 0.5:
+        cracked_height  = TF.hflip(cracked_height)
+        rgb_cracked     = TF.hflip(rgb_cracked)
+
+    if random.random() < 0.5:
+        cracked_height  = TF.vflip(cracked_height)
+        rgb_cracked     = TF.vflip(rgb_cracked)
+    
     # Apply gradient mask to height map
-    cracked_height = height.clone()
     segmentation_masks = torch.zeros((bs, 1, img_h, img_w))
     for i, (x, y) in enumerate(zip(x_start, y_start)):
         cracked_height[i,0, x:x+mask_h,y:y+mask_w] += grad_masks[i]
@@ -259,8 +270,7 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
     mask2 = grad_masks * edge_masks >= torch.amax(grad_masks, dim=(1,2), keepdim=True) * 0.7
 
     # Apply rgb mask
-    rgb_cracked = rgb.clone().numpy()
-    hsv = rgb2hsv(rgb_cracked, channel_axis=1) # Conversion to hsv to decrease value channel
+    hsv = rgb2hsv(rgb_cracked.numpy(), channel_axis=1) # Conversion to hsv to decrease value channel
     for i, (x, y) in enumerate(zip(x_start, y_start)):
         hsv[i, :, x:x+mask_h,y:y+mask_w][2, mask2[i].numpy()]*= 0.2
     rgb_cracked = torch.tensor(hsv2rgb(hsv, channel_axis=1)) * 255
