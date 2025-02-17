@@ -53,12 +53,12 @@ model:
       guidance_strength: 0.5
       reconstruct: 0.3
       save_reconstructs: false
-      plot_n_epoch: 30
+      plot_n_epoch: 25
       target: 2
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot_ids: [0,1]
+      plot_ids: [0,1,9,10,11]
       ood: true
       win_size: 5
   
@@ -72,8 +72,8 @@ data:
     variant: Enc_mix_512x512
     crack: synthetic
     batch_size: 16
-    transform: 
-        _target_: src.data.components.transforms.Augmentation
+    transform: null
+        # _target_: src.data.components.transforms.Augmentation
     # rgb_transform: null
     #     # _target_: src.data.components.transforms.diffuser_to_grayscale
     # height_transform: null

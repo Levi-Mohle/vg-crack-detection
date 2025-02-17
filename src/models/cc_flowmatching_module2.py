@@ -179,7 +179,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             & (self.current_epoch != 0):
             # Pick the second last batch (which is full)
             if (x.shape[0] == self.batch_size) or (batch_idx == 0):
-                self.last_val_batch = x
+                self.last_val_batch = [x, y]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -192,8 +192,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             & (self.current_epoch != 0): # Only sample every n epochs
             plot_loss(self, skip=2)
 
-            reconstructs = self.get_labeled_reconstructions(self.last_val_batch)
-            self.last_val_batch = [self.last_val_batch, reconstructs]
+            x, y = self.last_val_batch
+            reconstructs = []
+            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                    device=self.device)))
+            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                    device=self.device)))
+                                
+            self.last_val_batch = [x, reconstructs, y]
             
             if self.latent:
                 self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
@@ -204,7 +210,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             if self.mode == "both":
                 class_reconstructs_2ch(self, 
                                        self.last_val_batch[0],
-                                       self.last_val_batch[1], 
+                                       self.last_val_batch[1],
+                                       self.last_val_batch[2], 
                                        self.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
@@ -229,11 +236,9 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             # Reconstruct twice: with both 0 and 1 label
             reconstructs = []
             reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                    device=self.device))
-                                )
+                                                                    device=self.device)))
             reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                    device=self.device))
-                                )                  
+                                                                    device=self.device)))                  
             self.last_test_batch = [x, reconstructs, y]
 
             if self.ood:
