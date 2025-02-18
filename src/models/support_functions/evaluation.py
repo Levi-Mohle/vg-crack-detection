@@ -456,7 +456,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
 
-        if self.FM_param.latent:
+        if self.latent:
             x_gray = rgb_to_grayscale(x[:,:3])
             x = torch.cat((x_gray, x[:,3:]), dim=1)
             
@@ -549,7 +549,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
             # Send figure as artifact to logger
             # if self.logger.__class__.__name__ == "MLFlowLogger":
             #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-            
+
 def post_process_ssim(x0, ssim_img):
     """
     Given the input sample x0 and anomaly maps produced with SSIM,
