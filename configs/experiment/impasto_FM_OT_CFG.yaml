@@ -41,7 +41,7 @@ model:
       attention_resolutions : [16]
       dropout : 0.0
       channel_mult : [1, 1, 2, 2, 4, 4]
-      n_classes : 3
+      n_classes : null
 
     FM_param:
       latent: true
@@ -53,7 +53,7 @@ model:
       guidance_strength: 0.5
       reconstruct: 0.3
       save_reconstructs: false
-      plot_n_epoch: 25
+      plot_n_epoch: 20
       target: 2
       solver_lib: torchdiffeq
       mode: both
@@ -70,7 +70,7 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-    variant: Enc_mix_512x512
+    variant: Enc_512x512
     crack: synthetic
     batch_size: 16
     transform: null

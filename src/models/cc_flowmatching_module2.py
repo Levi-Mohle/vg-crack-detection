@@ -194,11 +194,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             plot_loss(self, skip=2)
 
             x, y = self.last_val_batch
-            reconstructs = []
-            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                    device=self.device)))
-            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                    device=self.device)))
+            if self.n_classes!=None:
+                reconstructs = []
+                reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                        device=self.device)))
+                reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                        device=self.device)))
+            else:
+                reconstructs = self.reconstruction(x, y)
                                 
             self.last_val_batch = [x, reconstructs, y]
 
@@ -236,17 +239,24 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # Pick the last full batch or
         if (x.shape[0] == self.batch_size) or (batch_idx == 0):
             # Reconstruct twice: with both 0 and 1 label
-            reconstructs = []
-            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                    device=self.device)))
-            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                    device=self.device)))                  
+            if self.n_classes!=None:
+                reconstructs = []
+                reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                        device=self.device)))
+                reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                        device=self.device)))
+            else:
+                reconstructs = self.reconstruction(x, y)
+                
             self.last_test_batch = [x, reconstructs, y]
 
             if self.ood:
                 # Calculate reconstruction loss used for OOD-detection
                 x0 = self.decode_data(x, self.mode)
-                x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
+                if self.n_classes!=None:
+                    x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
+                else:
+                    x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
                 
                 # Convert rgb channels to grayscale and revert normalization to [0,1]
                 x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
@@ -254,7 +264,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
                 # Append scores
                 self.test_losses.append(ood_score)
-                self.test_labels.append(y)
+                self.test_labels.append(batch[self.target])
                 
         
         if self.save_reconstructs:
@@ -311,12 +321,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         :param x: input image
         '''
         t           = torch.rand(x_1.shape[0], device=self.device)
-        y1          = y.detach().clone()
         
         if self.n_classes != None:
+            y1          = y.detach().clone()
             # Randomly change class labels to n + 1 for Classifier Free Guidance
             indices     = torch.randperm(x_1.shape[0])[:int(self.dropout_prob*x_1.shape[0])]
             y1[indices]  = self.n_classes - 1
+        else:
+            y1 = None
 
         # Generate noise
         x_0       = torch.randn_like(x_1, device=self.device)
@@ -365,9 +377,6 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
     
     @torch.no_grad()
     def reconstruction(self, x_1, y):
-        
-        # Required for class embedding
-        y = y.type(torch.LongTensor).to(self.device)
 
         tstart = 1 - self.reconstruct
         T = torch.linspace(tstart, 1, 10).to(self.device)
@@ -376,6 +385,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         x_t = x_1 * tstart + x_0 * (1-tstart)
         
         if self.n_classes!= None:
+            # Required for class embedding
+            y = y.type(torch.LongTensor).to(self.device)
             # Configure guidance_strength for Classifier Free Guidance
             w = self.guidance_strength
             unknown_class = self.n_classes - 1
