@@ -302,7 +302,6 @@ def ssim_for_batch(batch, r_batch, win_size=5):
     batch   = batch.cpu().numpy()
     r_batch = r_batch.cpu().numpy()
     bs = batch.shape[0]
-    print(batch.shape, r_batch.shape)
     
     ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
     ssim_batch_img = np.zeros_like(batch)
@@ -461,7 +460,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
             
         # Calculate pixel-wise squared error per channel + normalize
 
-        error_idv = ssim_for_batch(x, reconstruct, self.win_size)
+        _, error_idv = ssim_for_batch(x, reconstruct, self.win_size)
         # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
@@ -499,7 +498,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
             ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
             ax2.set_title("Reconstructed sample", fontsize =self.fs)
             
-            im3 = ax3.imshow(img[2][i,0], extent=extent, vmin=0)
+            im3 = ax3.imshow(img[2][i,0], extent=extent)
             ax3.set_yticks([0,1,2,3,4])
             ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
             ax3.set_title("Anomaly map individual", fontsize =self.fs)
@@ -521,7 +520,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
             ax5.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
             ax5.set_xlabel("X [mm]")
 
-            im6 = ax6.imshow(img[2][i,1], extent=extent, vmin=0)
+            im6 = ax6.imshow(img[2][i,1], extent=extent)
             ax6.set_yticks([0,1,2,3,4])
             ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
             ax6.set_xlabel("X [mm]")
