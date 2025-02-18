@@ -298,11 +298,17 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                     self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
             
             if self.mode == "both":
-                class_reconstructs_2ch(self, 
-                                    self.last_test_batch[0],
-                                    self.last_test_batch[1],
-                                    self.last_test_batch[2],
-                                    self.plot_ids)
+                if self.n_classes!=None:
+                    class_reconstructs_2ch(self, 
+                                        self.last_test_batch[0],
+                                        self.last_test_batch[1],
+                                        self.last_test_batch[2],
+                                        self.plot_ids)
+                else:
+                    visualize_reconstructs_2ch(self, 
+                                               self.last_test_batch[0], 
+                                               self.last_test_batch[1], 
+                                               self.plot_ids)
 
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
