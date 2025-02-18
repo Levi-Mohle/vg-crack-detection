@@ -302,6 +302,8 @@ def ssim_for_batch(batch, r_batch, win_size=5):
     batch   = batch.cpu().numpy()
     r_batch = r_batch.cpu().numpy()
     bs = batch.shape[0]
+    print(batch.shape, r_batch.shape)
+    
     ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
     ssim_batch_img = np.zeros_like(batch)
     for i in range(bs):
@@ -452,16 +454,10 @@ def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, fs=12):
         plt.close()
 
 def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
 
         if self.latent:
-            x_gray = rgb_to_grayscale(x[:,:3])
-            x = torch.cat((x_gray, x[:,3:]), dim=1)
-            
-            reconstruct_gray = rgb_to_grayscale(reconstruct[:,:3])
-            reconstruct = torch.cat((reconstruct_gray, reconstruct[:,3:]), dim=1)
+            x           = to_gray_0_1(x).cpu()
+            reconstruct = to_gray_0_1(reconstruct).cpu()
             
         # Calculate pixel-wise squared error per channel + normalize
 
