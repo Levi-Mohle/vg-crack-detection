@@ -1,3 +1,4 @@
+import sys
 from pandas import DataFrame
 import numpy as np
 from skimage.metrics import structural_similarity
@@ -55,31 +56,31 @@ def plot_loss_VQGAN(self, skip, fs=16):
 
 def plot_confusion_matrix(y_scores, y_true, thresholds):
 
-        np.append(thresholds, -np.inf)
+    np.append(thresholds, -np.inf)
 
-        best_accuracy = 0
-        best_threshold = None
+    best_accuracy = 0
+    best_threshold = None
 
-        for th in thresholds:
-            y_pred      = (y_scores > th).astype(int)
-            accuracy    = np.mean(y_pred == y_true)
+    for th in thresholds:
+        y_pred      = (y_scores > th).astype(int)
+        accuracy    = np.mean(y_pred == y_true)
 
-            if accuracy > best_accuracy:
-                best_y_pred     = y_pred
-                best_accuracy   = accuracy
-                best_threshold  = th
+        if accuracy > best_accuracy:
+            best_y_pred     = y_pred
+            best_accuracy   = accuracy
+            best_threshold  = th
 
-        cm = confusion_matrix(y_true, best_y_pred)
-        name_true = ["No crack true", "Crack true"]
-        name_pred = ["No crack pred", "Crack pred"]
-        cm_df = DataFrame(cm, index=name_true, columns=name_pred)
-        
-        print("##############################################")
-        print(f"Confusion Matrix for best accuracy {best_accuracy:.3f}:")
-        print(cm_df)
-        print("")
-        print(f"Given best threshold value: {best_threshold}")
-        print("##############################################")
+    cm = confusion_matrix(y_true, best_y_pred)
+    name_true = ["No crack true", "Crack true"]
+    name_pred = ["No crack pred", "Crack pred"]
+    cm_df = DataFrame(cm, index=name_true, columns=name_pred)
+
+    print("##############################################")
+    print(f"Confusion Matrix for best accuracy {best_accuracy:.3f}:")
+    print(cm_df)
+    print("")
+    print(f"Given best threshold value: {best_threshold}")
+    print("##############################################")
 
 def classify_metrics(y_score, y_true):
     auc_score           = roc_auc_score(y_true, y_score)
@@ -87,9 +88,10 @@ def classify_metrics(y_score, y_true):
 
     # Print
     print(f"AUC score: {auc_score:.3f}")
-    plot_confusion_matrix(y_score, y_true, thresholds)
+    plot_confusion_matrix(y_score, y_true, thresholds, save_loc)
+    
 
-def plot_histogram(y_score, y_true, self=None, fs=16):
+def plot_histogram(y_score, y_true, save_loc, self=None, fs=16):
     
     auc_score = roc_auc_score(y_true, y_score)
     if auc_score < 0.2:
@@ -98,16 +100,17 @@ def plot_histogram(y_score, y_true, self=None, fs=16):
     fpr95 = fpr[np.argmax(tpr >= 0.95)]
     
     # Print confusion matrix
-    plot_confusion_matrix(y_score, y_true, thresholds)
+    with open(save_loc, "w") as f:
+        sys.stdout = f
+        plot_confusion_matrix(y_score, y_true, thresholds)
+        print(f"AUC score: {auc_score:.3f}")
+    sys.stdout = sys.__stdout__
 
     # Separate ID and OOD samples
     y_id = y_score[np.where(y_true == 0)]
     y_ood = y_score[np.where(y_true != 0)]
 
     fig, axes= plt.subplots(2,1, figsize=(10, 10))
-    
-    # plot histograms of scores in same plot
-    print(f"AUC score: {auc_score:.3f}")
     
     axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
     axes[0].hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
