@@ -22,6 +22,7 @@ data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto
 # data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
 IMPASTO_train_dir = "2024-11-26_512x512_train.h5"
 # IMPASTO_train_dir = "2024-11-26_512x512_val.h5"
+# IMPASTO_train_dir = "2025-02-18_Real_Cracks512x512_test.h5"
 data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir))
 
 dataloader_train = DataLoader(  dataset    = data_train,
@@ -46,17 +47,33 @@ masks       = get_shapes(MPEG_path, cat_name, plot=False)
 
 # %%
 output_dir = data_dir
-output_filename = r"2024-11-26_Enc_synthetic_mix_seg_512x512_train.h5"
+output_filename = r"2024-11-26_Enc_aug_512x512_train.h5"
 output_filename_full_h5 = os.path.join(output_dir, output_filename)
-add_synthetic_cracks_to_h5(dataloader   = dataloader_train, 
-                           masks        = masks, 
-                           p            = 1, 
-                           filename     = output_filename_full_h5, 
-                           vae          = vae,
-                           add_cracks   = True,
-                           segmentation = True, 
-                           device       = device
-                           )
+# For adding p percentage of cracks
+# add_synthetic_cracks_to_h5(dataloader   = dataloader_train, 
+#                            masks        = masks, 
+#                            p            = 1, 
+#                            filename     = output_filename_full_h5, 
+#                            vae          = vae,
+#                            add_cracks   = False,
+#                            segmentation = False, 
+#                            device       = device
+#                            )
+
+# For only encoding dataset
+# encode_and_add2h5(dataloader = dataloader_train, 
+#                   filename   = output_filename_full_h5, 
+#                   vae        = vae,
+#                   device     = device
+#                  )
+
+# For only encoding AND augmenting dataset
+encode_and_augment2h5(dataloader = dataloader_train, 
+                      filename   = output_filename_full_h5, 
+                      vae        = vae,
+                      device     = device
+                     )
+
 
 ### TEMPORARY ###
 # for i, (rgb, height, id) in tqdm(enumerate(dataloader_train)):

@@ -277,7 +277,7 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         
     """
     
-    if (rgb_cracks != None) & (height_cracks != None):
+    if (rgb_cracks is not None) & (height_cracks is not None):
         id      = np.concatenate(
                                [np.ones(height_cracks.shape[0]), 
                                 np.zeros(height.shape[0])]
@@ -287,10 +287,10 @@ def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
     else:
         id = np.zeros(height.shape[0])
 
-    if target != None:
+    if target is not None:
         id = target
 
-    if segmentation!=None:
+    if segmentation is not None:
         zero_masks  = torch.zeros_like(height)
         seg_masks   = torch.concat([segmentation, zero_masks], axis=0)
 
@@ -348,7 +348,7 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
 
         original_size = rgbs.shape[0]
 
-        if (rgb_cracks != None) & (height_cracks != None):
+        if (rgb_cracks is not None) & (height_cracks is not None):
             i = 2
         else:
             i = 1
@@ -356,25 +356,25 @@ def append_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks
         rgbs.resize(original_size + i * rgb.shape[0], axis=0)
         heights.resize(original_size + i* height.shape[0], axis=0)
         OODs.resize(original_size + i * height.shape[0], axis=0)
-        if segmentation!=None:
+        if segmentation is not None:
             zero_masks  = torch.zeros_like(height)
             seg_mask    = torch.concat([segmentation, zero_masks], axis=0)
             seg_masks.resize(original_size + i* segmentation.shape[0], axis=0)
             seg_masks[original_size:] = seg_mask.cpu().numpy()
 
-        if target != None:
+        if target is not None:
             id = target
         else:
             id = np.zeros(height.shape[0])
 
-        if (rgb_cracks != None) & (height_cracks != None):
+        if (rgb_cracks is not None) & (height_cracks is not None):
             ood = np.ones(height_cracks.shape[0]) 
             rgbs[original_size:]     = torch.concat([rgb_cracks, rgb]).cpu().numpy()
             heights[original_size:]  = torch.concat([height_cracks, height]).cpu().numpy()
-            OODs[original_size:]     = np.concatenate([ood, id])
+            OODs[original_size:]     = id # TODO quick fix!!!
         else:
-            rgbs[original_size:]     = rgb
-            heights[original_size:]  = height
+            rgbs[original_size:]     = rgb.cpu().numpy()
+            heights[original_size:]  = height.cpu().numpy()
             OODs[original_size:]     = id
 
         # Close the Keyence file for reading and the Keyence file for writing

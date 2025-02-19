@@ -20,7 +20,7 @@ from notebooks.preprocess_latent_space.cracks import *
 data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
 # data_dir = r"C:\Users\lmohle\Documents\2_Coding\data\input\Training_data\512x512"
 # data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
-IMPASTO_train_dir = "2024-11-26_Enc_synthetic_mix_512x512_train3.h5"
+IMPASTO_train_dir = "2025-02-18_Enc_aug_512x512_train.h5"
 # IMPASTO_train_dir = "2024-11-26_512x512_val.h5"
 # IMPASTO_train_dir = "AE512x512_val.h5"
 data_train = HDF5PatchesDatasetCustom(hdf5_file_path = os.path.join(data_dir, IMPASTO_train_dir),

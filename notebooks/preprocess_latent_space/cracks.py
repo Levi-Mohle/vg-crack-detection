@@ -319,6 +319,8 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
             if segmentation:
                 seg_masks = torch.zeros((height.shape[0],3,height.shape[2], height.shape[3]))
                 seg_masks = encode_(vae, seg_masks, device=device)
+            else:
+                seg_masks = None
 
         # Transform and encode normal samples
         rgb                 = normalize_rgb(rgb)
@@ -344,5 +346,87 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
                         height       = height,
                         height_cracks= height_cracks,
                         segmentation = seg_masks,
+                        target       = id
+                        )
+
+def encode_and_augment2h5(dataloader, filename, vae, device="cpu"):
+    """
+
+    Args:
+
+        
+    Returns:
+        
+    """
+    for i, (rgb, height, id) in enumerate(tqdm(dataloader)):
+
+        # Transform normal samples
+        rgb                 = normalize_rgb(rgb)
+        height              = rescale_diffuser_height_idv(height)
+        
+        # Augment
+        p = random.random()
+        if p <= 1/3:
+            rgb_aug    = TF.hflip(rgb)
+            height_aug = TF.hflip(height)
+        elif p > 2/3:
+            rgb_aug    = TF.vflip(rgb)
+            height_aug = TF.vflip(height)
+        else:
+            rgb_aug    = TF.vflip(TF.hflip(rgb))
+            height_aug = TF.vflip(TF.hflip(height))
+
+        # Encode samples
+        rgb_aug, height_aug = encode_2ch(vae, rgb_aug, height_aug, device=device)
+        rgb, height         = encode_2ch(vae, rgb, height, device=device)
+
+        id = np.zeros(2*rgb.shape[0])
+        # Add all samples to new h5 file
+        if not os.path.exists(filename):
+            # Creating new h5 file
+            create_h5f_enc(filename, 
+                        rgb          = rgb,
+                        rgb_cracks   = rgb_aug,
+                        height       = height,
+                        height_cracks= height_aug,
+                        target       = id
+                        )
+        else:
+            # Appending h5 file
+            append_h5f_enc(filename, 
+                        rgb          = rgb,
+                        rgb_cracks   = rgb_aug,
+                        height       = height,
+                        height_cracks= height_aug,
+                        target       = id
+                        )
+
+def encode_and_add2h5(dataloader, filename, vae, device="cpu"):
+    """
+
+    Args:
+
+        
+    Returns:
+        
+    """
+    for i, (rgb, height, id) in enumerate(tqdm(dataloader)):
+        # Transform and encode normal samples
+        rgb                 = normalize_rgb(rgb)
+        height              = rescale_diffuser_height_idv(height)
+        rgb, height         = encode_2ch(vae, rgb, height, device=device)
+
+        if not os.path.exists(filename):
+            # Creating new h5 file
+            create_h5f_enc(filename, 
+                        rgb          = rgb,
+                        height       = height,
+                        target       = id
+                        )
+        else:
+            # Appending h5 file
+            append_h5f_enc(filename, 
+                        rgb          = rgb,
+                        height       = height,
                         target       = id
                         )
