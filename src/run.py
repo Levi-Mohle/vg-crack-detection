@@ -17,8 +17,8 @@ device = "cpu"
 batch_size = 16
 variant = "Enc_mix_512x512"
 
-train_size = .5
-val_size = .2
+train_size = .01
+val_size = .1
 test_size = .2
 
 ckpt_path = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2025-01-08_17-04-12\checkpoints\last.ckpt"

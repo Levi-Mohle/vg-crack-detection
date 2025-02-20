@@ -82,13 +82,16 @@ def plot_confusion_matrix(y_scores, y_true, thresholds):
     print(f"Given best threshold value: {best_threshold}")
     print("##############################################")
 
-def classify_metrics(y_score, y_true):
+def classify_metrics(y_score, y_true, save_loc):
     auc_score           = roc_auc_score(y_true, y_score)
     _, _, thresholds    = roc_curve(y_true, y_score)
 
-    # Print
-    print(f"AUC score: {auc_score:.3f}")
-    plot_confusion_matrix(y_score, y_true, thresholds, save_loc)
+    # Print confusion matrix
+    with open(save_loc, "w") as f:
+        sys.stdout = f
+        plot_confusion_matrix(y_score, y_true, thresholds)
+        print(f"AUC score: {auc_score:.3f}")
+    sys.stdout = sys.__stdout__
     
 
 def plot_histogram(y_score, y_true, save_loc, self=None, fs=16):

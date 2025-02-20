@@ -149,11 +149,10 @@ class CNNClassifierLitModule(LightningModule):
         plot_loss(self, skip=1)
 
         if self.ood:
-            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
-            y_true  = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+            y_score = np.argmax(np.concatenate([t for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
+            y_true  = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int), axis=1)
             save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
-            plot_confusion_matrix()
-            # plot_histogram(y_score, y_true, save_loc, self=self)
+            classify_metrics(y_score, y_true, save_loc)
 
         # Clear variables
         self.train_epoch_loss.clear()
