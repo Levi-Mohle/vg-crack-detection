@@ -1,0 +1,39 @@
+_target_: src.models.cnn_classifier_module.CNNClassifierLitModule
+
+cnn:
+  _target_: src.models.components.cnn_net.InceptionV4
+  n_classes: 2
+  input_size: [8,64,64]
+
+
+optimizer:
+  _target_: torch.optim.AdamW
+  _partial_: true
+  lr: 0.0001
+  weight_decay: 0.0
+
+cnn_param:
+  warm_up: 0
+  n_classes: ${model.cnn.n_classes}
+  plot_n_epoch: 5
+  batch_size: ${data.batch_size}
+  target: 2
+  mode: both
+  ood: false
+
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.OneCycleLR
+  _partial_: true
+  max_lr: ${model.optimizer.lr}
+  total_steps: ${trainer.max_epochs}
+  pct_start: ${eval:'${model.cnn_param.warm_up} / ${model.scheduler.total_steps}'}
+  anneal_strategy: cos
+  cycle_momentum: false
+  div_factor: ${eval:'${model.scheduler.max_lr}/1e-6'}
+  final_div_factor: 1
+
+compile: false
+
+paths: 
+  log_dir: ${paths.output_dir}
