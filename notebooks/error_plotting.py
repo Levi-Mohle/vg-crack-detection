@@ -10,6 +10,7 @@ from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torch.utils.data import DataLoader
 from skimage.metrics import structural_similarity
+from scipy.signal import convolve2d
 from torchvision.transforms import transforms
 import skimage.morphology as morhpology
 from tqdm import tqdm
@@ -24,8 +25,8 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 
 # %% Load data
 
-# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
 # input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
 
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
@@ -190,55 +191,64 @@ def filter_eccentricity(image):
             filtered_mask[region.coords[:,0], region.coords[:,1]] = 1
     return filtered_mask
 
-def post_process_ssim(x, ssim_img):
+def post_process_ssim(x0, ssim_img):
+    """
+    Given the input sample x0 and anomaly maps produced with SSIM,
+    this function filters the anomaly maps of noise and non-crack 
+    related artifacts. It derives an OOD-score from the filtered map.
+
+    Args:
+        x0 (2D tensor) : input sample. 2 channels contain grayscale
+                            and height (Bx2xHxW)
+        ssim_img (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        
+    Returns:
+        ano_maps (2D tensor) : filtered anomaly map (Bx1xHxW)
+        ood_score (1D tensor) : out-of-distribution scores (Bx1)
+    """
+    # Create empty tensor for filtered ssim and anomaly maps
     ssim_filt = np.zeros_like(ssim_img)
+    ano_maps  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
 
-    # Sobel filter
-    sobel = skimage.filters.sobel(x[:,1].numpy())
-    sobel = (sobel > .02).astype(int)
+    # Sobel filter on height map
+    sobel_filt = sobel(x0[:,1].cpu().numpy())
+    sobel_filt = (sobel_filt > .02).astype(int)
 
+    kernel = np.array([[0,1,0], [1, 2, 1], [0, 1, 0]])
+    # Loop over images in batch and both channels. Necessary since
+    # skimage has no batch processing
     for idx in range(ssim_img.shape[0]):
         for i in range(ssim_img.shape[1]):
 
             # Thresholding
             ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
-
-            # # Variation denoising
-            # ssim_filt[idx, i] = skimage.restoration.denoise_tv_chambolle(ssim_img[idx,i],
-            #                                                              weight=0.1 
-            #                                                             )
-            # # Gaussian filter to remove noise
-            # ssim_filt[idx,i] = skimage.filters.gaussian(ssim_filt[idx,i],
-            #                                             sigma=1.5 )
             
             # Morphology filters
-            ssim_filt[idx,i] = skimage.morphology.erosion(ssim_filt[idx,i],
-                                                            )
-            
-            # ssim_filt[idx,i] = filter_eccentricity(ssim_filt[idx,i]
-            #                                                 )
-            
-        ssim_filt[idx,i] = ((ssim_filt[idx,0]   == 1) & 
-                            (ssim_filt[idx,1]   == 1) &
-                            (sobel[idx]         == 1)
-                            ).astype(int)
+            # ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
+
+            ssim_filt[idx,i] = morhpology.binary_opening(ssim_filt[idx,i])
+            # ssim_filt[idx,i] = morhpology.dilation(ssim_filt[idx,i])
+
+        # Boolean masks: if pixel is present in ssim height, ssim rgb
+        # and sobel filter, it is accounted as crack pixel  
+        # for layer in [ssim_filt[idx,0], ssim_filt[idx,1], sobel_filt[idx]]:
+        #     # ano_maps[idx] += convolve2d(layer, kernel, mode = "same")
+        #     ano_maps[idx] += layer
+        
+
+        # ano_maps[idx] = (ano_maps[idx] >= 2).astype(int)
+        ano_maps[idx] = ((ssim_filt[idx,0]   == 1) & 
+                        (ssim_filt[idx,1]   == 1) &
+                        (sobel_filt[idx]    == 1)
+                        ).astype(int)
         
         # Opening (Erosion + Dilation) to remove noise + connect shapes
-        ssim_filt[idx,i] = skimage.morphology.opening(ssim_filt[idx,i])
-
-        # ssim_filt[idx,i] = skimage.morphology.dilation(ssim_filt[idx,i])
-        # ssim_filt[idx,i] = skimage.morphology.dilation(ssim_filt[idx,i])
+        ano_maps[idx] = morhpology.opening(ano_maps[idx])
     
-    
-
-    ssim_sum = np.sum(ssim_filt[:,i], axis=(1,2))
+    # Calculate OOD-score, based on total number of crack pixels
+    ood_score = np.sum(ano_maps, axis=(1,2))
                 
-    return ssim_filt, ssim_sum
-
-def OOD_proxy_filtered(x1, x2):
-    _, ssim_img     = ssim_for_batch(x1, x2)
-    y               = post_process_ssim(x1, ssim_img)
-    return y
+    return ano_maps, ood_score
 
 def classify(dataloader):
     targets     = []
@@ -264,7 +274,7 @@ def classify(dataloader):
 
 def plotting(x, y, idx=0):
     z = np.concatenate([x, y], axis=1)
-    fig, axes = plt.subplots(2,2)
+    fig, axes = plt.subplots(1,3, figsize=(12,6))
     for i, ax in enumerate(axes.flatten()):
         ax.imshow(z[idx,i])
         ax.axis("off")
@@ -298,9 +308,9 @@ def plotting_lifted_edge(x, recon, y, idx=0):
     return sobel
 
 # Plotting post process results
-_, ssim_img     = ssim_for_batch(x, reconstructs[1])
-y, _            = post_process_ssim(x, ssim_img)
-# plotting(ssim_img, y, idx=0)
+# _, ssim_img     = ssim_for_batch(x, reconstructs[1])
+# y, _            = post_process_ssim(x, ssim_img)
+# plotting(ssim_img, np.expand_dims(y, axis=1), idx=9)
 # sobel = plotting_lifted_edge(x, ssim_img, y, idx=9)
 
 # Classifying

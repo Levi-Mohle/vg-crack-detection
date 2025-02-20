@@ -10,7 +10,7 @@ from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
 from skimage.filters import sobel
-from skimage.morphology import opening, erosion
+import skimage.morphology as morphology
 
 def plot_loss(self, skip):
 
@@ -129,7 +129,7 @@ def plot_histogram(y_score, y_true, self=None, fs=16):
     plt.tight_layout()
     fig.subplots_adjust(hspace=0.3)
     
-    if self != None:
+    if self is not None:
         plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
         fig.savefig(plt_dir)
         plt.close()
@@ -577,7 +577,8 @@ def post_process_ssim(x0, ssim_img):
             ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
             
             # Morphology filters
-            ssim_filt[idx,i] = erosion(ssim_filt[idx,i])
+            ssim_filt[idx,i] = morphology.binary_erosion(ssim_filt[idx,i])
+
 
         # Boolean masks: if pixel is present in ssim height, ssim rgb
         # and sobel filter, it is accounted as crack pixel  
@@ -587,7 +588,7 @@ def post_process_ssim(x0, ssim_img):
                         ).astype(int)
         
         # Opening (Erosion + Dilation) to remove noise + connect shapes
-        ano_maps[idx] = opening(ano_maps[idx])
+        ano_maps[idx] = morphology.binary_opening(ano_maps[idx])
     
     # Calculate OOD-score, based on total number of crack pixels
     ood_score = np.sum(ano_maps, axis=(1,2))
