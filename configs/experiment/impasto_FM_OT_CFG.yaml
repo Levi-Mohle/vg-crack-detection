@@ -20,7 +20,7 @@ seed: 12345
 callbacks:
     early_stopping:
         monitor: "val/loss"
-        patience: 30
+        patience: 50
         mode: "min"
     model_summary:
         max_depth: 1
@@ -51,14 +51,14 @@ model:
       method: ot
       dropout_prob: 0.1
       guidance_strength: 0.5
-      reconstruct: 0.3
+      reconstruct: 0.4
       save_reconstructs: false
-      plot_n_epoch: 20
+      plot_n_epoch: 25
       target: 2
       solver_lib: torchdiffeq
       mode: both
       wh: 1
-      plot: false
+      plot: true
       plot_ids: [0,1,9,10,11]
       ood: true
       win_size: 5
