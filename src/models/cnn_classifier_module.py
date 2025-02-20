@@ -58,7 +58,7 @@ class CNNClassifierLitModule(LightningModule):
         os.makedirs(self.image_dir, exist_ok=True)
         
         # Define loss criterion
-        self.criterion = torch.nn.BCELoss()
+        self.criterion = torch.nn.BCELoss().to(self.device)
 
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
@@ -90,7 +90,7 @@ class CNNClassifierLitModule(LightningModule):
     
     def one_hot_encode(self, y):
         binary_labels = y.long()
-        one_hot = torch.zeros((y.shape[0],2), dtype=torch.float32)
+        one_hot = torch.zeros((y.shape[0],2), dtype=torch.float32, device=self.device)
         one_hot[torch.arange(y.shape[0]), binary_labels] = 1
         return one_hot
         
