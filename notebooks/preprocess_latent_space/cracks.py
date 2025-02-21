@@ -15,7 +15,8 @@ import torchvision.transforms.functional as TF
 
 from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.latent_space import encode_2ch, encode_
-from notebooks.preprocess_latent_space.dataset import append_h5f_enc, create_h5f_enc
+from notebooks.preprocess_latent_space.dataset import   append_h5f_enc, create_h5f_enc, \
+                                                        append_h5f, create_h5f
 
 def crop_mask(bin_mask, margin=10):
     """
@@ -276,7 +277,7 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
  
     return cracked_height.to(torch.uint16), rgb_cracked.to(torch.uint8), segmentation_masks
 
-def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True, segmentation=False, device="cpu"):
+def add_enc_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=True, segmentation=False, device="cpu"):
     """
     Adds p percentage of synthetic cracks to the dataset provided with the dataloader. New data gets immediately
     encoded useing a vae. Saves new dataset as h5 file as given filename
@@ -347,6 +348,64 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, vae, add_cracks=T
                         height_cracks= height_cracks,
                         segmentation = seg_masks,
                         target       = id
+                        )
+
+def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, add_cracks=True, segmentation=False):
+    """
+    Adds p percentage of synthetic cracks to the dataset provided with the dataloader. New data gets immediately
+    encoded useing a vae. Saves new dataset as h5 file as given filename
+
+    Args:
+        dataloader : dataloader containing the original dataset
+        masks (np.ndarray) : 2D arrays containing shapes for the cracks
+        p (float) : perctage of cracks that should be added to the dataset
+        filename (str) : output filename of the h5 file
+        vae (AutoEncoderKL): pre-trained vae
+        add_cracks (bool) : boolean value to turn on/off adding any cracks
+        segmentation (bool) : boolean value to turn on/off adding segmentation masks
+        
+    Returns:
+        
+    """
+    for i, (rgb, height, id) in enumerate(tqdm(dataloader)):
+
+        id = None # Uncomment if you want to ignore original labels
+
+        # Add, transform and encode synthetic cracks
+        every_n_samples = int(1/p)
+        if (i % every_n_samples == 0) & add_cracks:
+            height_cracks, rgb_cracks, seg_masks = \
+                Create_cracks_with_lifted_edges(height, rgb, 
+                                                masks=masks, 
+                                                decay_rate=2)
+            
+            if segmentation:
+                seg_masks = torch.cat((seg_masks,seg_masks,seg_masks), dim=1)
+            else:
+                seg_masks = None
+        else:
+            rgb_cracks    = None
+            height_cracks = None
+            if segmentation:
+                seg_masks = torch.zeros((height.shape[0],3,height.shape[2], height.shape[3]))
+            else:
+                seg_masks = None
+
+        if not os.path.exists(filename):
+            # Creating new h5 file
+            create_h5f(filename, 
+                        rgb          = rgb,
+                        rgb_cracks   = rgb_cracks,
+                        height       = height,
+                        height_cracks= height_cracks,
+                        )
+        else:
+            # Appending h5 file
+            append_h5f(filename, 
+                        rgb          = rgb,
+                        rgb_cracks   = rgb_cracks,
+                        height       = height,
+                        height_cracks= height_cracks,
                         )
 
 def encode_and_augment2h5(dataloader, filename, vae, device="cpu"):

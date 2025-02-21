@@ -251,6 +251,93 @@ def combine_h5_files(input_folder, output_file):
 
     print(f"Combined file created: {output_file}")
 
+def create_h5f(output_filename_full_h5, rgb, height, rgb_cracks, height_cracks):    
+    """
+    Create and save h5 file to store crack and normal tiny patches in
+
+    This function creates h5 files which are structured like:
+        
+        dataset_file.h5
+        ├───meas_capture
+        |   ├────height               (16-bit uint array size num_images x 1 x num_rows x num_cols)
+        |   └────rgb                  (16-bit uint array size num_images x 3 x num_rows x num_cols)
+        └───extra
+            └────OOD                  (8-bit uint array size num_images)
+
+    Args:
+        output_filename_full_h5 (str): filename + location of h5 file you want to create and save
+        rgb_cracks (torch.Tensor): rgb tiny patches containing cracks (N,3,height,width)
+        height_cracks (torch.Tensor): height tiny patches containing cracks (N,1,height,width)
+        rgb_normal (torch.Tensor): rgb tiny patches containing normal samples (N,3,height,width)
+        height_normal (torch.Tensor): height tiny patches containing normal samples (N,1,height,width)
+
+    Returns:
+        
+    """
+    # TODO Fix case where no cracks are added
+    with h5py.File(output_filename_full_h5, 'w') as h5f:
+        h5f.create_dataset('meas_capture/height',
+                            data = np.concatenate([height_cracks, height], axis=0),
+                            maxshape = (None, 1, 512, 512),
+                            dtype='uint16')
+        h5f.create_dataset('meas_capture/rgb',
+                            data = np.concatenate([rgb_cracks, rgb], axis=0),
+                            maxshape = (None, 3, 512, 512),
+                            dtype='uint8')
+        h5f.create_dataset('extra/OOD',
+                           data = np.concatenate(
+                               [np.ones(height_cracks.shape[0]), 
+                                np.zeros(height.shape[0])]
+                               ),
+                           maxshape= (None,),
+                           dtype= 'uint8')
+        # Close the Keyence file for reading and the Keyence file for writing
+        h5f.close()   
+
+def append_h5f(output_filename_full_h5, rgb, height, rgb_cracks, height_cracks):
+    """
+    Open and append a h5 file to store crack and normal tiny patches in
+
+    This function opens h5 files which are structured like:
+        
+        dataset_file.h5
+        ├───meas_capture
+        |   ├────height               (16-bit uint array size num_images x num_rows x num_cols)
+        |   └────rgb                  (16-bit uint array size num_images x num_rows x num_cols x 3)
+        └───extra
+            └────OOD                  (8-bit uint array size num_images)
+            
+    Args:
+        output_filename_full_h5 (str): filename + location of h5 file you want to open and append
+        rgb_cracks (torch.Tensor): rgb tiny patches containing cracks (N,3,height,width)
+        height_cracks (torch.Tensor): height tiny patches containing cracks (N,1,height,width)
+        rgb_normal (torch.Tensor): rgb tiny patches containing normal samples (N,3,height,width)
+        height_normal (torch.Tensor): height tiny patches containing normal samples (N,1,height,width)
+        tiny_size (np.ndarray): tiny patch size in pixels (heigh, width)
+
+    Returns:
+    """
+    with h5py.File(output_filename_full_h5, 'a') as hdf5:
+        rgbs     = hdf5['meas_capture/rgb']
+        heights  = hdf5['meas_capture/height']
+        OODs     = hdf5['extra/OOD']
+
+        original_size = rgb.shape[0]
+
+        rgbs.resize(original_size + 2 * rgb_cracks.shape[0], axis=0)
+        heights.resize(original_size + 2 * height_cracks.shape[0], axis=0)
+        OODs.resize(original_size + 2* height_cracks.shape[0], axis=0)
+
+        rgbs[original_size:]     = np.concatenate([rgb_cracks, rgb], axis=0)
+        heights[original_size:]  = np.concatenate([height_cracks, height], axis=0)
+
+        ood = np.ones(height_cracks.shape[0]) 
+        id = np.zeros(height.shape[0])
+        OODs[original_size:]     = np.concatenate([ood, id])
+
+        # Close the Keyence file for reading and the Keyence file for writing
+        hdf5.close()
+
 def create_h5f_enc(output_filename_full_h5, rgb, height, target=None, rgb_cracks=None, height_cracks=None, segmentation=None):    
     """
     Create and save h5 file to store crack and normal tiny patches in

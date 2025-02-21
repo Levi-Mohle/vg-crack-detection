@@ -17,6 +17,9 @@ import skimage
 def discretize_255(sample):
     return (sample * 255).to(torch.int32)
 
+def ToTensor(x):
+    return torch.tensor(x, dtype=torch.float32)
+
 def normalize_rgb(x):
     """
     Function to transform height data from 8bit [0, 255] to 32float [-1, 1]
@@ -74,18 +77,18 @@ def normalize_0_1():
     return transform
 
 def normalize_0_1_grayscale_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     transforms.Grayscale(),
                                     normalize_idv])
     return transform
 
 def normalize_height_0_1():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     normalize_height,])
     return transform
 
 def normalize_height_0_1_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     normalize_height_idv,])
     return transform
 
@@ -162,7 +165,7 @@ class Augmentation(transforms.Transform):
 class CNNTransform(transforms.Transform):
     def __init__(self) -> None:
         super().__init__()
-        self.rgb_transform    = normalize_0_1()
+        self.rgb_transform    = normalize_0_1_grayscale_idv()
         self.height_transform = normalize_height_0_1_idv()
 
     def forward(self, rgb, height):

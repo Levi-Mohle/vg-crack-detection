@@ -41,7 +41,7 @@ class HDF5PatchesDatasetCustom(Dataset):
         rgb     = self.rgb[idx][:]
         height  = self.height[idx][:]
         target  = self.target[idx]
-        print(rgb.shape)
+
         if self.transform is not None:
             rgb, height = self.transform(rgb, height)
 

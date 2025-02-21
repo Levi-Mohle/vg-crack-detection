@@ -33,7 +33,7 @@ model:
       lr: 1e-4
     cnn:
       n_classes: 2
-      input_size: [4,512,512]
+      input_size: [2,512,512]
 
     cnn_param:
       n_classes: ${model.cnn.n_classes}
