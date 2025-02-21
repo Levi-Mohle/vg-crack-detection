@@ -158,3 +158,15 @@ class Augmentation(transforms.Transform):
             height  = TF.vflip(height)
 
         return rgb, height
+
+class CNNTransform(transforms.Transform):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rgb_transform    = normalize_0_1()
+        self.height_transform = normalize_height_0_1_idv()
+
+    def forward(self, rgb, height):
+        rgb     = self.rgb_transform(rgb)
+        height  = self.height_transform(height)
+
+        return rgb, height

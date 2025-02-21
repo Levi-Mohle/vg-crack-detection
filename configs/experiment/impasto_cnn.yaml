@@ -33,7 +33,7 @@ model:
       lr: 1e-4
     cnn:
       n_classes: 2
-      input_size: [8,64,64]
+      input_size: [4,512,512]
 
     cnn_param:
       n_classes: ${model.cnn.n_classes}
@@ -50,11 +50,11 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-    variant: Enc_mix_512x512
+    variant: 512x512
     crack: synthetic
     batch_size: 16
-    transform: null
-        # _target_: src.data.components.transforms.Augmentation
+    transform: 
+        _target_: src.data.components.transforms.CNNTransform
     # rgb_transform: null
     #     # _target_: src.data.components.transforms.diffuser_to_grayscale
     # height_transform: null
