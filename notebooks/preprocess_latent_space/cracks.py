@@ -374,6 +374,7 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, add_cracks=True, 
         # Add, transform and encode synthetic cracks
         every_n_samples = int(1/p)
         if (i % every_n_samples == 0) & add_cracks:
+            print("adding cracks!")
             height_cracks, rgb_cracks, seg_masks = \
                 Create_cracks_with_lifted_edges(height, rgb, 
                                                 masks=masks, 
@@ -407,7 +408,8 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, add_cracks=True, 
                         height       = height,
                         height_cracks= height_cracks,
                         )
-
+        if i ==6:
+            break
 def encode_and_augment2h5(dataloader, filename, vae, device="cpu"):
     """
 

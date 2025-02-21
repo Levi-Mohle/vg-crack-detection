@@ -322,7 +322,7 @@ def append_h5f(output_filename_full_h5, rgb, height, rgb_cracks, height_cracks):
         heights  = hdf5['meas_capture/height']
         OODs     = hdf5['extra/OOD']
 
-        original_size = rgb.shape[0]
+        original_size = rgbs.shape[0]
 
         rgbs.resize(original_size + 2 * rgb_cracks.shape[0], axis=0)
         heights.resize(original_size + 2 * height_cracks.shape[0], axis=0)
