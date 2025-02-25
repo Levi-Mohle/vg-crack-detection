@@ -248,7 +248,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             else:
                 reconstructs = self.reconstruction(x, y)
                 
-            self.last_test_batch = [x, reconstructs, y]
+            self.last_test_batch = [x, reconstructs, batch[self.target]]
 
             if self.ood:
                 # Calculate reconstruction loss used for OOD-detection
@@ -266,13 +266,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 self.test_losses.append(ood_score)
                 self.test_labels.append(batch[self.target])
                 
-        
         if self.save_reconstructs:
             if self.latent:
-                # self.vae.to("cpu")
-                # self.last_test_batch = [self.last_test_batch[0].cpu(),
-                #                        self.last_test_batch[1].cpu(),
-                #                        self.last_test_batch[2].cpu()]
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode).cpu()
                 if self.n_classes != None:
                     for i in range(2): 
@@ -291,6 +286,12 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         plot_loss(self, skip=1)
         
+        if self.ood:
+            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
+            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+            save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
+            plot_histogram(y_score, y_true, save_loc, self=self)
+
         if self.plot:
             if self.latent and not(self.save_reconstructs):
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
@@ -306,18 +307,15 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                         self.last_test_batch[0],
                                         self.last_test_batch[1],
                                         self.last_test_batch[2],
+                                        self.test_losses[-1],
                                         self.plot_ids)
                 else:
                     visualize_reconstructs_2ch(self, 
                                                self.last_test_batch[0], 
-                                               self.last_test_batch[1], 
+                                               self.last_test_batch[1],
+                                               self.last_test_batch[2],
+                                               self.test_losses[-1], 
                                                self.plot_ids)
-
-        if self.ood:
-            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
-            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
-            save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
-            plot_histogram(y_score, y_true, save_loc, self=self)
 
         # Clear variables
         self.train_epoch_loss.clear()

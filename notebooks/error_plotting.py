@@ -58,6 +58,7 @@ def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12)
     extent = [0,4,0,4]
     for i in plot_ids:
         fig = plt.figure(constrained_layout=False, figsize=(15,17))
+        plt.suptitle(f"{target[i]}")
         gs = GridSpec(4, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1,1,1], hspace=0.2, wspace=0.2)
         
         # RGB images
@@ -157,7 +158,7 @@ def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12)
         cax12 = divider.append_axes("right", size="5%", pad=0.1)
         plt.colorbar(im12, cax=cax12)
 
-# class_reconstructs_2ch(x, reconstructs, target, plot_ids=[1])
+class_reconstructs_2ch(x, reconstructs, target, plot_ids=[1])
 
 # %% Get classification metrics
 

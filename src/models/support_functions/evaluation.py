@@ -337,7 +337,7 @@ def min_max_normalize(self, x, dim=(0,2,3)):
     max_val = x.amax(dim=dim, keepdim=True)
     return (x - min_val) / (max_val - min_val + 1e-8)
         
-def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, fs=12):
+def class_reconstructs_2ch(self, x, reconstructs, target, ood, plot_ids, fs=12):
     x = to_gray_0_1(x).cpu()
     # x = self.min_max_normalize(x, dim=(2,3)).cpu()
     
@@ -355,6 +355,7 @@ def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, fs=12):
     extent = [0,4,0,4]
     for i in plot_ids:
         fig = plt.figure(constrained_layout=False, figsize=(15,17))
+        fig.suptitle(f"OOD-score is: {ood[i]}")
         gs = GridSpec(4, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1,1,1], hspace=0.2, wspace=0.2)
         
         # RGB images
@@ -458,7 +459,7 @@ def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, fs=12):
         fig.savefig(plt_dir)
         plt.close()
 
-def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
+def visualize_reconstructs_2ch(self, x, reconstruct, target, ood, plot_ids):
 
         if self.latent:
             x           = to_gray_0_1(x).cpu()
@@ -477,6 +478,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
         extent = [0,4,0,4]
         for i in plot_ids:
             fig = plt.figure(constrained_layout=True, figsize=(15,7))
+            fig.suptitle(f"OOD-score is: {ood[i]} | True label is: {target[i]}")
             gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
             ax1 = fig.add_subplot(gs[0,0])
             ax2 = fig.add_subplot(gs[0,1])
