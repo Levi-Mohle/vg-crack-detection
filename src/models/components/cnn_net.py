@@ -281,23 +281,35 @@ class InceptionV4(nn.Module):
             Mixed_4a(),
             Mixed_5a(),
             Inception_A(),
-            # Inception_A(),
-            # Inception_A(),
-            # Inception_A(),
+            Inception_A(),
+            Inception_A(),
+            Inception_A(),
             Reduction_A(), # Mixed_6a
-            # Inception_B(),
-            # Inception_B(),
-            # Inception_B(),
-            # Inception_B(),
-            # Inception_B(),
-            # Inception_B(),
-            # Inception_B(),
-            # Reduction_B(), # Mixed_7a
-            # Inception_C(),
-            # Inception_C(),
-            # Inception_C()
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Inception_B(),
+            Reduction_B(), # Mixed_7a
+            Inception_C(),
+            Inception_C(),
+            Inception_C()
         )
-        self.last_linear = nn.Linear(1024, n_classes)
+        self.last_linear = nn.Linear(1536, n_classes)
+
+        # self.features = nn.Sequential(
+        #     BasicConv2d(self.input_size[0], 32, kernel_size=3, stride=2),
+        #     BasicConv2d(32, 32, kernel_size=3, stride=1),
+        #     BasicConv2d(32, 64, kernel_size=3, stride=1, padding=1),
+        #     Mixed_3a(),
+        #     Mixed_4a(),
+        #     Mixed_5a(),
+        #     Inception_A(),
+        #     Reduction_A(), # Mixed_6a
+        # )
+        # self.last_linear = nn.Linear(1024, n_classes)
 
     def logits(self, features):
         #Allows image of any size to be processed

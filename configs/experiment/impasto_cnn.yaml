@@ -50,7 +50,7 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-    variant: 512x512
+    variant: mix_512x512
     crack: synthetic
     batch_size: 16
     transform: 
