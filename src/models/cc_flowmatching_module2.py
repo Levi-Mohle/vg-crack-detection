@@ -275,7 +275,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 else:
                     self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode).cpu()
                 self.last_test_batch[2] = self.last_test_batch[2].cpu()
-            save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=True)
+            save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=False) # TODO make cfg related to self.n_classes
 
         
             
