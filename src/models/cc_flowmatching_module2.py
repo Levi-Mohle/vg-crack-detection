@@ -236,46 +236,46 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         loss        = self.conditional_flow_matching_loss(x, y)
         self.log("test/loss", loss, prog_bar=True)
 
-        # Pick the last full batch or
-        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
-            # Reconstruct twice: with both 0 and 1 label
-            if self.n_classes!=None:
-                reconstructs = []
-                reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                        device=self.device)))
-                reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                        device=self.device)))
-            else:
-                reconstructs = self.reconstruction(x, y)
+        # Reconstruct twice: with both 0 and 1 label
+        if self.n_classes!=None:
+            reconstructs = []
+            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                    device=self.device)))
+            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                    device=self.device)))
+        else:
+            reconstructs = self.reconstruction(x, y)
                 
+        # Pick the last full batch or first 
+        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
             self.last_test_batch = [x, reconstructs, batch[self.target]]
 
-            if self.ood:
-                # Calculate reconstruction loss used for OOD-detection
-                x0 = self.decode_data(x, self.mode)
-                if self.n_classes!=None:
-                    x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
-                else:
-                    x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
-                
-                # Convert rgb channels to grayscale and revert normalization to [0,1]
-                x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
-                _, ood_score    = OOD_score(x0=x0, x1=x0, x2=x1)
+        if self.ood:
+            # Calculate reconstruction loss used for OOD-detection
+            x0 = self.decode_data(x, self.mode)
+            if self.n_classes!=None:
+                x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
+            else:
+                x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
+            
+            # Convert rgb channels to grayscale and revert normalization to [0,1]
+            x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
+            _, ood_score    = OOD_score(x0=x0, x1=x0, x2=x1)
 
-                # Append scores
-                self.test_losses.append(ood_score)
-                self.test_labels.append(batch[self.target])
+            # Append scores
+            self.test_losses.append(ood_score)
+            self.test_labels.append(batch[self.target])
                 
         if self.save_reconstructs:
             if self.latent:
-                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode).cpu()
+                x = self.decode_data(x, self.mode).cpu()
                 if self.n_classes != None:
                     for i in range(2): 
-                        self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode).cpu()
+                        reconstructs[1][i] = self.decode_data(reconstructs[1][i], self.mode).cpu()
                 else:
-                    self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode).cpu()
-                self.last_test_batch[2] = self.last_test_batch[2].cpu()
-            save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=False) # TODO make cfg related to self.n_classes
+                    reconstructs[1] = self.decode_data(reconstructs[1], self.mode).cpu()
+                    y = batch[self.target].cpu()
+            save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=False) # TODO make cfg related to self.n_classes
 
         
             
