@@ -132,14 +132,10 @@ class CNNClassifierLitModule(LightningModule):
         loss   = self.criterion(y_pred, y)
         self.log("test/loss", loss, prog_bar=True)
 
-        # Pick the last full batch or
-        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
-            # Reconstruct twice: with both 0 and 1 label
-
-            if self.ood:
-                # Append scores
-                self.test_losses.append(y_pred)
-                self.test_labels.append(y)
+        if self.ood:
+            # Append scores
+            self.test_losses.append(y_pred)
+            self.test_labels.append(y)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""

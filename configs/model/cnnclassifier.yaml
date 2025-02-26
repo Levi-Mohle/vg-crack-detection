@@ -4,6 +4,7 @@ cnn:
   _target_: src.models.components.cnn_net.InceptionV4
   n_classes: 2
   input_size: [8,64,64]
+  latent: false
 
 
 optimizer:
