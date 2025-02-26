@@ -64,7 +64,7 @@ model:
       plot_ids: [1,5,6]
       encode: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
-      ood: false
+      ood: true
       use_cond: false
       condition_weight: 2
       skip_steps: 25
@@ -79,7 +79,7 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-  batch_size: 32
+  batch_size: 16
   variant: Enc_512x512
   crack: synthetic
   transform: null
