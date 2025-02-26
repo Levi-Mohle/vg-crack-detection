@@ -93,15 +93,17 @@ DDPM_param:
     wh: 1
     plot_n_epoch: 5
     plot_ids: [0,1,16,17]
-    latent: false
+    encode: false
     pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
     ood: false
     max_epochs: ${trainer.max_epochs}
     batch_size: ${data.batch_size}
     use_cond: false
     condition_weight: 2
-    skip: 25
+    skip_steps: 25
     eta: 1
+    save_reconstructs: false
+    plot: false
     
 compile: false
 

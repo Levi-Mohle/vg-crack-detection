@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+from datetime import datetime
 from diffusers.models import AutoencoderKL
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
@@ -40,10 +41,26 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.criterion          = criterion
 
         # Configure DDPM related parameters dict
-        self.DDPM_param = DDPM_param
+        self.mode               = DDPM_param.mode
+        self.target             = DDPM_param.target
+        self.reconstruct        = DDPM_param.reconstruct
+        self.wh                 = DDPM_param.wh
+        self.plot_n_epoch       = DDPM_param.plot_n_epoch
+        self.plot_ids           = DDPM_param.plot_ids
+        self.encode             = DDPM_param.encode
+        self.pretrained         = DDPM_param.pretrained
+        self.ood                = DDPM_param.ood
+        self.max_epochs         = DDPM_param.max_epochs
+        self.batch_size         = DDPM_param.batch_size
+        self.use_cond           = DDPM_param.use_cond
+        self.condition_weight   = DDPM_param.condition_weight
+        self.skip_steps         = DDPM_param.skip_steps
+        self.eta                = DDPM_param.eta
+        self.save_reconstructs  = DDPM_param.save_reconstructs
+        self.plot               = DDPM_param.plot
 
-        if self.DDPM_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.DDPM_param.pretrained,
+        if self.encode:
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -60,6 +77,10 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
         
+        if self.save_reconstructs:
+            time = datetime.today().strftime('%Y-%m-%d')
+            self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
+
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
         self.test_loss = MeanMetric()
@@ -90,10 +111,13 @@ class DenoisingDiffusionLitModule(LightningModule):
             x = batch[1].to(torch.float)
         elif mode == "rgb":
             x = batch[0].to(torch.float)
-        return x
+
+        # Return true label
+        y = batch[self.target]
+        return x,y
         
     def encode_data(self, batch, mode):
-        if self.DDPM_param.latent:
+        if self.encode:
             if mode == "both":
                 x1 = batch[0]
                 x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
@@ -110,58 +134,9 @@ class DenoisingDiffusionLitModule(LightningModule):
                 with torch.no_grad():
                     x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
         else:
-            x = self.select_mode(batch,mode)
+            x, _ = self.select_mode(batch,mode)
         return x
-        
-    def training_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.DDPM_param.mode)
-        x = self.select_mode(batch, self.DDPM_param.mode)
-        residual, noise = self(x)
-        loss = self.criterion(residual, noise, self.device)
-        self.log("train/loss", loss, prog_bar=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.DDPM_param.mode)
-        x = self.select_mode(batch, self.DDPM_param.mode)
-        residual, noise = self(x)
-        loss = self.criterion(residual, noise, self.device)
-        self.log("val/loss", loss, prog_bar=True)
-
-        # Reconstruct test samples
-        x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
-
-        # Pick the second last batch (which is full)
-        # if x.shape[0] == self.DDPM_param.batch_size:
-        if (self.current_epoch % self.DDPM_param.plot_n_epoch == 0) \
-            & (self.current_epoch != 0): # Only sample once per 5 epochs
-            x = self.select_mode(batch, self.DDPM_param.mode)
-            self.last_val_batch = [x, reconstruct]
-
-    def on_train_epoch_end(self) -> None:
-        """Lightning hook that is called when a training epoch ends."""
-        self.train_epoch_loss.append(self.trainer.callback_metrics['train/loss'])
-        
-    def on_validation_epoch_end(self) -> None:
-        """Lightning hook that is called when a validation epoch ends."""
-        self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % self.DDPM_param.plot_n_epoch == 0) \
-            & (self.current_epoch != 0): # Only sample once per 5 epochs
-            plot_loss(self, skip=2)
-            if self.DDPM_param.latent:
-                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-                                                           self.DDPM_param.mode)    
-                self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
-                                                           self.DDPM_param.mode)    
-            if self.DDPM_param.mode == "both":
-                self.visualize_reconstructs_2ch(self.last_val_batch[0], 
-                                                self.last_val_batch[1],  
-                                                self.DDPM_param.plot_ids)
-            else:
-                self.visualize_reconstructs_1ch(self.last_val_batch[0], 
-                                                self.last_val_batch[1], 
-                                                self.DDPM_param.plot_ids)
-
+    
     def decode_data(self, z, mode):
         if mode=="both":
             z1, z2 = z[:,:4], z[:,4:]
@@ -178,6 +153,59 @@ class DenoisingDiffusionLitModule(LightningModule):
             x = self.vae.decode(z/0.18215).sample
             x = x[:,0].unsqueeze(1)
             return x
+                
+    def training_step(self, batch, batch_idx):
+        # x = self.encode_data(batch, self.mode)
+        x, _ = self.select_mode(batch, self.mode)
+        residual, noise = self(x)
+        loss = self.criterion(residual, noise, self.device)
+        self.log("train/loss", loss, prog_bar=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        # x = self.encode_data(batch, self.mode)
+        x, y = self.select_mode(batch, self.mode)
+        residual, noise = self(x)
+        loss = self.criterion(residual, noise, self.device)
+        self.log("val/loss", loss, prog_bar=True)
+
+        if (self.current_epoch % self.plot_n_epoch == 0) \
+            & (self.current_epoch != 0): # Only sample once per 5 epochs
+            # Pick the second last batch (which is full)
+            if (x.shape[0] == self.batch_size) or (batch_idx == 0):
+                self.last_val_batch = [x, 0, y]
+
+    def on_train_epoch_end(self) -> None:
+        """Lightning hook that is called when a training epoch ends."""
+        self.train_epoch_loss.append(self.trainer.callback_metrics['train/loss'])
+
+    def on_validation_epoch_end(self) -> None:
+        """Lightning hook that is called when a validation epoch ends."""
+        self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
+        if (self.current_epoch % self.plot_n_epoch == 0) \
+            & (self.current_epoch != 0): # Only sample once per 5 epochs
+            plot_loss(self, skip=2)
+            
+            x, y = self.last_val_batch
+            _, reconstruct = self.partial_diffusion(x, self.reconstruct)
+            if self.encode:
+                self.last_val_batch[0] = self.decode_data(x, self.mode)    
+                self.last_val_batch[1] = self.decode_data(reconstruct, self.mode)    
+            else:
+                self.last_val_batch[1] = reconstruct
+            
+            if self.mode == "both":
+                visualize_reconstructs_2ch(self, 
+                                               self.last_test_batch[0], 
+                                               self.last_test_batch[1],
+                                               self.last_test_batch[2],
+                                               self.plot_ids
+                                               )
+            else:
+                # self.visualize_reconstructs_1ch(self.last_val_batch[0], 
+                #                                 self.last_val_batch[1], 
+                #                                 self.plot_ids)
+                pass
         
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
@@ -185,60 +213,74 @@ class DenoisingDiffusionLitModule(LightningModule):
         elif reduction == 'batch':
             chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
 
-        if self.DDPM_param.mode == "both":
-            return (chl_loss[:,0] + self.DDPM_param.wh * chl_loss[:,1]).unsqueeze(1)
+        if self.mode == "both":
+            return (chl_loss[:,0] + self.wh * chl_loss[:,1]).unsqueeze(1)
         else:
             return chl_loss
         
     def test_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.DDPM_param.mode)
-        x = self.select_mode(batch, self.DDPM_param.mode)
-        y = batch[self.DDPM_param.target]
+        # x = self.encode_data(batch, self.mode)
+        x, y = self.select_mode(batch, self.mode)
         residual, noise = self(x)
         loss = self.criterion(residual, noise, self.device)
         self.log("test/loss", loss, prog_bar=True)
 
         # Reconstruct test samples
-        x, reconstruct = self.partial_diffusion(x, self.DDPM_param.reconstruct)
+        _, reconstruct = self.partial_diffusion(x, self.reconstruct)
 
-        if self.DDPM_param.ood:
+        if self.ood:
             # Calculate reconstruction loss used for OOD-detection
-            losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
-            self.test_losses.append(losses)
+            x0 = self.decode_data(x, self.mode)
+            x1 = self.decode_data(reconstruct, self.mode) # Only pick non-crack reconstructions
+ 
+            # Convert rgb channels to grayscale and revert normalization to [0,1]
+            x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
+            _, ood_score    = OOD_score(x0=x0, x1=x0, x2=x1)
+
+            # Append scores
+            self.test_losses.append(ood_score)
             self.test_labels.append(y)
 
-
         # Pick the last full batch or
-        if (x.shape[0] == self.DDPM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.DDPM_param.mode)
+        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
             self.last_test_batch = [x, reconstruct, y]
 
+        if self.save_reconstructs:
+            if self.encode:
+                self.last_test_batch[0] = self.decode_data(x, self.mode).cpu()
+                self.last_test_batch[1] = self.decode_data(reconstruct, self.mode).cpu()
+                self.last_test_batch[2] = y.cpu()
+            save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=False) # TODO make cfg related to self.n_classes
             
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
-        # Sample from gaussian nosie
-        # x_hat = self.sample(num_samples=16)
         
-        # Visualizations
-        # self.visualize_samples(x_hat)
-
-        # Save last batch for visualization
-        if self.DDPM_param.latent:
-            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.DDPM_param.mode)
-            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.DDPM_param.mode)
-            
         plot_loss(self, skip=1)
-        if self.DDPM_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], 
-                                            self.last_test_batch[1], 
-                                            self.DDPM_param.plot_ids)
-        else:
-            self.visualize_reconstructs_1ch(self.last_test_batch[0], 
-                                            self.last_test_batch[1], 
-                                            self.DDPM_param.plot_ids)
 
-        if self.DDPM_param.ood:
-            plot_histogram(self)
+        if self.ood:
+            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
+            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+            save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
+            plot_histogram(y_score, y_true, save_loc, self=self)
+            
+        if self.plot:
+            if self.encode and not(self.save_reconstructs):
+                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
+                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
+            
+            if self.mode == "both":
+                visualize_reconstructs_2ch(self, 
+                                            self.last_test_batch[0], 
+                                            self.last_test_batch[1],
+                                            self.last_test_batch[2],
+                                            self.plot_ids,
+                                            self.test_losses[-1], 
+                                            )
+            else:
+                # self.visualize_reconstructs_1ch(self.last_test_batch[0], 
+                #                                 self.last_test_batch[1], 
+                #                                 self.plot_ids)
+                pass # TODO fix 1ch plot for newer versions
 
         # Clear variables
         self.train_epoch_loss.clear()
@@ -258,13 +300,13 @@ class DenoisingDiffusionLitModule(LightningModule):
         # Reconstruct the samples
 
         # Use conditional DDIM
-        if self.DDPM_param.use_cond:
+        if self.use_cond:
             # Implementation from Mousakha et al, 2023
 
             # Define target
             y = x
 
-            seq = range(1 , Tc+1, self.DDPM_param.skip)
+            seq = range(1 , Tc+1, self.skip_steps)
             seq_next = [0] + list(seq[:-1])
             for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
                 t = torch.tensor([i] * x.shape[0], device=self.device)
@@ -273,11 +315,11 @@ class DenoisingDiffusionLitModule(LightningModule):
                 
                 alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
                 alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
-                sigma = self.DDPM_param.eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
+                sigma = self.eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
                 
                 yt = self.noise_scheduler.add_noise(y, e, t)
                 
-                e_hat = e - self.DDPM_param.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
+                e_hat = e - self.condition_weight * torch.sqrt(1-alpha_prod) * (yt-xt)
                 ft = (xt - torch.sqrt(1-alpha_prod)*e_hat) / torch.sqrt(alpha_prod)
                 
                 xt = torch.sqrt(alpha_prod_prev) * ft + torch.sqrt(1-alpha_prod_prev-sigma**2) * e_hat + sigma * torch.randn_like(xt)
@@ -306,164 +348,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         min_val = x.amin(dim=dim, keepdim=True)
         max_val = x.amax(dim=dim, keepdim=True)
         return (x - min_val) / (max_val - min_val + 1e-8)
-        
-    def visualize_reconstructs_1ch(self, x, reconstruct, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
 
-        # Convert rgb to grayscale for plotting
-        if self.DDPM_param.mode == 'rgb':
-            x              = rgb_to_grayscale(x)
-            reconstruct    = rgb_to_grayscale(reconstruct)
-            
-        # Calculate pixel-wise squared error per channel + normalize
-        error = ((x - reconstruct)**2)
-
-        img = [x.cpu(), reconstruct.cpu(), error.cpu()]
-
-        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
-
-        fig, axes = plt.subplots(nrows=len(plot_ids), ncols=3, 
-                                 width_ratios=[1.08,1,1.08], 
-                                 figsize=(9, 3*len(plot_ids)))
-        
-        plt.subplots_adjust(wspace=0.2, hspace=-0.2)
-        extent = [0,4,0,4]
-        for i, id in enumerate(plot_ids):
-            for j in range(3):
-                if i == 0:
-                     axes[i, j].set_title(title[j], fontsize=self.fs-1)
-                # plot images
-                if j == 2:
-                     im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0)
-                else:
-                    im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0, vmax=1)
-                # plot colorbars
-                if j != 1:
-                    divider = make_axes_locatable(axes[i,j])
-                    cax = divider.append_axes("right", size="5%", pad=0.1)
-                    plt.colorbar(im, cax=cax)
-                if i == len(plot_ids) - 1:
-                     axes[i,j].set_xlabel("X [mm]")
-                else:
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-
-                if j == 0:
-                     axes[i,j].set_ylabel("Y [mm]")
-                     axes[i,j].text(-0.4, 0.5, f"Sample {id}", fontsize= self.fs, rotation=90, va="center", ha="center", transform=axes[i,j].transAxes)
-                elif (i < len(plot_ids) - 1) & (j > 0):
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-                else:
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-                
-                        
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
-        fig.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        # if self.logger.__class__.__name__ == "MLFlowLogger":
-        #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-    
-    def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
-
-        if self.DDPM_param.latent:
-            x_gray = rgb_to_grayscale(x[:,:3])
-            x = torch.cat((x_gray, x[:,3:]), dim=1)
-            
-            reconstruct_gray = rgb_to_grayscale(reconstruct[:,:3])
-            reconstruct = torch.cat((reconstruct_gray, reconstruct[:,3:]), dim=1)
-            
-        # Calculate pixel-wise squared error per channel + normalize
-        error_idv = ((x - reconstruct)**2).cpu()
-        # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
-
-        # Calculate pixel-wise squared error combined + normalize
-        error_comb = self.reconstruction_loss(x, reconstruct, reduction=None).cpu()
-        # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
-        
-        img = [self.min_max_normalize(x, dim=(2,3)).cpu(), self.min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
-        extent = [0,4,0,4]
-        for i in plot_ids:
-            fig = plt.figure(constrained_layout=True, figsize=(15,7))
-            gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
-            ax1 = fig.add_subplot(gs[0,0])
-            ax2 = fig.add_subplot(gs[0,1])
-            ax3 = fig.add_subplot(gs[0,2])
-            ax4 = fig.add_subplot(gs[1,0])
-            ax5 = fig.add_subplot(gs[1,1])
-            ax6 = fig.add_subplot(gs[1,2])
-            # Span whole column
-            ax7 = fig.add_subplot(gs[:,3])
-            axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
-
-            # Plot
-            im1 = ax1.imshow(img[0][i,0], extent=extent, vmin=0, vmax=1)
-            ax1.set_yticks([0,1,2,3,4])
-            ax1.tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-            ax1.set_title("Original sample", fontsize =self.fs)
-            ax1.set_ylabel("Y [mm]")
-            ax1.text(-0.3, 0.5, "Gray-scale", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
-            divider = make_axes_locatable(ax1)
-            cax1 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im1, cax=cax1)
-
-            im2 = ax2.imshow(img[1][i,0], extent=extent, vmin=0, vmax=1)
-            ax2.set_yticks([0,1,2,3,4])
-            ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-            ax2.set_title("Reconstructed sample", fontsize =self.fs)
-            
-            im3 = ax3.imshow(img[2][i,0], extent=extent, vmin=0)
-            ax3.set_yticks([0,1,2,3,4])
-            ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-            ax3.set_title("Anomaly map individual", fontsize =self.fs)
-            divider = make_axes_locatable(ax3)
-            cax3 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im3, cax=cax3)
-
-            im4 = ax4.imshow(img[0][i,1], extent=extent, vmin=0, vmax=1)
-            ax4.set_yticks([0,1,2,3,4])
-            ax4.set_xlabel("X [mm]")
-            ax4.set_ylabel("Y [mm]")
-            ax4.text(-0.3, 0.5, "Height", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax4.transAxes)
-            divider = make_axes_locatable(ax4)
-            cax4 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im4, cax=cax4)
-
-            im5 = ax5.imshow(reconstruct[i,1].cpu(), extent=extent)
-            ax5.set_yticks([0,1,2,3,4])
-            ax5.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-            ax5.set_xlabel("X [mm]")
-
-            im6 = ax6.imshow(img[2][i,1], extent=extent, vmin=0)
-            ax6.set_yticks([0,1,2,3,4])
-            ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-            ax6.set_xlabel("X [mm]")
-            divider = make_axes_locatable(ax6)
-            cax6 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im6, cax=cax6)
-
-            # Span whole column
-            im7 = ax7.imshow(img[3][i,0], extent=extent, vmin=0)
-            ax7.set_title("Anomaly map combined", fontsize =self.fs)
-            ax7.set_yticks([0,1,2,3,4])
-            ax7.set_xlabel("X [mm]")
-            ax7.set_ylabel("Y [mm]")
-
-            # for ax in axs:
-                # ax.axis("off")
-
-            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
-            fig.savefig(plt_dir)
-            plt.close()
-            # Send figure as artifact to logger
-            # if self.logger.__class__.__name__ == "MLFlowLogger":
-            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-
-        
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
         test, or predict.

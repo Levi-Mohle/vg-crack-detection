@@ -307,15 +307,17 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                         self.last_test_batch[0],
                                         self.last_test_batch[1],
                                         self.last_test_batch[2],
+                                        self.plot_ids,
                                         self.test_losses[-1],
-                                        self.plot_ids)
+                                        )
                 else:
                     visualize_reconstructs_2ch(self, 
                                                self.last_test_batch[0], 
                                                self.last_test_batch[1],
                                                self.last_test_batch[2],
+                                               self.plot_ids,
                                                self.test_losses[-1], 
-                                               self.plot_ids)
+                                               )
 
         # Clear variables
         self.train_epoch_loss.clear()

@@ -337,7 +337,7 @@ def min_max_normalize(self, x, dim=(0,2,3)):
     max_val = x.amax(dim=dim, keepdim=True)
     return (x - min_val) / (max_val - min_val + 1e-8)
         
-def class_reconstructs_2ch(self, x, reconstructs, target, ood, plot_ids, fs=12):
+def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, ood=None, fs=12):
     x = to_gray_0_1(x).cpu()
     # x = self.min_max_normalize(x, dim=(2,3)).cpu()
     
@@ -459,7 +459,7 @@ def class_reconstructs_2ch(self, x, reconstructs, target, ood, plot_ids, fs=12):
         fig.savefig(plt_dir)
         plt.close()
 
-def visualize_reconstructs_2ch(self, x, reconstruct, target, ood, plot_ids):
+def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None):
 
         if self.latent:
             x           = to_gray_0_1(x).cpu()
@@ -474,6 +474,9 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, ood, plot_ids):
         error_comb = self.reconstruction_loss(x, reconstruct, reduction=None).cpu()
         # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
         
+        if ood is None:
+            ood = [None] * len(plot_ids)
+
         img = [self.min_max_normalize(x, dim=(2,3)).cpu(), self.min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
         extent = [0,4,0,4]
         for i in plot_ids:
@@ -552,6 +555,64 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, ood, plot_ids):
             # Send figure as artifact to logger
             # if self.logger.__class__.__name__ == "MLFlowLogger":
             #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+
+def visualize_reconstructs_1ch(self, x, reconstruct, plot_ids):
+        # Convert back to [0,1] for plotting
+        x = (x + 1) / 2
+        reconstruct = (reconstruct + 1) / 2
+
+        # Convert rgb to grayscale for plotting
+        if self.mode == 'rgb':
+            x              = rgb_to_grayscale(x)
+            reconstruct    = rgb_to_grayscale(reconstruct)
+            
+        # Calculate pixel-wise squared error per channel + normalize
+        error = ((x - reconstruct)**2)
+
+        img = [x.cpu(), reconstruct.cpu(), error.cpu()]
+
+        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
+
+        fig, axes = plt.subplots(nrows=len(plot_ids), ncols=3, 
+                                 width_ratios=[1.08,1,1.08], 
+                                 figsize=(9, 3*len(plot_ids)))
+        
+        plt.subplots_adjust(wspace=0.2, hspace=-0.2)
+        extent = [0,4,0,4]
+        for i, id in enumerate(plot_ids):
+            for j in range(3):
+                if i == 0:
+                     axes[i, j].set_title(title[j], fontsize=self.fs-1)
+                # plot images
+                if j == 2:
+                     im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0)
+                else:
+                    im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0, vmax=1)
+                # plot colorbars
+                if j != 1:
+                    divider = make_axes_locatable(axes[i,j])
+                    cax = divider.append_axes("right", size="5%", pad=0.1)
+                    plt.colorbar(im, cax=cax)
+                if i == len(plot_ids) - 1:
+                     axes[i,j].set_xlabel("X [mm]")
+                else:
+                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
+
+                if j == 0:
+                     axes[i,j].set_ylabel("Y [mm]")
+                     axes[i,j].text(-0.4, 0.5, f"Sample {id}", fontsize= self.fs, rotation=90, va="center", ha="center", transform=axes[i,j].transAxes)
+                elif (i < len(plot_ids) - 1) & (j > 0):
+                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+                else:
+                     axes[i,j].tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
+                
+                        
+        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
+        fig.savefig(plt_dir)
+        plt.close()
+        # Send figure as artifact to logger
+        # if self.logger.__class__.__name__ == "MLFlowLogger":
+        #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
 
 def post_process_ssim(x0, ssim_img):
     """
