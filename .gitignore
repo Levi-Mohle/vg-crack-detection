@@ -151,6 +151,7 @@ configs/local/default.yaml
 /logs/
 .env
 configs/logger/mlflow.yaml
+/notebooks/dump
 
 # Aim logging
 .aim

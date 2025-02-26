@@ -290,7 +290,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
             y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
             save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
-            plot_histogram(y_score, y_true, save_loc, self=self)
+            plot_histogram(y_score, y_true, save_loc)
 
         if self.plot:
             if self.latent and not(self.save_reconstructs):

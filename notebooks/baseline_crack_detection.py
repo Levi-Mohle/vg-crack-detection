@@ -16,7 +16,7 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from notebooks.utils.crack_detection import crack_detection_total
-from src.models.support_functions.evaluation import classify_metrics
+from src.models.support_functions.evaluation import classify_metrics, plot_histogram
 # %% Load the data
 
 # Choose if run from local machine or SURF cloud
@@ -28,15 +28,15 @@ else:
     pass
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
-                                    batch_size         = 18,
+                                    batch_size         = 16,
                                     variant            = "512x512_local",
-                                    crack              = "realBI"
+                                    crack              = "synthetic"
                                     )
 
 lightning_data.setup()
 loader = lightning_data.test_dataloader()
 # %% Plot crack detection results
-idx = 9
+idx = 4
 for i, (rgb, height, id) in enumerate(loader):
     
     crack_mask, _ = crack_detection_total(rgb[idx].permute(1,2,0).numpy(), \
@@ -73,5 +73,5 @@ y_pred = np.array(y_pred)
 y_true = np.concatenate([y.numpy() for y in y_true]).astype(int)
 # %% Get classification metrics
 
-save_loc = r"C:\Users\lmohle\Downloads\result.txt"
-classify_metrics(y_pred, y_true, save_loc)
+save_loc = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\notebooks\dump"
+plot_histogram(y_pred, y_true, save_loc)

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import os
 import h5py
 import torch
+from datetime import datetime
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
@@ -82,10 +83,11 @@ def plot_confusion_matrix(y_scores, y_true, thresholds):
     print(f"Given best threshold value: {best_threshold}")
     print("##############################################")
 
-def classify_metrics(y_score, y_true, save_loc):
+def classify_metrics(y_score, y_true, save_dir):
     auc_score           = roc_auc_score(y_true, y_score)
     _, _, thresholds    = roc_curve(y_true, y_score)
 
+    save_loc = os.path.join(save_dir, "classification_metrics.txt")
     # Print confusion matrix
     with open(save_loc, "w") as f:
         sys.stdout = f
@@ -94,7 +96,7 @@ def classify_metrics(y_score, y_true, save_loc):
     sys.stdout = sys.__stdout__
     
 
-def plot_histogram(y_score, y_true, save_loc, self=None, fs=16):
+def plot_histogram(y_score, y_true, save_dir, fs=16):
     
     auc_score = roc_auc_score(y_true, y_score)
     if auc_score < 0.2:
@@ -102,6 +104,7 @@ def plot_histogram(y_score, y_true, save_loc, self=None, fs=16):
     fpr, tpr, thresholds = roc_curve(y_true, y_score)
     fpr95 = fpr[np.argmax(tpr >= 0.95)]
     
+    save_loc = os.path.join(save_dir, "classification_metrics.txt")
     # Print confusion matrix
     with open(save_loc, "w") as f:
         sys.stdout = f
@@ -135,10 +138,10 @@ def plot_histogram(y_score, y_true, save_loc, self=None, fs=16):
     plt.tight_layout()
     fig.subplots_adjust(hspace=0.3)
     
-    if self is not None:
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_hist_ROC.png")
-        fig.savefig(plt_dir)
-        plt.close()
+    time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+    plt_dir = os.path.join(save_dir, f"{time}_hist_ROC.png")
+    fig.savefig(plt_dir)
+    plt.close()
     
     # Logging plot as figure to mlflow
     # if self.logger.__class__.__name__ == "MLFlowLogger":
