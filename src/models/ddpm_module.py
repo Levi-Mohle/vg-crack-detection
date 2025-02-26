@@ -186,26 +186,26 @@ class DenoisingDiffusionLitModule(LightningModule):
             & (self.current_epoch != 0): # Only sample once per 5 epochs
             plot_loss(self, skip=2)
             
-            x, y = self.last_val_batch
-            _, reconstruct = self.partial_diffusion(x, self.reconstruct)
-            if self.encode:
-                self.last_val_batch[0] = self.decode_data(x, self.mode)    
-                self.last_val_batch[1] = self.decode_data(reconstruct, self.mode)    
-            else:
-                self.last_val_batch[1] = reconstruct
+            # x, y = self.last_val_batch
+            # _, reconstruct = self.partial_diffusion(x, self.reconstruct)
+            # if self.encode:
+            #     self.last_val_batch[0] = self.decode_data(x, self.mode)    
+            #     self.last_val_batch[1] = self.decode_data(reconstruct, self.mode)    
+            # else:
+            #     self.last_val_batch[1] = reconstruct
             
-            if self.mode == "both":
-                visualize_reconstructs_2ch(self, 
-                                               self.last_test_batch[0], 
-                                               self.last_test_batch[1],
-                                               self.last_test_batch[2],
-                                               self.plot_ids
-                                               )
-            else:
-                # self.visualize_reconstructs_1ch(self.last_val_batch[0], 
-                #                                 self.last_val_batch[1], 
-                #                                 self.plot_ids)
-                pass
+            # if self.mode == "both":
+            #     visualize_reconstructs_2ch(self, 
+            #                                    self.last_test_batch[0], 
+            #                                    self.last_test_batch[1],
+            #                                    self.last_test_batch[2],
+            #                                    self.plot_ids
+            #                                    )
+            # else:
+            #     # self.visualize_reconstructs_1ch(self.last_val_batch[0], 
+            #     #                                 self.last_val_batch[1], 
+            #     #                                 self.plot_ids)
+            #     pass
         
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
