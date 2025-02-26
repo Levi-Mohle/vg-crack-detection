@@ -93,14 +93,14 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.test_losses = []
         self.test_labels = []
 
-    def forward(self, x, steps=None):
+    def forward(self, x, steps=None, y=None):
         noise = torch.randn(x.shape, device=self.device)
         if steps == None:
             steps = torch.randint(self.noise_scheduler.config.num_train_timesteps, (x.size(0),), device=self.device)
         else:
             steps = torch.tensor([steps] * x.shape[0], device=self.device)
         noisy_images = self.noise_scheduler.add_noise(x, noise, steps)
-        residual = self.model(noisy_images, steps).sample
+        residual = self.model(noisy_images, steps, y=y)
         
         return residual, noise
 
@@ -311,7 +311,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
                 t = torch.tensor([i] * x.shape[0], device=self.device)
                 
-                e = self.model(xt, t)['sample']
+                e, _ = self(xt, t)
                 
                 alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
                 alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
@@ -327,7 +327,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         else:
             for timestep in range(Tc, 0, -1):
                     t = torch.tensor([timestep] * x.shape[0], device=self.device)
-                    e = self.model(xt, t).sample
+                    e, _ = self(xt, t)
                     
                     alpha            = self.noise_scheduler.alphas[timestep]
                     alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]
