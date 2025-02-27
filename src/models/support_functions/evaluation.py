@@ -464,9 +464,8 @@ def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, ood=None, fs
 
 def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None):
 
-        if self.latent:
-            x           = to_gray_0_1(x).cpu()
-            reconstruct = to_gray_0_1(reconstruct).cpu()
+        x           = to_gray_0_1(x).cpu()
+        reconstruct = to_gray_0_1(reconstruct).cpu()
             
         # Calculate pixel-wise squared error per channel + normalize
 

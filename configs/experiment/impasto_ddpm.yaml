@@ -71,6 +71,7 @@ model:
       eta: 1
       save_reconstructs: false
       plot: true
+      win_size: 5
     
 trainer:
   min_epochs: 5
@@ -79,7 +80,7 @@ trainer:
   gradient_clip_val: 0.5
 
 data:
-  batch_size: 32
+  batch_size: 16
   variant: Enc_512x512
   crack: synthetic
   transform: null

@@ -58,6 +58,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.eta                = DDPM_param.eta
         self.save_reconstructs  = DDPM_param.save_reconstructs
         self.plot               = DDPM_param.plot
+        self.win_size           = DDPM_param.win_size
 
         if self.encode:
             self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
@@ -260,8 +261,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
             y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
-            save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
-            plot_histogram(y_score, y_true, save_loc, self=self)
+            plot_histogram(y_score, y_true, save_dir=self.log_dir)
             
         if self.plot:
             if self.encode and not(self.save_reconstructs):
@@ -311,7 +311,7 @@ class DenoisingDiffusionLitModule(LightningModule):
             for index, (i,j) in enumerate(zip(reversed(seq), reversed(seq_next))):
                 t = torch.tensor([i] * x.shape[0], device=self.device)
                 
-                e, _ = self(xt, t)
+                e, _ = self(xt, i)
                 
                 alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
                 alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
@@ -327,7 +327,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         else:
             for timestep in range(Tc, 0, -1):
                     t = torch.tensor([timestep] * x.shape[0], device=self.device)
-                    e, _ = self(xt, t)
+                    e, _ = self(xt, timestep)
                     
                     alpha            = self.noise_scheduler.alphas[timestep]
                     alpha_prod       = self.noise_scheduler.alphas_cumprod[timestep]

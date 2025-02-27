@@ -125,6 +125,7 @@ DDPM_param:
     eta: 1
     save_reconstructs: false
     plot: false
+    win_size: 5
     
 compile: false
 
