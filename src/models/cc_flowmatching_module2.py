@@ -46,7 +46,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         # Configure FM related parameters dict
         self.n_classes          = FM_param.n_classes
-        self.latent             = FM_param.latent
+        self.encode             = FM_param.encode
         self.pretrained         = FM_param.pretrained
         self.step_size          = FM_param.step_size
         self.method             = FM_param.method
@@ -69,7 +69,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # instantiate an affine path object for flowmatching
         self.path = AffineProbPath(scheduler=CondOTScheduler())
 
-        if self.latent:
+        if self.encode:
             self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
                                                       local_files_only=True,
                                                       use_safetensors=True
@@ -125,7 +125,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         return x, y
     
     def encode_data(self, batch, mode):
-        if self.latent:
+        if self.encode:
             if mode == "both":
                 x1 = batch[0]
                 x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
@@ -206,7 +206,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             self.last_val_batch = [x, reconstructs, y]
 
             if self.plot:
-                if self.latent:
+                if self.encode:
                     self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
                                                                self.mode) 
                     for i in range(2): 
@@ -267,7 +267,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             self.test_labels.append(batch[self.target])
                 
         if self.save_reconstructs:
-            if self.latent:
+            if self.encode:
                 x = self.decode_data(x, self.mode).cpu()
                 if self.n_classes != None:
                     for i in range(2): 
@@ -275,7 +275,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 else:
                     reconstructs[1] = self.decode_data(reconstructs[1], self.mode).cpu()
                     y = batch[self.target].cpu()
-            save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=False) # TODO make cfg related to self.n_classes
+            if self.n_classes is not None:
+                cfg = True
+            else:
+                cfg = False
+            save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=cfg)
 
         
             
@@ -292,7 +296,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             plot_histogram(y_score, y_true, save_dir = self.log_dir)
 
         if self.plot:
-            if self.latent and not(self.save_reconstructs):
+            if self.encode and not(self.save_reconstructs):
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
                 if self.n_classes!=None:
                     for i in range(2): 

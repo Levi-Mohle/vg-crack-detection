@@ -44,7 +44,7 @@ model:
       n_classes : null
 
     FM_param:
-      latent: true
+      encode: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
       # pretrained: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
       step_size: 0.01
