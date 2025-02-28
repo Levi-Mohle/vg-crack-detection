@@ -25,12 +25,15 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 
 # %% Load data
 
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_synthetic_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
 # input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-28_cDDPM_0.8_realBI_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
 
+cfg = False
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
-                                                     cfg= True,
+                                                     cfg= cfg,
                                                      rgb_transform=revert_normalize_rgb(),
                                                      height_transform= revert_normalize_height())
 
@@ -38,11 +41,17 @@ reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
 dataloader = DataLoader(reconstruct_dataset, batch_size=18, shuffle=False)
 # %% Load 1 batch of data
 
-for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
-    x = torch.concat([rgb, height], dim=1)
-    reconstructs = [torch.concat([r0_rgb, r0_height], dim=1), 
-                    torch.concat([r1_rgb, r1_height], dim=1)]
-    break
+if cfg:
+    for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
+        x = torch.concat([rgb, height], dim=1)
+        reconstructs = [torch.concat([r0_rgb, r0_height], dim=1), 
+                        torch.concat([r1_rgb, r1_height], dim=1)]
+        break
+else:
+    for rgb, height, r_rgb, r_height, target in dataloader:
+        x = torch.concat([rgb, height], dim=1)
+        reconstructs = torch.concat([r_rgb, r_height], dim=1)
+        break
 
 # %% Visualize reconstructs
 def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12):
@@ -215,7 +224,6 @@ def post_process_ssim(x0, ssim_img):
     sobel_filt = sobel(x0[:,1].cpu().numpy())
     sobel_filt = (sobel_filt > .02).astype(int)
 
-    kernel = np.array([[0,1,0], [1, 2, 1], [0, 1, 0]])
     # Loop over images in batch and both channels. Necessary since
     # skimage has no batch processing
     for idx in range(ssim_img.shape[0]):
@@ -251,34 +259,57 @@ def post_process_ssim(x0, ssim_img):
                 
     return ano_maps, ood_score
 
-def classify(dataloader):
+def get_ood_scores(dataloader):
     targets     = []
     predictions = []
-    for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
+    if cfg:
+        for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
 
-        x   = torch.concat([rgb,height], dim=1)
-        r0  = torch.concat([r0_rgb,r0_height], dim=1)
-        r1  = torch.concat([r1_rgb,r1_height], dim=1)
+            x   = torch.concat([rgb,height], dim=1)
+            r0  = torch.concat([r0_rgb,r0_height], dim=1)
+            r1  = torch.concat([r1_rgb,r1_height], dim=1)
 
-        # ssim, _, _ = OOD_proxy(r0, r1)
-        # _, ssim = OOD_proxy_filtered(x, r0)
-        _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
+            # ssim, _, _ = OOD_proxy(r0, r1)
+            # _, ssim = OOD_proxy_filtered(x, r0)
+            _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
 
-        predictions.append(ood_score)
-        targets.append(target)
+            predictions.append(ood_score)
+            targets.append(target)
+    else:
+        for rgb, height, r_rgb, r_height, target in dataloader:
+
+            x   = torch.concat([rgb,height], dim=1)
+            r0  = torch.concat([r_rgb,r_height], dim=1)
+
+            # ssim, _, _ = OOD_proxy(r0, r1)
+            # _, ssim = OOD_proxy_filtered(x, r0)
+            _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
+
+            predictions.append(ood_score)
+            targets.append(target)
 
     y_true  = np.concatenate([t.numpy() for t in targets])
     y_score = np.concatenate([t for t in predictions])
 
-    # classify_metrics(y_score, y_true)
-    plot_histogram(y_score, y_true)
+    return y_score, y_true
 
-def plotting(x, y, idx=0):
-    z = np.concatenate([x, y], axis=1)
-    fig, axes = plt.subplots(1,3, figsize=(12,6))
+def classify(dataloader):
+    
+    y_score, y_true = get_ood_scores(dataloader)
+
+    # classify_metrics(y_score, y_true)
+    # plot_histogram(y_score, y_true)
+    _, _, thresholds    = roc_curve(y_true, y_score)
+    print_confusion_matrix(y_score, y_true, thresholds)
+
+def plotting(x, ssim, post, idx=0):
+    z = np.concatenate([x, ssim, post], axis=1)
+    fig, axes = plt.subplots(1,5, figsize=(12,6))
+    titles = ['RGB', 'height', 'SSIM rgb', 'SSIM height', 'Post']
     for i, ax in enumerate(axes.flatten()):
         ax.imshow(z[idx,i])
         ax.axis("off")
+        ax.set_title(titles[i])
     plt.show()
 
 def get_rectangle(mask):
@@ -308,12 +339,52 @@ def plotting_lifted_edge(x, recon, y, idx=0):
 
     return sobel
 
+def threshold_mover(y_score, y_true, step_backward=0):
+
+    auc_score           = roc_auc_score(y_true, y_score)
+    _, _, thresholds    = roc_curve(y_true, y_score)
+    np.append(thresholds, -np.inf)
+
+    best_accuracy = 0
+    best_threshold = None
+
+    for i, th in enumerate(thresholds):
+        y_pred      = (y_score >= th).astype(int)
+        accuracy    = np.mean(y_pred == y_true)
+
+        if accuracy > best_accuracy:
+            best_y_pred     = y_pred
+            best_accuracy   = accuracy
+            best_threshold  = th
+            best_i          = i
+
+    y_pred      = (y_score >= thresholds[best_i+step_backward]).astype(int)
+    accuracy    = np.mean(y_pred == y_true)
+    
+    cm = confusion_matrix(y_true, y_pred)
+    name_true = ["No crack true", "Crack true"]
+    name_pred = ["No crack pred", "Crack pred"]
+    cm_df = DataFrame(cm, index=name_true, columns=name_pred)
+
+    print("##############################################")
+    print(f"Confusion Matrix for best accuracy {accuracy:.3f}:")
+    print(cm_df)
+    print("")
+    print(f"Given best threshold value: {thresholds[best_i+step_backward]}")
+    print(f"AUC score: {auc_score:.3f}")
+    print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
+    print("##############################################")
+
 # Plotting post process results
-# _, ssim_img     = ssim_for_batch(x, reconstructs[1])
+# _, ssim_img     = ssim_for_batch(x, reconstructs[0])
 # y, _            = post_process_ssim(x, ssim_img)
-# plotting(ssim_img, np.expand_dims(y, axis=1), idx=9)
+# plotting(x, ssim_img, np.expand_dims(y, axis=1), idx=10)
 # sobel = plotting_lifted_edge(x, ssim_img, y, idx=9)
 
 # Classifying
-classify(dataloader)
+# classify(dataloader)
+y_score, y_true = get_ood_scores(dataloader)
+# %%
+plot_classification_metrics(y_score, y_true)
+plot_histogram(y_score, y_true)
 # %%

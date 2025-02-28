@@ -2,7 +2,7 @@ import sys
 from pandas import DataFrame
 import numpy as np
 from skimage.metrics import structural_similarity
-from sklearn.metrics import roc_curve, roc_auc_score, confusion_matrix
+from sklearn.metrics import roc_curve, roc_auc_score, confusion_matrix, precision_recall_curve, f1_score
 import matplotlib.pyplot as plt
 import os
 import h5py
@@ -55,81 +55,25 @@ def plot_loss_VQGAN(self, skip, fs=16):
     plt.savefig(plt_dir)
     plt.close()
 
-def plot_confusion_matrix(y_scores, y_true, thresholds):
+def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
 
-    np.append(thresholds, -np.inf)
-
-    best_accuracy = 0
-    best_threshold = None
-
-    for th in thresholds:
-        y_pred      = (y_scores > th).astype(int)
-        accuracy    = np.mean(y_pred == y_true)
-
-        if accuracy > best_accuracy:
-            best_y_pred     = y_pred
-            best_accuracy   = accuracy
-            best_threshold  = th
-
-    cm = confusion_matrix(y_true, best_y_pred)
-    name_true = ["No crack true", "Crack true"]
-    name_pred = ["No crack pred", "Crack pred"]
-    cm_df = DataFrame(cm, index=name_true, columns=name_pred)
-
-    print("##############################################")
-    print(f"Confusion Matrix for best accuracy {best_accuracy:.3f}:")
-    print(cm_df)
-    print("")
-    print(f"Given best threshold value: {best_threshold}")
-    print("##############################################")
-
-def classify_metrics(y_score, y_true, save_dir):
-    auc_score           = roc_auc_score(y_true, y_score)
-    _, _, thresholds    = roc_curve(y_true, y_score)
-
-    save_loc = os.path.join(save_dir, "classification_metrics.txt")
-    # Print confusion matrix
-    with open(save_loc, "w") as f:
-        sys.stdout = f
-        plot_confusion_matrix(y_score, y_true, thresholds)
-        print(f"AUC score: {auc_score:.3f}")
-        print(f"true labels: {y_true}")
-        print(f"OOD scores: {y_score}")
-    sys.stdout = sys.__stdout__
-    
-
-def plot_histogram(y_score, y_true, save_dir, fs=16):
-    
     auc_score = roc_auc_score(y_true, y_score)
     if auc_score < 0.2:
         auc_score = 1. - auc_score
     fpr, tpr, thresholds = roc_curve(y_true, y_score)
     fpr95 = fpr[np.argmax(tpr >= 0.95)]
+
+    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
     
-    save_loc = os.path.join(save_dir, "classification_metrics.txt")
-    # Print confusion matrix
-    with open(save_loc, "w") as f:
-        sys.stdout = f
-        plot_confusion_matrix(y_score, y_true, thresholds)
-        print(f"AUC score: {auc_score:.3f}")
-        print(f"true labels: {y_true}")
-        print(f"OOD scores: {y_score}")
-    sys.stdout = sys.__stdout__
+    fig, axes= plt.subplots(1,2, figsize=(10, 10))
+    # plot precision recall
+    axes[0].plot(recall, precision)
+    axes[0].set_title('Precision-Recall curve', fontsize = fs)
+    axes[0].set_ylabel('Precision', fontsize = fs)
+    axes[0].set_xlabel('Recall', fontsize = fs)
+    axes[0].set_box_aspect(1)
 
-    # Separate ID and OOD samples
-    y_id = y_score[np.where(y_true == 0)]
-    y_ood = y_score[np.where(y_true != 0)]
-
-    fig, axes= plt.subplots(2,1, figsize=(10, 10))
-    
-    axes[0].hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
-    axes[0].hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
-    axes[0].legend()
-    axes[0].set_title('Outlier Detection', fontsize = fs)
-    axes[0].set_ylabel('Counts', fontsize = fs)
-    axes[0].set_xlabel('Loss', fontsize = fs)
-
-    # plot roc
+    # plot ROC
     axes[1].plot(fpr, tpr)
     axes[1].set_title('ROC', fontsize = fs)
     axes[1].set_ylabel('True Positive Rate', fontsize = fs)
@@ -140,10 +84,131 @@ def plot_histogram(y_score, y_true, save_dir, fs=16):
     axes[1].plot([0,1], [0,1], ls="--")
 
     plt.tight_layout()
+    
+    # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+    plt_dir = os.path.join(save_dir, f"PR_ROC.png")
+    fig.savefig(plt_dir)
+    plt.close()
+
+    if save_dir is not None:
+        save_loc = os.path.join(save_dir, "classification_metrics.txt")
+        # Print confusion matrix
+        with open(save_loc, "w") as f:
+            sys.stdout = f
+            print_confusion_matrix(y_score, y_true, thresholds)
+        sys.stdout = sys.__stdout__
+    else:
+        print_confusion_matrix(y_score, y_true, thresholds)
+
+
+def print_confusion_matrix(y_score, y_true, thresholds):
+
+    fpr, tpr, _ = roc_curve(y_true, y_score)
+    fpr95       = fpr[np.argmax(tpr >= 0.95)]
+
+    np.append(thresholds, -np.inf)
+
+    best_f1         = 0
+    best_threshold  = None
+    accuracy        = 0
+
+    for th in thresholds:
+        y_pred      = (y_score >= th).astype(int)
+        f1          = f1_score(y_true, y_pred)
+        
+        if f1 > best_f1:
+            best_y_pred     = y_pred
+            accuracy        = np.mean(y_pred == y_true)
+            best_threshold  = th
+            best_f1         = f1
+
+    cm = confusion_matrix(y_true, best_y_pred)
+    name_true = ["No crack true", "Crack true"]
+    name_pred = ["No crack pred", "Crack pred"]
+    cm_df = DataFrame(cm, index=name_true, columns=name_pred)
+
+    print("##############################################")
+    print(f"Confusion Matrix for best f1-score {best_f1:.3f}:")
+    print(cm_df)
+    print("")
+    print(f"Given threshold value @ best f1-score: {best_threshold}")
+    print(f"{'Accuracy:':<20}{accuracy:.3f}")
+    print(f"{'Precision:':<20}{cm[1,1]/(cm[0,1]+cm[1,1]):.3f}")
+    print(f"{'Recall:':<20}{cm[1,1]/(cm[1,0]+cm[1,1]):.3f}")
+    print(f"{'FPR @ 95% Recall:':<20}{fpr95:.3f}")
+    print(f"{'Misclassification:':<20}{cm[0,1]+cm[1,0]}")
+    print("##############################################")
+
+def classify_metrics(y_score, y_true, save_dir):
+    auc_score           = roc_auc_score(y_true, y_score)
+    _, _, thresholds    = roc_curve(y_true, y_score)
+
+    save_loc = os.path.join(save_dir, "classification_metrics.txt")
+    # Print confusion matrix
+    with open(save_loc, "w") as f:
+        sys.stdout = f
+        print_confusion_matrix(y_score, y_true, thresholds)
+        print(f"AUC score: {auc_score:.3f}")
+        print(f"true labels: {y_true}")
+        print(f"OOD scores: {y_score}")
+    sys.stdout = sys.__stdout__
+
+def threshold_mover(y_score, y_true, step_backward=0):
+
+    auc_score           = roc_auc_score(y_true, y_score)
+    _, _, thresholds    = roc_curve(y_true, y_score)
+    np.append(thresholds, -np.inf)
+
+    best_accuracy = 0
+    best_threshold = None
+
+    for i, th in enumerate(thresholds):
+        y_pred      = (y_score >= th).astype(int)
+        accuracy    = np.mean(y_pred == y_true)
+
+        if accuracy > best_accuracy:
+            best_y_pred     = y_pred
+            best_accuracy   = accuracy
+            best_threshold  = th
+            best_i          = i
+
+    y_pred      = (y_score >= thresholds[best_i+step_backward]).astype(int)
+    accuracy    = np.mean(y_pred == y_true)
+
+    cm = confusion_matrix(y_true, y_pred)
+    name_true = ["No crack true", "Crack true"]
+    name_pred = ["No crack pred", "Crack pred"]
+    cm_df = DataFrame(cm, index=name_true, columns=name_pred)
+
+    print("##############################################")
+    print(f"Confusion Matrix for best accuracy {accuracy:.3f}:")
+    print(cm_df)
+    print("")
+    print(f"Given best threshold value: {thresholds[best_i+step_backward]}")
+    print(f"AUC score: {auc_score:.3f}")
+    print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
+    print("##############################################")   
+
+def plot_histogram(y_score, y_true, save_dir=None, fs=16):
+
+    # Separate ID and OOD samples
+    y_id = y_score[np.where(y_true == 0)]
+    y_ood = y_score[np.where(y_true != 0)]
+
+    fig, axes= plt.subplots(1,1, figsize=(10,5))
+    
+    axes.hist(y_id, bins=50, alpha=0.5, label='In-distribution', density=True)
+    axes.hist(y_ood, bins=50, alpha=0.5, label='Out-of-distribution', density=True)
+    axes.legend()
+    axes.set_title('Outlier Detection', fontsize = fs)
+    axes.set_ylabel('Counts', fontsize = fs)
+    axes.set_xlabel('Loss', fontsize = fs)
+
+    plt.tight_layout()
     fig.subplots_adjust(hspace=0.3)
     
-    time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
-    plt_dir = os.path.join(save_dir, f"{time}_hist_ROC.png")
+    # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+    plt_dir = os.path.join(save_dir, f"histogram.png")
     fig.savefig(plt_dir)
     plt.close()
     
