@@ -86,12 +86,12 @@ def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
     plt.tight_layout()
     
     # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
-    plt_dir = os.path.join(save_dir, f"PR_ROC.png")
+    plt_dir = os.path.join(save_dir, "0_PR_ROC.png")
     fig.savefig(plt_dir)
     plt.close()
 
     if save_dir is not None:
-        save_loc = os.path.join(save_dir, "classification_metrics.txt")
+        save_loc = os.path.join(save_dir, "0_classification_metrics.txt")
         # Print confusion matrix
         with open(save_loc, "w") as f:
             sys.stdout = f
@@ -143,7 +143,7 @@ def classify_metrics(y_score, y_true, save_dir):
     auc_score           = roc_auc_score(y_true, y_score)
     _, _, thresholds    = roc_curve(y_true, y_score)
 
-    save_loc = os.path.join(save_dir, "classification_metrics.txt")
+    save_loc = os.path.join(save_dir, "0_classification_metrics.txt")
     # Print confusion matrix
     with open(save_loc, "w") as f:
         sys.stdout = f
@@ -208,7 +208,7 @@ def plot_histogram(y_score, y_true, save_dir=None, fs=16):
     fig.subplots_adjust(hspace=0.3)
     
     # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
-    plt_dir = os.path.join(save_dir, f"histogram.png")
+    plt_dir = os.path.join(save_dir, f"0_histogram.png")
     fig.savefig(plt_dir)
     plt.close()
     

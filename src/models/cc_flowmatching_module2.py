@@ -296,7 +296,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
             
             # Save OOD-scores and true labels for later use
-            np.savez(os.path.join(self.log_dir, "labelsNscores"), y_true=y_true, y_scores=y_score)
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
             
             plot_histogram(y_score, y_true, save_dir = self.log_dir)
             plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
