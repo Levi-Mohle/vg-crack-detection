@@ -271,10 +271,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 x = self.decode_data(x, self.mode).cpu()
                 if self.n_classes != None:
                     for i in range(2): 
-                        reconstructs[1][i] = self.decode_data(reconstructs[1][i], self.mode).cpu()
+                        reconstructs[i] = self.decode_data(reconstructs[i], self.mode).cpu()
                 else:
-                    reconstructs[1] = self.decode_data(reconstructs[1], self.mode).cpu()
-                    y = batch[self.target].cpu()
+                    reconstructs = self.decode_data(reconstructs, self.mode).cpu()
+            
+            y = batch[self.target].cpu()
             if self.n_classes is not None:
                 cfg = True
             else:
@@ -311,7 +312,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                         self.last_test_batch[1],
                                         self.last_test_batch[2],
                                         self.plot_ids,
-                                        self.test_losses[-1],
+                                        self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
                                         )
                 else:
                     visualize_reconstructs_2ch(self, 
@@ -319,7 +320,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                                self.last_test_batch[1],
                                                self.last_test_batch[2],
                                                self.plot_ids,
-                                               self.test_losses[-1], 
+                                               self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
                                                )
 
         # Clear variables

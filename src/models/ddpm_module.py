@@ -269,12 +269,12 @@ class DenoisingDiffusionLitModule(LightningModule):
                 self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
             
             if self.mode == "both":
-                visualize_reconstructs_2ch(self, 
-                                            self.last_test_batch[0], 
-                                            self.last_test_batch[1],
-                                            self.last_test_batch[2],
-                                            self.plot_ids,
-                                            self.test_losses[-1], 
+                visualize_reconstructs_2ch(self = self, 
+                                            x = self.last_test_batch[0], 
+                                            reconstruct = self.last_test_batch[1],
+                                            target = self.last_test_batch[2],
+                                            plot_ids = self.plot_ids,
+                                            ood = self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
                                             )
             else:
                 # self.visualize_reconstructs_1ch(self.last_test_batch[0], 

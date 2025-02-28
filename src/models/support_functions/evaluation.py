@@ -93,6 +93,8 @@ def classify_metrics(y_score, y_true, save_dir):
         sys.stdout = f
         plot_confusion_matrix(y_score, y_true, thresholds)
         print(f"AUC score: {auc_score:.3f}")
+        print(f"true labels: {y_true}")
+        print(f"OOD scores: {y_score}")
     sys.stdout = sys.__stdout__
     
 
@@ -110,6 +112,8 @@ def plot_histogram(y_score, y_true, save_dir, fs=16):
         sys.stdout = f
         plot_confusion_matrix(y_score, y_true, thresholds)
         print(f"AUC score: {auc_score:.3f}")
+        print(f"true labels: {y_true}")
+        print(f"OOD scores: {y_score}")
     sys.stdout = sys.__stdout__
 
     # Separate ID and OOD samples
