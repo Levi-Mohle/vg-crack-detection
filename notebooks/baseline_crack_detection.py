@@ -28,7 +28,7 @@ else:
     pass
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
-                                    batch_size         = 16,
+                                    batch_size         = 80,
                                     variant            = "512x512_local",
                                     crack              = "realBI"
                                     )
@@ -36,7 +36,7 @@ lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
 lightning_data.setup()
 loader = lightning_data.test_dataloader()
 # %% Plot crack detection results
-idx = 4
+idx = 60
 for i, (rgb, height, id) in enumerate(loader):
     
     crack_mask, _ = crack_detection_total(rgb[idx].permute(1,2,0).numpy(), \
@@ -48,7 +48,7 @@ for i, (rgb, height, id) in enumerate(loader):
 extent = [0,4,0,4]
 fs = 16
 fig, axes = plt.subplots(1,2, figsize=(10,15))
-axes[0].imshow(rgb[idx].permute(1,2,0), extent=extent)
+axes[0].imshow(height[idx].permute(1,2,0), extent=extent)
 axes[1].imshow(crack_mask, extent=extent)
 for ax in axes.flatten():
     ax.set_ylabel("Y [mm]")
@@ -75,5 +75,10 @@ y_true = np.concatenate([y.numpy() for y in y_true]).astype(int)
 
 save_loc = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\notebooks\dump"
 # plot_histogram(y_score, y_true, save_loc)
-plot_classification_metrics(y_true, y_score)
+plot_classification_metrics(y_score, y_true)
+
+th = 169
+FN = ((y_score >= th) == False) & y_true
+idx = np.where(FN == 1)[0]
+print(idx)
 # %%
