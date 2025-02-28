@@ -35,7 +35,7 @@ FM_param:
   guidance_strength: 1.0
   step_size: 0.1
   warm_up: 0
-  latent: false
+  encode: false
   plot_n_epoch: 5
   batch_size: ${data.batch_size}
   solver_lib: torchdiffeq

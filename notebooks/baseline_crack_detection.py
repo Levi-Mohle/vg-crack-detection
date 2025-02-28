@@ -30,7 +30,7 @@ else:
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
                                     batch_size         = 16,
                                     variant            = "512x512_local",
-                                    crack              = "synthetic"
+                                    crack              = "realAB"
                                     )
 
 lightning_data.setup()
