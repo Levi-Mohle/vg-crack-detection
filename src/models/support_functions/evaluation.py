@@ -78,7 +78,7 @@ def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
     axes[1].set_title('ROC', fontsize = fs)
     axes[1].set_ylabel('True Positive Rate', fontsize = fs)
     axes[1].set_xlabel('False Positive Rate', fontsize = fs)
-    axes[1].legend([f"AUC {auc_score:.2f}"], fontsize = 12)
+    axes[1].legend([f"AUC {auc_score:.3f}"], fontsize = 12)
     axes[1].set_box_aspect(1)
 
     axes[1].plot([0,1], [0,1], ls="--")
@@ -103,6 +103,7 @@ def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
 
 def print_confusion_matrix(y_score, y_true, thresholds):
 
+    auc_score   = roc_auc_score(y_true, y_score)
     fpr, tpr, _ = roc_curve(y_true, y_score)
     fpr95       = fpr[np.argmax(tpr >= 0.95)]
 
@@ -131,11 +132,13 @@ def print_confusion_matrix(y_score, y_true, thresholds):
     print(f"Confusion Matrix for best f1-score {best_f1:.3f}:")
     print(cm_df)
     print("")
+    print(f"{'AUC:':<20}{auc_score:.3f}")
+    print(f"{'FPR @ 95% Recall:':<20}{fpr95:.3f}")
+    print("")
     print(f"Given threshold value @ best f1-score: {best_threshold}")
     print(f"{'Accuracy:':<20}{accuracy:.3f}")
     print(f"{'Precision:':<20}{cm[1,1]/(cm[0,1]+cm[1,1]):.3f}")
     print(f"{'Recall:':<20}{cm[1,1]/(cm[1,0]+cm[1,1]):.3f}")
-    print(f"{'FPR @ 95% Recall:':<20}{fpr95:.3f}")
     print(f"{'Misclassification:':<20}{cm[0,1]+cm[1,0]}")
     print("##############################################")
 
