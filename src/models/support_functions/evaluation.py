@@ -73,6 +73,8 @@ def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
     axes[0].set_xlabel('Recall', fontsize = fs)
     axes[0].set_box_aspect(1)
 
+    axes[0].plot([0,1], [0.5,0.5], ls="--")
+
     # plot ROC
     axes[1].plot(fpr, tpr)
     axes[1].set_title('ROC', fontsize = fs)
@@ -84,13 +86,13 @@ def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
     axes[1].plot([0,1], [0,1], ls="--")
 
     plt.tight_layout()
-    
-    # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
-    plt_dir = os.path.join(save_dir, "0_PR_ROC.png")
-    fig.savefig(plt_dir)
-    plt.close()
 
     if save_dir is not None:
+        # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+        plt_dir = os.path.join(save_dir, "0_PR_ROC.png")
+        fig.savefig(plt_dir)
+        plt.close()
+
         save_loc = os.path.join(save_dir, "0_classification_metrics.txt")
         # Print confusion matrix
         with open(save_loc, "w") as f:
@@ -208,12 +210,12 @@ def plot_histogram(y_score, y_true, save_dir=None, fs=16):
     axes.set_xlabel('Loss', fontsize = fs)
 
     plt.tight_layout()
-    fig.subplots_adjust(hspace=0.3)
     
-    # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
-    plt_dir = os.path.join(save_dir, f"0_histogram.png")
-    fig.savefig(plt_dir)
-    plt.close()
+    if save_dir is not None:
+        # time    = datetime.today().strftime('%Y-%m-%d_%H-%M-%S')
+        plt_dir = os.path.join(save_dir, f"0_histogram.png")
+        fig.savefig(plt_dir)
+        plt.close()
     
     # Logging plot as figure to mlflow
     # if self.logger.__class__.__name__ == "MLFlowLogger":

@@ -31,14 +31,14 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-28_cDDPM_0.8_realBI_reconstructs.h5"
 input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
 
-cfg = False
+cfg = True
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      cfg= cfg,
                                                      rgb_transform=revert_normalize_rgb(),
                                                      height_transform= revert_normalize_height())
 
 # Plot some mini-patches
-dataloader = DataLoader(reconstruct_dataset, batch_size=18, shuffle=False)
+dataloader = DataLoader(reconstruct_dataset, batch_size=80, shuffle=False)
 # %% Load 1 batch of data
 
 if cfg:
@@ -169,28 +169,6 @@ def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12)
 
 class_reconstructs_2ch(x, reconstructs, target, plot_ids=[1])
 
-# %% Get classification metrics
-
-def OOD_proxy(batch, r_batch, win_size=5):
-    batch   = batch.cpu().numpy()
-    r_batch = r_batch.cpu().numpy()
-    bs = batch.shape[0]
-    ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
-    ssim_batch_img = np.zeros_like(batch)
-    for i in range(bs):
-        for j in range(batch.shape[1]):
-            ssim,  img_ssim = structural_similarity(batch[i,j], 
-                                r_batch[i,j],
-                                win_size=win_size,
-                                data_range=1,
-                                full=True)
-            ssim_batch_img[i, j] = img_ssim * -1
-            ssim_batch[i, j]     = np.sum(ssim_batch_img[i, j] > -.7)
-    
-    OOD_mask = (ssim_batch_img[:,0] > -0.7) & (ssim_batch_img[:,1] > -0.95)
-    ssim_comb = np.sum(OOD_mask, axis=(1,2))
-    return ssim_comb, ssim_batch, ssim_batch_img
-
 # %% Post processing SSIM results
 
 def filter_eccentricity(image):
@@ -201,7 +179,7 @@ def filter_eccentricity(image):
             filtered_mask[region.coords[:,0], region.coords[:,1]] = 1
     return filtered_mask
 
-def post_process_ssim(x0, ssim_img):
+def post_process_ssim2(x0, ssim_img):
     """
     Given the input sample x0 and anomaly maps produced with SSIM,
     this function filters the anomaly maps of noise and non-crack 
@@ -233,15 +211,15 @@ def post_process_ssim(x0, ssim_img):
             ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
             
             # Morphology filters
-            # ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
+            ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
 
-            ssim_filt[idx,i] = morhpology.binary_opening(ssim_filt[idx,i])
+            # ssim_filt[idx,i] = morhpology.binary_opening(ssim_filt[idx,i])
             # ssim_filt[idx,i] = morhpology.dilation(ssim_filt[idx,i])
 
         # Boolean masks: if pixel is present in ssim height, ssim rgb
         # and sobel filter, it is accounted as crack pixel  
         # for layer in [ssim_filt[idx,0], ssim_filt[idx,1], sobel_filt[idx]]:
-        #     # ano_maps[idx] += convolve2d(layer, kernel, mode = "same")
+        # #     # ano_maps[idx] += convolve2d(layer, kernel, mode = "same")
         #     ano_maps[idx] += layer
         
 
@@ -375,16 +353,54 @@ def threshold_mover(y_score, y_true, step_backward=0):
     print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
     print("##############################################")
 
-# Plotting post process results
-# _, ssim_img     = ssim_for_batch(x, reconstructs[0])
-# y, _            = post_process_ssim(x, ssim_img)
-# plotting(x, ssim_img, np.expand_dims(y, axis=1), idx=10)
-# sobel = plotting_lifted_edge(x, ssim_img, y, idx=9)
+def OOD_score(x0, x1, x2):
+    """
+    Given the original sample x0 and its reconstructions x1 and x2, 
+    this function returns the filtered anomaly map and OOD-score to be
+    used in classification. If comparison is made between x0 and x1 or x2,
+    provide x1 = x0.
 
-# Classifying
+    Args:
+        x0 (2D tensor) : input sample (Bx2xHxW)
+        x1 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        x2 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        
+
+    Returns:
+        ano_maps (2D tensor) : filtered anomaly map (Bx1xHxW)
+        ood_score (1D tensor) : out-of-distribution scores (Bx1)
+    
+    """
+    # Obtain SSIM between x1 and x2
+    _, ssim_img             = ssim_for_batch(x1, x2)
+    # Calculate anomaly maps and OOD-score
+    ano_maps, ood_score     = post_process_ssim2(x0, ssim_img)
+    return ano_maps, ood_score# Classifying
 # classify(dataloader)
 y_score, y_true = get_ood_scores(dataloader)
+
 # %%
 plot_classification_metrics(y_score, y_true)
-plot_histogram(y_score, y_true)
+# plot_histogram(y_score, y_true)
+print(y_score)
+print(y_true)
+# %%
+th = 9988
+FN = ((y_score >= th) == False) & y_true
+idx = np.where(FN == 1)[0]
+print(idx)
+# %%
+
+# Plotting post process results
+idx = 59
+if cfg:
+    _, ssim_img             = ssim_for_batch(x, reconstructs[0])
+else:
+    _, ssim_img             = ssim_for_batch(x, reconstructs)
+ano_maps, ood_score     = post_process_ssim(x, ssim_img)
+plotting(x, ssim_img, np.expand_dims(ano_maps, axis=1), idx=idx)
+print(np.sum(ood_score[idx]))
+# %%
+sobel_filt = (sobel(x[idx,1].numpy()) > .005).astype(int)
+plt.imshow(sobel_filt)
 # %%
