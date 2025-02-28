@@ -38,6 +38,7 @@ class CNNClassifierLitModule(LightningModule):
         self.ood            = cnn_param.ood
         self.plot_n_epoch   = cnn_param.plot_n_epoch
         self.batch_size     = cnn_param.batch_size
+        self.save_model     = cnn_param.save_model
 
         # if self.latent:
         #     self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
@@ -147,8 +148,15 @@ class CNNClassifierLitModule(LightningModule):
         if self.ood:
             y_score = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
             y_true  = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int), axis=1)
-            save_loc = os.path.join(self.log_dir, "classification_metrics.txt")
-            classify_metrics(y_score, y_true, save_loc)
+
+            # Save OOD-scores and true labels for later use
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
+            
+            plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
+
+        if self.save_model:
+            torch.save(self.cnn.state_dict(), os.path.join(self.log_dir, "cnn_model.pth"))
 
         # Clear variables
         self.train_epoch_loss.clear()

@@ -44,6 +44,7 @@ model:
       target: 2
       mode: both
       ood: true
+      save_model: false
   
 trainer:
   min_epochs: 5

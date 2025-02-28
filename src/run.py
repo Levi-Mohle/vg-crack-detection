@@ -3,7 +3,7 @@ from pathlib import Path
 
 src_path  = Path.cwd()  / "src"
 
-mode = "train" # ["train", "eval"]
+mode = "eval" # ["train", "eval"]
 
 model = "cnnclassifier"
 # model = "cae"
@@ -15,13 +15,13 @@ data = "impasto"
 debug = 'fdr'
 device = "cpu" 
 batch_size = 16
-variant = "512x512"
+variant = "Enc_mix_512x512"
 
 train_size = .01
 val_size = .2
 test_size = .2
 
-ckpt_path = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2025-01-08_17-04-12\checkpoints\last.ckpt"
+ckpt_path = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\logs\train\runs\2025-02-28_15-21-58\checkpoints\last.ckpt"
 
 if mode == "train":
     subprocess.run(["python", "train.py",

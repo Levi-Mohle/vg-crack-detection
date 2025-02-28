@@ -21,6 +21,7 @@ cnn_param:
   target: 2
   mode: both
   ood: false
+  save_model: false
 
 
 scheduler:
