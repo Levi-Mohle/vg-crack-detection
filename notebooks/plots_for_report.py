@@ -31,19 +31,19 @@ else:
     pass
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
-                                    batch_size         = 18,
+                                    batch_size         = 80,
                                     variant            = "512x512_local",
                                     crack              = "synthetic"
                                     )
 
 lightning_data.setup()
 loader = lightning_data.test_dataloader()
-# %% Plot a batch
+# %% Retrieve images from dataloader
 
 for i, (rgb, height, id) in enumerate(loader):
      if i==1:
         break
-
+# %% Plot noise levels
 idx = 2
 x0_rgb      = torch.randn((3,512,512))
 x0_height   = torch.randn((1,512,512))
@@ -80,4 +80,21 @@ for i, ax in enumerate(axes.flatten()):
     ax.set_xticks([0,1,2,3,4])
 fig.tight_layout()
 
-# %% 
+# %% Plot cracks with lifted edges
+print(torch.where(id == 1)[0])
+idx = 2
+
+extent = [0,4,0,4]
+fs = 12
+cracks = [rgb, height]
+T = ["RGB", "Height"]
+fig, axes = plt.subplots(1,2, figsize=(8,12))
+for i, ax in enumerate(axes.flatten()):
+    ax.set_title(f"{T[i]}")
+    ax.imshow(cracks[i][idx].permute(1,2,0), extent=extent)
+    ax.set_ylabel("Y [mm]")
+    ax.set_xlabel("X [mm]")
+    ax.set_yticks([0,1,2,3,4])
+    ax.set_xticks([0,1,2,3,4])
+fig.tight_layout()
+# %%
