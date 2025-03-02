@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from tqdm import tqdm
 
 # add main folder to working directory
 wd = Path(__file__).parent.parent
@@ -19,49 +20,53 @@ from notebooks.utils.crack_detection import crack_detection_total
 from src.models.support_functions.evaluation import *
 # %% Load the data
 
-# Choose if run from local machine or SURF cloud
-local = True
+# Choose if run from local machine (true) or SURF cloud (false)
+local = False
 
 if local:
     data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+    save_loc = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\notebooks\images"
+    variant = "512x512_local"
 else:
-    pass
+    data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
+    save_loc = r"/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
+    variant = "512x512"
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
-                                    batch_size         = 80,
-                                    variant            = "512x512_local",
-                                    crack              = "realBI"
+                                    batch_size         = 32,
+                                    variant            = variant,
+                                    crack              = "realAB"
                                     )
 
 lightning_data.setup()
 loader = lightning_data.test_dataloader()
 # %% Plot crack detection results
-idx = 60
-for i, (rgb, height, id) in enumerate(loader):
+# idx = 60
+# for i, (rgb, height, id) in enumerate(loader):
     
-    crack_mask, _ = crack_detection_total(rgb[idx].permute(1,2,0).numpy(), \
-                                    height[idx,0].numpy())
+#     crack_mask, _ = crack_detection_total(rgb[idx].permute(1,2,0).numpy(), \
+#                                     height[idx,0].numpy())
 
-    if i==0:
-        break
+#     if i==0:
+#         break
 
-extent = [0,4,0,4]
-fs = 16
-fig, axes = plt.subplots(1,2, figsize=(10,15))
-axes[0].imshow(height[idx].permute(1,2,0), extent=extent)
-axes[1].imshow(crack_mask, extent=extent)
-for ax in axes.flatten():
-    ax.set_ylabel("Y [mm]")
-    ax.set_xlabel("X [mm]")
-    ax.set_yticks([0,1,2,3,4])
-    ax.set_xticks([0,1,2,3,4])
-fig.tight_layout()
+# extent = [0,4,0,4]
+# fs = 16
+# fig, axes = plt.subplots(1,2, figsize=(10,15))
+# axes[0].imshow(height[idx].permute(1,2,0), extent=extent)
+# axes[1].imshow(crack_mask, extent=extent)
+# for ax in axes.flatten():
+#     ax.set_ylabel("Y [mm]")
+#     ax.set_xlabel("X [mm]")
+#     ax.set_yticks([0,1,2,3,4])
+#     ax.set_xticks([0,1,2,3,4])
+# fig.tight_layout()
 
 # %% Run crack detection algorithm over all data samples
 
 y_score = []
 y_true = []
-for i, (rgb, height, id) in enumerate(loader):
+for i, (rgb, height, id) in enumerate(tqdm(loader)):
     for j in range(rgb.shape[0]): 
         crack_mask, _ = crack_detection_total(rgb[j].permute(1,2,0).numpy(), \
                                                 height[j,0].numpy())
@@ -73,7 +78,6 @@ y_score = np.array(y_score)
 y_true = np.concatenate([y.numpy() for y in y_true]).astype(int)
 # %% Get classification metrics
 
-save_loc = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\notebooks\dump"
 # plot_histogram(y_score, y_true, save_loc)
 plot_classification_metrics(y_score, y_true)
 
