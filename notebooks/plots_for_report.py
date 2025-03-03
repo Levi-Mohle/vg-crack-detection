@@ -10,6 +10,7 @@ from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
+from skimage.filters import sobel
 import skimage.morphology as morhpology
 from tqdm import tqdm
 
@@ -19,11 +20,12 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
-
-# %% Load the data
+from src.models.support_functions.evaluation import *
+from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstructs
 
 # Choose if run from local machine or SURF cloud
 local = True
+# %% Load the data
 
 if local:
     data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
@@ -33,7 +35,7 @@ else:
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
                                     batch_size         = 80,
                                     variant            = "512x512_local",
-                                    crack              = "synthetic"
+                                    crack              = "realAB"
                                     )
 
 lightning_data.setup()
@@ -82,19 +84,110 @@ fig.tight_layout()
 
 # %% Plot cracks with lifted edges
 print(torch.where(id == 1)[0])
-idx = 2
+idx = 9
 
 extent = [0,4,0,4]
-fs = 12
+fs = 14
 cracks = [rgb, height]
 T = ["RGB", "Height"]
 fig, axes = plt.subplots(1,2, figsize=(8,12))
 for i, ax in enumerate(axes.flatten()):
-    ax.set_title(f"{T[i]}")
+    # ax.set_title(f"{T[i]}", fontsize=fs)
     ax.imshow(cracks[i][idx].permute(1,2,0), extent=extent)
-    ax.set_ylabel("Y [mm]")
-    ax.set_xlabel("X [mm]")
+    ax.set_ylabel("Y [mm]", fontsize=fs)
+    ax.set_xlabel("X [mm]", fontsize=fs)
     ax.set_yticks([0,1,2,3,4])
     ax.set_xticks([0,1,2,3,4])
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+fig.tight_layout()
+# %% Load reconstructs
+
+if local:
+    # data_dir = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-03_cDDPM_0.8_realAB_reconstructs.h5"
+    data_dir = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
+else:
+    pass
+
+cfg = False
+reconstruct_dataset = HDF5PatchesDatasetReconstructs(data_dir,
+                                                     cfg= cfg,
+                                                     rgb_transform=revert_normalize_rgb(),
+                                                     height_transform= revert_normalize_height())
+
+dataloader = DataLoader(reconstruct_dataset, batch_size=80, shuffle=False)
+
+if cfg:
+    for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
+        x = torch.concat([rgb, height], dim=1)
+        reconstructs = [torch.concat([r0_rgb, r0_height], dim=1), 
+                        torch.concat([r1_rgb, r1_height], dim=1)]
+        break
+else:
+    for rgb, height, r_rgb, r_height, target in dataloader:
+        x = torch.concat([rgb, height], dim=1)
+        reconstructs = torch.concat([r_rgb, r_height], dim=1)
+        break
+
+# %% Visualize reconstructs
+extent  = [0,4,0,4]
+fs      = 14
+cracks  = [rgb, height]
+T       = ["RGB", "Height"]
+
+_, ssim_img = ssim_for_batch(x, reconstructs)
+
+ssim_filt   = np.zeros_like(ssim_img)
+ano_maps    = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
+sobel_filt  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
+for idx in range(ssim_img.shape[0]):
+    sobel_filt[idx] = sobel(x[idx,1].cpu().numpy())
+    sobel_filt[idx] = (sobel_filt[idx] > .02).astype(int)
+    for i in range(ssim_img.shape[1]):
+        ssim_filt[idx, i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
+        ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
+
+    ano_maps[idx] = (
+                    (ssim_filt[idx,0]   == 1) & 
+                    (ssim_filt[idx,1]   == 1) 
+                    # (sobel_filt[idx]    == 1)
+                    ).astype(int)
+    
+    # Opening (Erosion + Dilation) to remove noise + connect shapes
+    ano_maps[idx] = morhpology.opening(ano_maps[idx])
+
+idx     = 9
+fig, axes = plt.subplots(2,1, figsize=(12,8))
+for i, ax in enumerate(axes.flatten()):
+    # ax.set_title(f"{T[i]}", fontsize=fs)
+    ax.imshow(ssim_img[idx][i], extent=extent)
+    ax.set_ylabel("Y [mm]", fontsize=fs)
+    ax.set_xlabel("X [mm]", fontsize=fs)
+    ax.set_yticks([0,1,2,3,4])
+    ax.set_xticks([0,1,2,3,4])
+    ax.tick_params(axis='both', which='both', labelsize=fs)
+    # ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+fig.tight_layout()
+
+fig, axes = plt.subplots(1,1, figsize=(5,5))
+for ax in [axes]:
+    # ax.set_title(f"{T[i]}", fontsize=fs)
+    ax.imshow(sobel_filt[idx], extent=extent)
+    ax.set_ylabel("Y [mm]", fontsize=fs)
+    ax.set_xlabel("X [mm]", fontsize=fs)
+    ax.set_yticks([0,1,2,3,4])
+    ax.set_xticks([0,1,2,3,4])
+    # ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+    ax.tick_params(axis='both', which='both', labelsize=fs)
+fig.tight_layout()
+
+fig, axes = plt.subplots(1,1, figsize=(8,8))
+for ax in [axes]:
+    # ax.set_title(f"{T[i]}", fontsize=fs)
+    ax.imshow(ano_maps[idx], extent=extent)
+    # ax.set_ylabel("Y [mm]", fontsize=fs)
+    # ax.set_xlabel("X [mm]", fontsize=fs)
+    ax.set_yticks([0,1,2,3,4])
+    ax.set_xticks([0,1,2,3,4])
+    ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
 fig.tight_layout()
 # %%

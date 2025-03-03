@@ -197,14 +197,15 @@ def post_process_ssim2(x0, ssim_img):
     # Create empty tensor for filtered ssim and anomaly maps
     ssim_filt = np.zeros_like(ssim_img)
     ano_maps  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
-
-    # Sobel filter on height map
-    sobel_filt = sobel(x0[:,1].cpu().numpy())
-    sobel_filt = (sobel_filt > .02).astype(int)
-
+    sobel_filt  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
+ 
     # Loop over images in batch and both channels. Necessary since
     # skimage has no batch processing
     for idx in range(ssim_img.shape[0]):
+        
+        # Sobel filter on height map
+        sobel_filt[idx] = sobel(x0[idx,1].cpu().numpy())
+        sobel_filt[idx] = (sobel_filt[idx] > .02).astype(int)
         for i in range(ssim_img.shape[1]):
 
             # Thresholding
@@ -222,15 +223,15 @@ def post_process_ssim2(x0, ssim_img):
         # #     # ano_maps[idx] += convolve2d(layer, kernel, mode = "same")
         #     ano_maps[idx] += layer
         
-
         # ano_maps[idx] = (ano_maps[idx] >= 2).astype(int)
-        ano_maps[idx] = ((ssim_filt[idx,0]   == 1) & 
-                        (ssim_filt[idx,1]   == 1) &
-                        (sobel_filt[idx]    == 1)
+        ano_maps[idx] = (
+                        (ssim_filt[idx,0]   == 1) & 
+                        (ssim_filt[idx,1]   == 1) 
+                        # (sobel_filt[idx]    == 1)
                         ).astype(int)
         
         # Opening (Erosion + Dilation) to remove noise + connect shapes
-        ano_maps[idx] = morhpology.opening(ano_maps[idx])
+        # ano_maps[idx] = morhpology.opening(ano_maps[idx])
     
     # Calculate OOD-score, based on total number of crack pixels
     ood_score = np.sum(ano_maps, axis=(1,2))
