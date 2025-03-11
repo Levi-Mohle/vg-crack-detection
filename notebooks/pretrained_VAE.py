@@ -146,7 +146,7 @@ ssim_RGB    = []
 ssim_HEIGHT = []
 
 # Loop to encode & decode images and comparing result with SSIM 
-for rgb, height, _ in (pbar := tqdm(train_loader)):
+for rgb, height, _ in (pbar := tqdm(test_loader)):
     recon_rgb, recon_height = encode_decode(vae, rgb, height)
 
     ssim_RGB.append(ssim(rgb.to(device), recon_rgb))
@@ -157,6 +157,9 @@ for rgb, height, _ in (pbar := tqdm(train_loader)):
     
     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
 
-# Print mean
-print(f"The mean SSIM for RGB image: {mean_rgb:.5f}")
-print(f"The mean SSIM for height images: {mean_height:.5f}")
+std_rgb = np.std(np.array(ssim_RGB),axis=0)
+std_height = np.std(np.array(ssim_HEIGHT),axis=0)
+
+# Print mean + std
+print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
+print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")
