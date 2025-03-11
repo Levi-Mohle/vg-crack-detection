@@ -3,6 +3,7 @@ from diffusers.models import AutoencoderKL
 import numpy as np
 import os
 from datetime import datetime
+import time
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
@@ -127,6 +128,9 @@ class CNNClassifierLitModule(LightningModule):
             plot_loss(self, skip=2)
          
     def test_step(self, batch, batch_idx):
+
+        if batch_idx == 0:
+            self.start_time = time.time()
         # x = self.encode_data(batch, self.mode)
         x, y = self.select_mode(batch, self.mode)
         y_pred = self.cnn(x)
@@ -158,6 +162,10 @@ class CNNClassifierLitModule(LightningModule):
         if self.save_model:
             torch.save(self.cnn.state_dict(), os.path.join(self.log_dir, "cnn_model.pth"))
 
+        self.end_time = time.time()
+        inference_time = self.end_time - self.start_time
+        print(f"Inference time: {inference_time:.4f} seconds")
+        
         # Clear variables
         self.train_epoch_loss.clear()
         self.val_epoch_loss.clear()

@@ -4,6 +4,7 @@ from diffusers.models import AutoencoderKL
 import numpy as np
 import os
 from datetime import datetime
+import time
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -231,6 +232,9 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             return chl_loss
          
     def test_step(self, batch, batch_idx):
+
+        if batch_idx == 0:
+            self.start_time = time.time()
         # x = self.encode_data(batch, self.mode)
         x, y = self.select_mode(batch, self.mode)
         loss        = self.conditional_flow_matching_loss(x, y)
@@ -328,6 +332,10 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                                self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
                                                )
 
+        self.end_time = time.time()
+        inference_time = self.end_time - self.start_time
+        print(f"Inference time: {inference_time:.4f} seconds")
+        
         # Clear variables
         self.train_epoch_loss.clear()
         self.val_epoch_loss.clear()

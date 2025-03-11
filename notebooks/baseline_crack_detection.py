@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import os
 import sys
+import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -33,9 +34,9 @@ else:
     variant = "512x512"
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
-                                    batch_size         = 32,
+                                    batch_size         = 16,
                                     variant            = variant,
-                                    crack              = "realAB"
+                                    crack              = "realBI"
                                     )
 
 lightning_data.setup()
@@ -63,6 +64,7 @@ loader = lightning_data.test_dataloader()
 # fig.tight_layout()
 
 # %% Run crack detection algorithm over all data samples
+start_time = time.time()
 
 y_score = []
 y_true = []
@@ -80,6 +82,10 @@ y_true = np.concatenate([y.numpy() for y in y_true]).astype(int)
 
 # plot_histogram(y_score, y_true, save_loc)
 plot_classification_metrics(y_score, y_true)
+
+end_time = time.time()
+inference_time = end_time - start_time
+print(f"Inference time: {inference_time:.4f} seconds")
 
 th = 169
 FN = ((y_score >= th) == False) & y_true

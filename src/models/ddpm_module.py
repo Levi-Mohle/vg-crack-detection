@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import os
 from datetime import datetime
+import time
 from diffusers.models import AutoencoderKL
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
@@ -180,6 +181,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         """Lightning hook that is called when a training epoch ends."""
         self.train_epoch_loss.append(self.trainer.callback_metrics['train/loss'])
 
+    
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
@@ -220,6 +222,9 @@ class DenoisingDiffusionLitModule(LightningModule):
             return chl_loss
         
     def test_step(self, batch, batch_idx):
+
+        if batch_idx == 0:
+            self.start_time = time.time()
         # x = self.encode_data(batch, self.mode)
         x, y = self.select_mode(batch, self.mode)
         residual, noise = self(x)
@@ -287,6 +292,10 @@ class DenoisingDiffusionLitModule(LightningModule):
                 #                                 self.plot_ids)
                 pass # TODO fix 1ch plot for newer versions
 
+        self.end_time = time.time()
+        inference_time = self.end_time - self.start_time
+        print(f"Inference time: {inference_time:.4f} seconds")
+        
         # Clear variables
         self.train_epoch_loss.clear()
         self.val_epoch_loss.clear()
