@@ -25,11 +25,10 @@ vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device
 
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
-                                    variant="Enc_512x512",
-                                    crack="synthetic",
-                                    batch_size = 4,
-                                    # rgb_transform = diffuser_normalize(),
-                                    # height_transform = diffuser_normalize_height_idv()
+                                    variant="512x512",
+                                    crack="realBI",
+                                    batch_size = 8,
+                                    transform = DiffuserTransform()
                                     )
 lightning_data.setup()
 
@@ -141,25 +140,25 @@ ssim = SSIM(gaussian_kernel=False,
             data_range=1,
             kernel_size=11).to(device)
 
-# Create empty lists to store SSIM scores
-ssim_RGB    = []
-ssim_HEIGHT = []
+# # Create empty lists to store SSIM scores
+# ssim_RGB    = []
+# ssim_HEIGHT = []
 
-# Loop to encode & decode images and comparing result with SSIM 
-for rgb, height, _ in (pbar := tqdm(test_loader)):
-    recon_rgb, recon_height = encode_decode(vae, rgb, height)
+# # Loop to encode & decode images and comparing result with SSIM 
+# for rgb, height, _ in (pbar := tqdm(train_loader)):
+#     recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
 
-    ssim_RGB.append(ssim(rgb.to(device), recon_rgb))
-    ssim_HEIGHT.append(ssim(height.to(device), recon_height))
+#     ssim_RGB.append(ssim(rgb, recon_rgb))
+#     ssim_HEIGHT.append(ssim(height, recon_height))
 
-    mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
-    mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
+#     mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
+#     mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
     
-    pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
+#     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
 
-std_rgb = np.std(np.array(ssim_RGB),axis=0)
-std_height = np.std(np.array(ssim_HEIGHT),axis=0)
+# std_rgb = torch.std(torch.tensor(ssim_RGB),axis=0)
+# std_height = torch.std(torch.tensor(ssim_HEIGHT),axis=0)
 
-# Print mean + std
-print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
-print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")
+# # Print mean + std
+# print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
+# print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")

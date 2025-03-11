@@ -111,8 +111,8 @@ def diffuser_to_grayscale_idv():
 
 
 def diffuser_normalize():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    rescale_diffuser,
+    transform = transforms.Compose([ToTensor,
+                                    normalize_rgb,
                                         ])
     return transform
 
@@ -123,7 +123,7 @@ def diffuser_normalize_height():
     return transform
 
 def diffuser_normalize_height_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     rescale_diffuser_height_idv,
                                         ])
     return transform
@@ -167,6 +167,18 @@ class CNNTransform(transforms.Transform):
         super().__init__()
         self.rgb_transform    = normalize_0_1_grayscale_idv()
         self.height_transform = normalize_height_0_1_idv()
+
+    def forward(self, rgb, height):
+        rgb     = self.rgb_transform(rgb)
+        height  = self.height_transform(height)
+
+        return rgb, height
+
+class DiffuserTransform(transforms.Transform):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rgb_transform    = diffuser_normalize()
+        self.height_transform = diffuser_normalize_height_idv()
 
     def forward(self, rgb, height):
         rgb     = self.rgb_transform(rgb)

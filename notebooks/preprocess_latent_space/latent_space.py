@@ -90,7 +90,7 @@ def decode_2ch(vae, enc_rgb, enc_height, device="cpu"):
     vae.to(device)
     
     # Decode
-    recon_rgb      = decode_(enc_rgb)
-    recon_height   = decode_(enc_height)[:,0].unsqueeze(1)
+    recon_rgb      = decode_(vae, enc_rgb, device)
+    recon_height   = decode_(vae, enc_height, device)[:,0].unsqueeze(1)
 
     return recon_rgb, recon_height
