@@ -14,8 +14,8 @@ optimizer:
 scheduler:
   _target_: src.models.components.scheduler.schedulers.WarmupCosineScheduler
   _partial_: true
-  num_warmup_steps: 500
-  num_training_steps: 6400
+  num_warmup_steps: 40
+  num_training_steps: ${data.batch_size}
   num_cycles: 0.5
 
 criterion:

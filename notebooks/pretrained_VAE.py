@@ -25,17 +25,17 @@ vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device
 
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
-                                    variant="512x512",
+                                    variant="Enc_512x512",
                                     crack="realBI",
-                                    batch_size = 8,
-                                    transform = DiffuserTransform()
+                                    batch_size = 1,
+                                    # transform = DiffuserTransform()
                                     )
 lightning_data.setup()
 
 train_loader = lightning_data.train_dataloader()
 val_loader = lightning_data.val_dataloader()
 test_loader = lightning_data.test_dataloader()
-
+print(train_loader.__len__())
 img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
 # %% Encode - Decode data
 
