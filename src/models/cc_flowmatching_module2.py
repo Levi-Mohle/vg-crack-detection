@@ -316,13 +316,20 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             
             if self.mode == "both":
                 if self.n_classes!=None:
-                    class_reconstructs_2ch(self, 
-                                        self.last_test_batch[0],
-                                        self.last_test_batch[1],
-                                        self.last_test_batch[2],
-                                        self.plot_ids,
-                                        self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
-                                        )
+                    # class_reconstructs_2ch(self, 
+                    #                     self.last_test_batch[0],
+                    #                     self.last_test_batch[1],
+                    #                     self.last_test_batch[2],
+                    #                     self.plot_ids,
+                    #                     self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
+                    #                     )
+                    visualize_reconstructs_2ch(self, 
+                                               self.last_test_batch[0], 
+                                               self.last_test_batch[1][0],
+                                               self.last_test_batch[2],
+                                               self.plot_ids,
+                                               self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
+                                               )    
                 else:
                     visualize_reconstructs_2ch(self, 
                                                self.last_test_batch[0], 
