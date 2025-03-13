@@ -67,7 +67,7 @@ model:
       encode: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       ood: true
-      use_cond: true
+      use_cond: false
       condition_weight: 2
       skip_steps: 25
       eta: 1
