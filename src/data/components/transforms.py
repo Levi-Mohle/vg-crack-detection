@@ -132,8 +132,8 @@ def diffuser_normalize_height_idv():
 
 def revert_normalize_rgb():
     transform = transforms.Compose([transforms.ToTensor(),
-                                    inverse_norm,
-                                    transforms.Grayscale()
+                                    transforms.Grayscale(),
+                                    inverse_norm, 
                                         ])
     return transform
 

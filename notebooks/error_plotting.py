@@ -29,16 +29,17 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-11_real_reconstructs.h5"
 # input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-28_cDDPM_0.8_realBI_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-14_cDDIM2_0.4_realBI_reconstructs.h5"
 
-cfg = True
+cfg = False
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      cfg= cfg,
-                                                     rgb_transform=revert_normalize_rgb(),
-                                                     height_transform= revert_normalize_height())
+                                                     rgb_transform=None,
+                                                     height_transform=None)
 
 # Plot some mini-patches
-dataloader = DataLoader(reconstruct_dataset, batch_size=80, shuffle=False)
+dataloader = DataLoader(reconstruct_dataset, batch_size=16, shuffle=False)
 # %% Load 1 batch of data
 
 if cfg:
@@ -195,8 +196,8 @@ def post_process_ssim2(x0, ssim_img):
         ood_score (1D tensor) : out-of-distribution scores (Bx1)
     """
     # Create empty tensor for filtered ssim and anomaly maps
-    ssim_filt = np.zeros_like(ssim_img)
-    ano_maps  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
+    ssim_filt   = np.zeros_like(ssim_img)
+    ano_maps    = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
     sobel_filt  = np.zeros((ssim_img.shape[0],ssim_img.shape[2],ssim_img.shape[3]))
  
     # Loop over images in batch and both channels. Necessary since
@@ -209,10 +210,10 @@ def post_process_ssim2(x0, ssim_img):
         for i in range(ssim_img.shape[1]):
 
             # Thresholding
-            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
+            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=91)).astype(int)
             
             # Morphology filters
-            ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
+            # ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
 
             # ssim_filt[idx,i] = morhpology.binary_opening(ssim_filt[idx,i])
             # ssim_filt[idx,i] = morhpology.dilation(ssim_filt[idx,i])
@@ -221,17 +222,18 @@ def post_process_ssim2(x0, ssim_img):
         # and sobel filter, it is accounted as crack pixel  
         # for layer in [ssim_filt[idx,0], ssim_filt[idx,1], sobel_filt[idx]]:
         # #     # ano_maps[idx] += convolve2d(layer, kernel, mode = "same")
-        #     ano_maps[idx] += layer
+            # ano_maps[idx] += layer
         
         # ano_maps[idx] = (ano_maps[idx] >= 2).astype(int)
         ano_maps[idx] = (
                         (ssim_filt[idx,0]   == 1) & 
-                        (ssim_filt[idx,1]   == 1) 
+                        (ssim_filt[idx,1]   == 1)
                         # (sobel_filt[idx]    == 1)
                         ).astype(int)
         
         # Opening (Erosion + Dilation) to remove noise + connect shapes
-        # ano_maps[idx] = morhpology.opening(ano_maps[idx])
+        # ano_maps[idx] = morhpology.binary_opening(ano_maps[idx])
+        # ano_maps[idx] = morhpology.binary_erosion(ano_maps[idx])
     
     # Calculate OOD-score, based on total number of crack pixels
     ood_score = np.sum(ano_maps, axis=(1,2))
@@ -250,6 +252,7 @@ def get_ood_scores(dataloader):
 
             # ssim, _, _ = OOD_proxy(r0, r1)
             # _, ssim = OOD_proxy_filtered(x, r0)
+            x, r0       = to_gray_0_1(x), to_gray_0_1(r0)
             _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
 
             predictions.append(ood_score)
@@ -262,6 +265,7 @@ def get_ood_scores(dataloader):
 
             # ssim, _, _ = OOD_proxy(r0, r1)
             # _, ssim = OOD_proxy_filtered(x, r0)
+            x, r0       = to_gray_0_1(x), to_gray_0_1(r0)
             _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
 
             predictions.append(ood_score)
@@ -383,8 +387,8 @@ y_score, y_true = get_ood_scores(dataloader)
 # %%
 plot_classification_metrics(y_score, y_true)
 # plot_histogram(y_score, y_true)
-print(y_score)
-print(y_true)
+# print(y_score)
+# print(y_true)
 # %%
 th = 9988
 FN = ((y_score >= th) == False) & y_true
