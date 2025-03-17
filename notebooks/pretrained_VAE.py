@@ -18,17 +18,26 @@ from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.dataset import create_h5f_enc, append_h5f_enc
 from notebooks.preprocess_latent_space.latent_space import *
 
-device = "cuda" 
-model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
+ 
+local = True
+
+if local:
+    model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
+    data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+    device="cpu"
+else:
+    model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
+    data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
+    device = "cuda"
 
 vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
 
 # %% Load the data
-lightning_data = IMPASTO_DataModule(data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto",
-                                    variant="Enc_512x512",
-                                    crack="realBI",
-                                    batch_size = 1,
-                                    # transform = DiffuserTransform()
+lightning_data = IMPASTO_DataModule(data_dir = data_dir,
+                                    variant="512x512",
+                                    crack="realAB",
+                                    batch_size = 18,
+                                    transform = DiffuserTransform()
                                     )
 lightning_data.setup()
 
@@ -45,46 +54,46 @@ def undo_norm(x):
     return x
 # %% Plot results rgb
 
-# for rgb, height, _ in train_loader:
-#     recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
+for rgb, height, _ in train_loader:
+    recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
     
-#     recon_rgb = undo_norm(recon_rgb)
-#     recon_height = undo_norm(recon_height)
-#     break
+    recon_rgb = undo_norm(recon_rgb)
+    recon_height = undo_norm(recon_height)
+    break
 
-# rgb2 = undo_norm(rgb)
+rgb2 = undo_norm(rgb)
 
-# i = 3
-# fig, axes = plt.subplots(1, 2, figsize=(12,8))
-# axes[0].imshow(rgb2[i].permute(1,2,0))
-# axes[0].set_title(f"Original mini patch", fontsize=16)
-# axes[0].axis('off')
+i = 3
+fig, axes = plt.subplots(1, 2, figsize=(12,8))
+axes[0].imshow(rgb2[i].permute(1,2,0))
+axes[0].set_title(f"Original mini patch", fontsize=16)
+axes[0].axis('off')
 
-# axes[1].imshow(recon_rgb[i].permute(1,2,0))
-# axes[1].set_title(f"Reconstructed", fontsize=16)
-# axes[1].axis('off')
+axes[1].imshow(recon_rgb[i].permute(1,2,0))
+axes[1].set_title(f"Reconstructed", fontsize=16)
+axes[1].axis('off')
 
-# plt_dir = os.path.join(img_dir, "test_rgb")
+plt_dir = os.path.join(img_dir, "test_rgb")
 # fig.savefig(plt_dir)
-# plt.close()
+plt.close()
 
-# # %% Plot results height
+# %% Plot results height
 
 # height2 = undo_norm(height)
 
-# i, j = 3, 2
-# fig, axes = plt.subplots(1, 2, figsize=(12,8))
-# axes[0].imshow(height2[i,0])
-# axes[0].set_title(f"Original mini patch", fontsize=16)
-# axes[0].axis('off')
+i, j = 3, 2
+fig, axes = plt.subplots(1, 2, figsize=(12,8))
+axes[0].imshow(height2[i,0])
+axes[0].set_title(f"Original mini patch", fontsize=16)
+axes[0].axis('off')
 
-# axes[1].imshow(recon_height[i,0])
-# axes[1].set_title(f"Reconstructed", fontsize=16)
-# axes[1].axis('off')
+axes[1].imshow(recon_height[i,0])
+axes[1].set_title(f"Reconstructed", fontsize=16)
+axes[1].axis('off')
 
-# plt_dir = os.path.join(img_dir, "test_height")
-# fig.savefig(plt_dir)
-# plt.close()
+plt_dir = os.path.join(img_dir, "test_height")
+fig.savefig(plt_dir)
+plt.close()
 
 # ONLY DECODING
 
