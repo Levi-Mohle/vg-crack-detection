@@ -4,6 +4,7 @@ from diffusers.models import AutoencoderKL
 import numpy as np
 import os
 import sys
+import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -19,7 +20,7 @@ from notebooks.preprocess_latent_space.dataset import create_h5f_enc, append_h5f
 from notebooks.preprocess_latent_space.latent_space import *
 
  
-local = True
+local = False
 
 if local:
     model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
@@ -35,7 +36,7 @@ vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = data_dir,
                                     variant="512x512",
-                                    crack="realAB",
+                                    crack="realBI",
                                     batch_size = 18,
                                     transform = DiffuserTransform()
                                     )
@@ -44,56 +45,67 @@ lightning_data.setup()
 train_loader = lightning_data.train_dataloader()
 val_loader = lightning_data.val_dataloader()
 test_loader = lightning_data.test_dataloader()
-print(train_loader.__len__())
+
 img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
+
+# Encode only
+
+start_time = time.time()
+for rgb, height, _ in tqdm(test_loader):
+    enc1, enc2 = encode_2ch(vae, rgb, height, device)
+end_time = time.time()
+inference_time = end_time - start_time
+print(f"Inference time: {inference_time:.4f} seconds")
+
 # %% Encode - Decode data
 
-def undo_norm(x):
-    x = (x + 1.) / 2.
-    x = x.clamp(0., 1.)
-    return x
-# %% Plot results rgb
+# def undo_norm(x):
+#     x = (x + 1.) / 2.
+#     x = x.clamp(0., 1.)
+#     return x
+# # %% Plot results rgb
 
-for rgb, height, _ in train_loader:
-    recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
+# for rgb, height, _ in test_loader:
+#     recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
     
-    recon_rgb = undo_norm(recon_rgb)
-    recon_height = undo_norm(recon_height)
-    break
+#     recon_rgb = undo_norm(recon_rgb)
+#     recon_height = undo_norm(recon_height)
+#     break
 
-rgb2 = undo_norm(rgb)
+# rgb2 = undo_norm(rgb)
 
-i = 3
-fig, axes = plt.subplots(1, 2, figsize=(12,8))
-axes[0].imshow(rgb2[i].permute(1,2,0))
-axes[0].set_title(f"Original mini patch", fontsize=16)
-axes[0].axis('off')
+# for i in range(rgb.shape[0]):
+#     fig, axes = plt.subplots(1, 2, figsize=(12,8))
+#     axes[0].imshow(rgb2[i].permute(1,2,0))
+#     # axes[0].set_title(f"Original mini patch", fontsize=16)
+#     axes[0].axis('off')
+    
+#     axes[1].imshow(recon_rgb[i].permute(1,2,0))
+#     # axes[1].set_title(f"Reconstructed", fontsize=16)
+#     axes[1].axis('off')
 
-axes[1].imshow(recon_rgb[i].permute(1,2,0))
-axes[1].set_title(f"Reconstructed", fontsize=16)
-axes[1].axis('off')
+#     plt.tight_layout()
+#     plt_dir = os.path.join(img_dir, f"test_rgb_{i}")
+#     fig.savefig(plt_dir)
+#     plt.close()
+    
+#     # %% Plot results height
+    
+#     height2 = undo_norm(height)
+    
+#     fig, axes = plt.subplots(1, 2, figsize=(12,8))
+#     axes[0].imshow(height2[i,0])
+#     # axes[0].set_title(f"Original mini patch", fontsize=16)
+#     axes[0].axis('off')
+    
+#     axes[1].imshow(recon_height[i,0])
+#     # axes[1].set_title(f"Reconstructed", fontsize=16)
+#     axes[1].axis('off')
 
-plt_dir = os.path.join(img_dir, "test_rgb")
-# fig.savefig(plt_dir)
-plt.close()
-
-# %% Plot results height
-
-# height2 = undo_norm(height)
-
-i, j = 3, 2
-fig, axes = plt.subplots(1, 2, figsize=(12,8))
-axes[0].imshow(height2[i,0])
-axes[0].set_title(f"Original mini patch", fontsize=16)
-axes[0].axis('off')
-
-axes[1].imshow(recon_height[i,0])
-axes[1].set_title(f"Reconstructed", fontsize=16)
-axes[1].axis('off')
-
-plt_dir = os.path.join(img_dir, "test_height")
-fig.savefig(plt_dir)
-plt.close()
+#     plt.tight_layout()
+#     plt_dir = os.path.join(img_dir, f"test_height_{i}")
+#     fig.savefig(plt_dir)
+#     plt.close()
 
 # ONLY DECODING
 
@@ -145,9 +157,9 @@ plt.close()
 # %% Check error / SSIM before and after encoding-decoding
 
 # Initialize SSIM settings
-ssim = SSIM(gaussian_kernel=False,
-            data_range=1,
-            kernel_size=11).to(device)
+# ssim = SSIM(gaussian_kernel=False,
+#             data_range=1,
+#             kernel_size=11).to(device)
 
 # # Create empty lists to store SSIM scores
 # ssim_RGB    = []

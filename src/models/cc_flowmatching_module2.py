@@ -245,8 +245,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             reconstructs = []
             reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
                                                                     device=self.device)))
-            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                    device=self.device)))
+            # reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+            #                                                         device=self.device)))
         else:
             reconstructs = self.reconstruction(x, y)
                 
