@@ -21,6 +21,7 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from src.models.support_functions.evaluation import *
+from notebooks.preprocess_latent_space.cracks import *
 from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstructs
 
 # Choose if run from local machine or SURF cloud
@@ -29,8 +30,9 @@ local = True
 
 if local:
     data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+    MPEG_path   = r"C:\Users\lmohle\Documents\2_Coding\data\Datasets\MPEG400"
 else:
-    pass
+    MPEG_path   = r"/data/storage_crack_detection/datasets/MPEG400"
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
                                     batch_size         = 80,
@@ -199,4 +201,43 @@ for ax in [axes]:
     ax.set_xticks([0,1,2,3,4])
     ax.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
 fig.tight_layout()
+
+# %% Visualize synthetic cracks
+# Get binary shape masks
+cat_name    = 'brick'
+img_dirs    = [os.path.join(MPEG_path, "MPEG400-Original", f) \
+                   for f in os.listdir(os.path.join(MPEG_path, "MPEG400-Original")) \
+                   if cat_name in f]
+gt_dirs     = [os.path.join(MPEG_path, "MPEG400-GT", "png", f) \
+                for f in os.listdir(os.path.join(MPEG_path, "MPEG400-GT", "png")) \
+                if cat_name in f]
+for (img_dir, gt_dir) in zip(img_dirs, gt_dirs):
+    # Open, invert and transform to grayscale
+    orig_img = np.array(PIL.ImageOps.invert(Image.open(img_dir)).convert('L'))
+    orig_img = (orig_img > 100).astype(np.uint8)
+
+    gt_img = np.array(Image.open(gt_dir).convert('L'))
+    gt_img = (gt_img > 100).astype(np.uint8)
+    
+    # Thickening the skeletal image to improve shape extraction
+    gt_img = morphology.binary_dilation(gt_img) 
+
+    # Subtracting skeletal image from original
+    diff = ((orig_img - gt_img)>0).astype(np.uint8)
+    break
+
+plt.figure()
+plt.imshow(orig_img)
+plt.axis("off")
+
+plt.figure()
+plt.imshow(gt_img)
+plt.axis("off")
+
+plt.figure()
+plt.imshow(diff)
+plt.axis("off")
+
+# masks       = get_shapes(MPEG_path, cat_name, plot=True)
 # %%
+

@@ -82,11 +82,11 @@ def get_shapes(MPEG_path, cat_name, plot=False):
     for (img_dir, gt_dir) in zip(img_dirs, gt_dirs):
         # Open, invert and transform to grayscale
         orig_img = np.array(PIL.ImageOps.invert(Image.open(img_dir)).convert('L'))
-        orig_img = (orig_img > 0).astype(np.uint8)
+        orig_img = (orig_img > 100).astype(np.uint8)
 
         # Open and transform to grayscale
         gt_img = np.array(Image.open(gt_dir).convert('L'))
-        gt_img = (gt_img > 0).astype(np.uint8)
+        gt_img = (gt_img > 100).astype(np.uint8)
         # Thickening the skeletal image to improve shape extraction
         gt_img = morphology.binary_dilation(gt_img) 
 

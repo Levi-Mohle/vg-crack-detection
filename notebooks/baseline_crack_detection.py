@@ -22,7 +22,7 @@ from src.models.support_functions.evaluation import *
 # %% Load the data
 
 # Choose if run from local machine (true) or SURF cloud (false)
-local = False
+local = True
 
 if local:
     data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
@@ -81,6 +81,7 @@ y_true = np.concatenate([y.numpy() for y in y_true]).astype(int)
 # %% Get classification metrics
 
 # plot_histogram(y_score, y_true, save_loc)
+classify_metrics(y_score, y_true)
 plot_classification_metrics(y_score, y_true)
 
 end_time = time.time()

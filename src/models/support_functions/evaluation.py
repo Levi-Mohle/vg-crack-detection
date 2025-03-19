@@ -144,19 +144,25 @@ def print_confusion_matrix(y_score, y_true, thresholds):
     print(f"{'Misclassification:':<20}{cm[0,1]+cm[1,0]}")
     print("##############################################")
 
-def classify_metrics(y_score, y_true, save_dir):
+def classify_metrics(y_score, y_true, save_dir=None):
     auc_score           = roc_auc_score(y_true, y_score)
     _, _, thresholds    = roc_curve(y_true, y_score)
 
-    save_loc = os.path.join(save_dir, "0_classification_metrics.txt")
-    # Print confusion matrix
-    with open(save_loc, "w") as f:
-        sys.stdout = f
+    if save_dir is not None:
+        save_loc = os.path.join(save_dir, "0_classification_metrics.txt")
+        # Print confusion matrix
+        with open(save_loc, "w") as f:
+            sys.stdout = f
+            print_confusion_matrix(y_score, y_true, thresholds)
+            print(f"AUC score: {auc_score:.3f}")
+            print(f"true labels: {y_true}")
+            print(f"OOD scores: {y_score}")
+        sys.stdout = sys.__stdout__
+    else:
         print_confusion_matrix(y_score, y_true, thresholds)
         print(f"AUC score: {auc_score:.3f}")
         print(f"true labels: {y_true}")
         print(f"OOD scores: {y_score}")
-    sys.stdout = sys.__stdout__
 
 def threshold_mover(y_score, y_true, step_backward=0):
 
