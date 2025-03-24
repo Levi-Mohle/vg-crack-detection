@@ -13,6 +13,8 @@ from torchvision.transforms import transforms
 from skimage.filters import sobel
 import skimage.morphology as morhpology
 from tqdm import tqdm
+from PIL import Image
+from cv2 import inpaint, INPAINT_NS
 
 # add main folder to working directory
 wd = Path(__file__).parent.parent
@@ -239,5 +241,29 @@ plt.imshow(diff)
 plt.axis("off")
 
 # masks       = get_shapes(MPEG_path, cat_name, plot=True)
-# %%
+# %% Intro GIF
 
+color_dir   = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Big Impasto-20250218-1643\80_ColorImage__X699.2811_Y66.7457_Z30.6423771381378.bmp"
+height_dir  = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Big Impasto-20250218-1643\80_HeightImage__X699.2811_Y66.7457_Z30.6423771381378.bmp"
+dirs = [color_dir, height_dir]
+
+
+
+fig, axes = plt.subplots(1,2, figsize=(10,15))
+extent = [0,24,0,24]
+for i, ax in enumerate(axes.flatten()):
+    img = Image.open(dirs[i])
+    if i ==1:
+        img = np.array(img)
+        int99 = np.mean(img) - 3 * np.std(img)
+        mask = (img <= int99).astype('uint8')
+        img = cv2.inpaint(img, mask, 10, cv2.INPAINT_NS)
+    ax.imshow(img, extent=extent)
+    # ax.set_ylabel("Y [mm]")
+    # ax.set_xlabel("X [mm]")
+    # ax.set_yticks([0,5,10,15,20])
+    # ax.set_xticks([0,5,10,15,20])
+    ax.axis("off")
+fig.tight_layout()
+
+# %%
