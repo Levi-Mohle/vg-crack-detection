@@ -88,7 +88,7 @@ fig.tight_layout()
 
 # %% Plot cracks with lifted edges
 # print(torch.where(id == 1)[0])
-idx = 0
+idx = 9
 
 extent = [0,4,0,4]
 fs = 14
@@ -101,12 +101,12 @@ fig, axes = plt.subplots(1,2, figsize=(10,15), width_ratios=[1,1.08])
 for i, ax in enumerate(axes.flatten()):
     # ax.set_title(f"{T[i]}", fontsize=fs)
     im = ax.imshow(cracks[i][idx].permute(1,2,0), extent=extent)
-    # ax.set_ylabel("Y [mm]", fontsize=fs)
-    # ax.set_xlabel("X [mm]", fontsize=fs)
-    # ax.set_yticks([0,1,2,3,4])
-    # ax.set_xticks([0,1,2,3,4])
-    # ax.tick_params(axis='both', which='major', labelsize=fs)
-    ax.axis("off")
+    ax.set_ylabel("Y [mm]", fontsize=fs)
+    ax.set_xlabel("X [mm]", fontsize=fs)
+    ax.set_yticks([0,1,2,3,4])
+    ax.set_xticks([0,1,2,3,4])
+    ax.tick_params(axis='both', which='major', labelsize=fs)
+    # ax.axis("off")
 divider = make_axes_locatable(axes[1])
 cax = divider.append_axes("right", size="5%", pad=0.1)
 cbar = plt.colorbar(im, cax=cax)
@@ -243,27 +243,36 @@ plt.axis("off")
 # masks       = get_shapes(MPEG_path, cat_name, plot=True)
 # %% Intro GIF
 
-color_dir   = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Big Impasto-20250218-1643\80_ColorImage__X699.2811_Y66.7457_Z30.6423771381378.bmp"
-height_dir  = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Big Impasto-20250218-1643\80_HeightImage__X699.2811_Y66.7457_Z30.6423771381378.bmp"
+# color_dir   = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Big Impasto-20250218-1643\80_ColorImage__X699.2811_Y66.7457_Z30.6423771381378.bmp"
+# height_dir  = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Big Impasto-20250218-1643\80_HeightImage__X699.2811_Y66.7457_Z30.6423771381378.bmp"
+color_dir   = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Almond Blossom-20250107-1604\40_ColorImage__X298.8397_Y149.1174_Z40.6661909818649.bmp"
+height_dir  = r"C:\Users\lmohle\Documents\2_Coding\data\input\Harms Almond Blossom-20250107-1604\40_HeightImage__X298.8397_Y149.1174_Z40.6661909818649.bmp"
 dirs = [color_dir, height_dir]
 
+fs =14
 
-
-fig, axes = plt.subplots(1,2, figsize=(10,15))
+fig, axes = plt.subplots(1,2, figsize=(10,15), width_ratios=[1,1.08])
 extent = [0,24,0,24]
 for i, ax in enumerate(axes.flatten()):
     img = Image.open(dirs[i])
     if i ==1:
         img = np.array(img)
+        img = (img.astype(np.float32)) * 25*10**(-4)
         int99 = np.mean(img) - 3 * np.std(img)
         mask = (img <= int99).astype('uint8')
         img = cv2.inpaint(img, mask, 10, cv2.INPAINT_NS)
-    ax.imshow(img, extent=extent)
-    # ax.set_ylabel("Y [mm]")
-    # ax.set_xlabel("X [mm]")
-    # ax.set_yticks([0,5,10,15,20])
-    # ax.set_xticks([0,5,10,15,20])
-    ax.axis("off")
+    im = ax.imshow(img, extent=extent)
+    ax.set_ylabel("Y [mm]")
+    ax.set_xlabel("X [mm]")
+    ax.set_yticks([0,5,10,15,20])
+    ax.set_xticks([0,5,10,15,20])
+    # ax.axis("off")
+divider = make_axes_locatable(axes[1])
+cax = divider.append_axes("right", size="5%", pad=0.1)
+cbar = plt.colorbar(im, cax=cax)
+cbar.set_label("Height [$\mu$m]", fontsize=fs+2)
+cbar.ax.tick_params(labelsize=fs)
 fig.tight_layout()
+
 
 # %%

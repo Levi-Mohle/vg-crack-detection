@@ -409,3 +409,28 @@ print(np.sum(ood_score[idx]))
 sobel_filt = (sobel(x[idx,1].numpy()) > .005).astype(int)
 plt.imshow(sobel_filt)
 # %%
+i = 11
+# x, r0 = rgb.numpy(), r_rgb.numpy()
+x, r0       = to_gray_0_1(rgb).numpy(), to_gray_0_1(r_rgb).numpy()
+ssim,  img_ssim = structural_similarity(x[i], 
+                                        r0[i],
+                                        win_size=5,
+                                        data_range=1,
+                                        channel_axis= 0,
+                                        full=True)
+img_ssim = img_ssim * -1
+# img_ssim = img_ssim[0] * 299/1000 + img_ssim[1] * 587/1000 + img_ssim[2] * 114/1000
+fig, axes = plt.subplots(1,3, figsize=(12,4))
+for i, ax in enumerate(axes.flatten()):
+    im = ax.imshow(img_ssim.transpose(1,2,0))
+    ax.axis("off")
+    # plt.colorbar(im, ax=ax)
+fig.tight_layout()
+# %%
+ig, axes = plt.subplots(4,4, figsize=(16,16))
+for i, ax in enumerate(axes.flatten()):
+    im = ax.imshow(height[i].permute(1,2,0))
+    ax.axis("off")
+    # plt.colorbar(im, ax=ax)
+fig.tight_layout()
+# %%
