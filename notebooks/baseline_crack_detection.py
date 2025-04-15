@@ -17,7 +17,7 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from notebooks.utils.crack_detection import *
-from src.models.support_functions.evaluation import *
+from src.models.components.utils.evaluation import *
 # %% Load the data
 
 # Choose if run from local machine (true) or SURF cloud (false)

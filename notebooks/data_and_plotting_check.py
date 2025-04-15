@@ -15,7 +15,7 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
-from src.models.support_functions.evaluation import ssim_for_batch
+from src.models.components.utils.evaluation import ssim_for_batch
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
                                     batch_size         = 16,

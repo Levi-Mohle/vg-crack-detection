@@ -7,7 +7,7 @@ import time
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.support_functions.evaluation import *
+from src.models.components.utils.evaluation import *
 import tqdm
 
 class CNNClassifierLitModule(LightningModule):

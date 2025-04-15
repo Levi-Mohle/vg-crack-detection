@@ -10,7 +10,7 @@ wd = Path(__file__).parent.parent
 sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
-from src.models.support_functions.evaluation import *
+from src.models.components.utils.evaluation import *
 
 # %% Load
 
