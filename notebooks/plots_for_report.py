@@ -97,7 +97,7 @@ fs = 14
 height2 = (height.to(torch.float32)) * 25*10**(-4)
 cracks = [rgb, height2]
 T = ["RGB", "Height"]
-fig, axes = plt.subplots(1,2, figsize=(10,15), width_ratios=[1,1.08])
+fig, axes = plt.subplots(2,1, figsize=(15,10))
 for i, ax in enumerate(axes.flatten()):
     # ax.set_title(f"{T[i]}", fontsize=fs)
     im = ax.imshow(cracks[i][idx].permute(1,2,0), extent=extent)
@@ -107,11 +107,12 @@ for i, ax in enumerate(axes.flatten()):
     ax.set_xticks([0,1,2,3,4])
     ax.tick_params(axis='both', which='major', labelsize=fs)
     # ax.axis("off")
-divider = make_axes_locatable(axes[1])
-cax = divider.append_axes("right", size="5%", pad=0.1)
-cbar = plt.colorbar(im, cax=cax)
-cbar.set_label("Height [$\mu$m]", fontsize=fs+2)
-cbar.ax.tick_params(labelsize=fs)
+axes[0].set_title("Original sample", fontsize=25)
+# divider = make_axes_locatable(axes[1])
+# cax = divider.append_axes("right", size="5%", pad=0.1)
+# cbar = plt.colorbar(im, cax=cax)
+# cbar.set_label("Height [$\mu$m]", fontsize=fs+2)
+# cbar.ax.tick_params(labelsize=fs)
 fig.tight_layout()
 # %% Load reconstructs
 
