@@ -88,7 +88,7 @@ fig.tight_layout()
 
 # %% Plot cracks with lifted edges
 # print(torch.where(id == 1)[0])
-idx = 9
+# idx = 9
 
 extent = [0,4,0,4]
 fs = 14
