@@ -441,7 +441,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         solver = ODESolver(velocity_model=wrapped_vf)
         sol    = solver.sample(time_grid=T,
                                 x_init=x_t,
-                                method="midpoint",
+                                method=self.solver,
                                 step_size=self.step_size,
                                 return_intermediates=False,
                                 y = y)
