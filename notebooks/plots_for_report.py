@@ -23,7 +23,7 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from src.models.components.utils.evaluation import *
-from notebooks.preprocess_latent_space.cracks import *
+from notebooks.preprocess_latent_space.synthetic_cracks import *
 from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstructs
 
 # Choose if run from local machine or SURF cloud

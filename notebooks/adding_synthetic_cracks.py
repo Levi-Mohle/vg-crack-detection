@@ -14,7 +14,7 @@ sys.path.append(str(wd))
 
 from src.data.components.transforms import *
 from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetCustom
-from notebooks.preprocess_latent_space.cracks import *
+from notebooks.preprocess_latent_space.synthetic_cracks import *
 from notebooks.preprocess_latent_space.latent_space import *
 
 # %% Load the data & model

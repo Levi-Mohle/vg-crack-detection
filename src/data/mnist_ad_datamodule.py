@@ -159,9 +159,9 @@ class MNIST_AD_DataModule(LightningDataModule):
         """
 
         targets_train = self.data_train.targets
-    
+        
+        # Define your In-Distribution training set
         train_indices = torch.where(targets_train == self.ID_number)[0]
-
         ID_dataset = Subset(self.data_train, train_indices)
 
         return DataLoader(
@@ -179,6 +179,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         """
         targets_test = self.data_test.targets
 
+        # Define your In-Distribution validation set of size "val_size"
         val_indices = torch.where(targets_test == self.ID_number)[0][0:self.val_size]
         ID_val_dataset = Subset(self.data_test, val_indices)
         
@@ -198,8 +199,8 @@ class MNIST_AD_DataModule(LightningDataModule):
         targets_test = self.data_test.targets
 
         test_indices = []
+        # Create a sub test set, containing "test_size" number of samples from each class
         for class_number in range(10):
-            # if class_number != self.ID_number:
             class_indices = torch.where(targets_test == class_number)[0][0:self.test_size]
             test_indices.extend(class_indices.tolist())
                 

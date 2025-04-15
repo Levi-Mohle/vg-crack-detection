@@ -1,3 +1,12 @@
+"""
+Routines to create synthetic cracks with lifted edges and apply them to mini-patches
+
+    Source Name : synthetic_cracks.py
+    Contents    : Functions to create synthetic cracks with lifted edges
+    Date        : 2025
+
+ """
+
 import os
 import numpy as np
 import random
@@ -77,7 +86,6 @@ def get_shapes(MPEG_path, cat_name, plot=False):
                    for f in os.listdir(os.path.join(MPEG_path, "MPEG400-GT", "png")) \
                     if cat_name in f]
     
-
     all_masks = []
     for (img_dir, gt_dir) in zip(img_dirs, gt_dirs):
         # Open, invert and transform to grayscale
@@ -135,7 +143,7 @@ def get_grad_mask(masks, flap_height, decay_rate, seed=None):
         masks (np.array) : 2D binary mask containing a shape
         flap_height (int) : maximum height value to be added to the existing height map
         decay_rate (float) : Rate of decay for gradient on flap
-        seed (int) : fixed seed
+        seed (int) : fixed seed for reproducibility
 
     Returns:
         grad_mask (np.array) : 2D mask containing the shape with exponential gradient
@@ -199,7 +207,7 @@ def Create_cracks_with_lifted_edges(height, rgb, masks, flap_height= None, decay
         masks (list) : list containing binary masks of flap shapes
         flap_height (int) : maximum height value to be added to the existing height map
         decay_rate (float) : Rate of decay for gradient on flap
-        seed (int) : fixed seed
+        seed (int) : fixed seed for reproducibility
 
     Returns:
         cracked_rgb (torch.Tensor): rgb mini patch containing cracks (1,3,height,width)

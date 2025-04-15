@@ -11,7 +11,9 @@ from src.data.components.path_setup import impasto_dataset_variant
 class IMPASTO_DataModule(LightningDataModule):
     """`LightningDataModule` for the impasto dataset.
 
-    TODO : Write about impasto dataset 
+    The impasto dataset contains both RGB and height images, also called mini-patches, from different datasets, 
+    depending on the .h5 that is loaded. The RGB images are 3 channel 512x512 px, while the height images are 1 channel 512x512 px. 
+    If an encoded version of the impasto dataset is used, both RGB and height latents have dimensions 4x64x64.
 
     A `LightningDataModule` implements 7 key methods:
 
