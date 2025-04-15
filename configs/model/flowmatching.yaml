@@ -76,13 +76,6 @@ FM_param:
   ood: false
   win_size: 3
 
-OT:
-  _target_: src.models.components.optimal_transport.OTPlanSampler
-  method: exact
-  reg: 0.05
-  reg_m: 1.0
-  normalize_cost: false
-
 scheduler:
   _target_: torch.optim.lr_scheduler.OneCycleLR
   _partial_: true

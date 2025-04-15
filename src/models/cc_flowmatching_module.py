@@ -29,7 +29,6 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         FM_param: DictConfig,
-        OT,
         compile,
         paths: DictConfig,
     ):
@@ -70,6 +69,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # instantiate an affine path object for flowmatching
         self.path = AffineProbPath(scheduler=CondOTScheduler())
 
+        # In case when data is pre-encoded
         if self.encode:
             self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
                                                       local_files_only=True,
@@ -84,10 +84,12 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # Specify fontsize for plots
         self.fs = 16
 
+        # Specify log and image directories
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
 
+        # Define file name for saving reconstructs
         if self.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
             self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
@@ -285,16 +287,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             else:
                 cfg = False
             save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=cfg)
-
-        
-            
+    
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Visualizations
         # Save last batch for visualization
 
         plot_loss(self, skip=1)
-        
+
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
             y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
