@@ -54,22 +54,19 @@ optimizer:
   weight_decay: 0.0
 
 FM_param:
-  method: iCFM
-  CFG: false
-  guidance_strength: 1.0
   step_size: 0.1
   warm_up: 0
-  latent: false
+  encode: false
   plot_n_epoch: 5
   batch_size: ${data.batch_size}
   size: 32
   solver_lib: torchdiffeq
   solver: euler
-  pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+  pretrained_dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
   sigma_min: 1e-4
   reconstruct: 1
   save_reconstructs: false
-  target: 1
+  target_index: 1
   mode: rgb
   wh: 1
   plot_ids: [0,1,16,17]

@@ -36,7 +36,6 @@ optimizer:
 #   num_cycles: 0.5
 
 FM_param:
-  method: iCFM
   n_classes: ${model.unet.n_classes}
   dropout_prob: 0.0
   guidance_strength: 1.0
@@ -47,7 +46,7 @@ FM_param:
   batch_size: ${data.batch_size}
   solver_lib: torchdiffeq
   solver: euler
-  pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+  pretrained_dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
   reconstruct: 1
   save_reconstructs: false
   target: 1

@@ -41,21 +41,16 @@ model:
       attention_resolutions : [16]
       dropout : 0.0
       channel_mult : [1, 1, 2, 2, 4, 4]
-      n_classes : 3
+      n_classes : null
 
     FM_param:
-      latent: true
-      pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+      encode: true
+      pretrained_dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
       step_size: 0.01
-      method: ot
-      n_classes: ${model.unet.n_classes}
-      dropout_prob: 0.1
-      CFG: true
-      guidance_strength: 1.0
       reconstruct: 0.3
       save_reconstructs: false
       plot_n_epoch: 20
-      target: 2
+      target_index: 2
       solver_lib: torchdiffeq
       mode: both
       wh: 1

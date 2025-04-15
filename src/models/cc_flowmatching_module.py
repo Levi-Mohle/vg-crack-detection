@@ -49,14 +49,13 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.encode             = FM_param.encode
         self.pretrained         = FM_param.pretrained
         self.step_size          = FM_param.step_size
-        self.method             = FM_param.method
         self.dropout_prob       = FM_param.dropout_prob
         self.guidance_strength  = FM_param.guidance_strength
         self.reconstruct        = FM_param.reconstruct
         self.batch_size         = FM_param.batch_size
         self.save_reconstructs  = FM_param.save_reconstructs
         self.plot_n_epoch       = FM_param.plot_n_epoch
-        self.target             = FM_param.target
+        self.target_index       = FM_param.target
         self.solver_lib         = FM_param.solver_lib
         self.solver             = FM_param.solver
         self.mode               = FM_param.mode
@@ -403,7 +402,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         
         solver = ODESolver(velocity_model=wrapped_vf)
         sol    = solver.sample(x_init=x_0,
-                                method="midpoint",
+                                method=self.solver,
                                 step_size=self.step_size,
                                 return_intermediates=False)
 

@@ -42,15 +42,31 @@ class FlowMatchingLitModule(LightningModule):
         self.unet              = unet
 
         # Configure FM related parameters dict
-        self.FM_param          = FM_param
-        
+        self.step_size          = FM_param.step_size
+        self.warm_up            = FM_param.warm_up
+        self.encode             = FM_param.encode
+        self.plot_n_epoch       = FM_param.plot_n_epoch
+        self.batch_size         = FM_param.batch_size
+        self.size               = FM_param.size
+        self.solver_lib         = FM_param.solver_lib
+        self.solver             = FM_param.solver
+        self.pretrained_dir     = FM_param.pretrained_dir
+        self.sigma_min          = FM_param.sigma_min
+        self.reconstruct        = FM_param.reconstruct
+        self.save_reconstructs  = FM_param.save_reconstructs
+        self.target_index       = FM_param.target_index
+        self.mode               = FM_param.mode
+        self.wh                 = FM_param.wh
+        self.plot_ids           = FM_param.plot_ids
+        self.ood                = FM_param.ood
+        self.win_size           = FM_param.win_size
 
         # instantiate an affine path object for flowmatching
         self.path = AffineProbPath(scheduler=CondOTScheduler())
 
 
-        if self.FM_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
+        if self.encode:
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained_dir,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -67,7 +83,7 @@ class FlowMatchingLitModule(LightningModule):
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
 
-        if self.FM_param.save_reconstructs:
+        if self.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
             self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
         
@@ -96,7 +112,7 @@ class FlowMatchingLitModule(LightningModule):
         return x
     
     def encode_data(self, batch, mode):
-        if self.FM_param.latent:
+        if self.encode:
             if mode == "both":
                 x1 = batch[0]
                 x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
@@ -134,17 +150,17 @@ class FlowMatchingLitModule(LightningModule):
             return x
         
     def training_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)   
-        y = batch[self.FM_param.target]     
+        # x = self.encode_data(batch, self.mode)
+        x = self.select_mode(batch, self.mode)   
+        y = batch[self.target_index]     
         loss = self.conditional_flow_matching_loss(x)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)
-        y = batch[self.FM_param.target] 
+        # x = self.encode_data(batch, self.mode)
+        x = self.select_mode(batch, self.mode)
+        y = batch[self.target_index] 
         loss = self.conditional_flow_matching_loss(x)
         self.log("val/loss", loss, prog_bar=True)
 
@@ -152,8 +168,8 @@ class FlowMatchingLitModule(LightningModule):
         reconstruct = self.reconstruction(x)
 
         # Pick the second last batch (which is full)
-        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.FM_param.mode)
+        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
+            x = self.select_mode(batch, self.mode)
             self.last_val_batch = [x, reconstruct]
 
     def on_train_epoch_end(self) -> None:
@@ -163,22 +179,22 @@ class FlowMatchingLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+        if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
             plot_loss(self, skip=2)
-            if self.FM_param.latent:
+            if self.encode:
                 self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-                                                           self.FM_param.mode) 
+                                                           self.mode) 
                 self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
-                                                           self.FM_param.mode)    
-            if self.FM_param.mode == "both":
+                                                           self.mode)    
+            if self.mode == "both":
                 self.visualize_reconstructs_2ch(self.last_val_batch[0], 
                                                 self.last_val_batch[1],  
-                                                self.FM_param.plot_ids)
+                                                self.plot_ids)
             else:
                 self.visualize_reconstructs_1ch(self.last_val_batch[0], 
                                                 self.last_val_batch[1], 
-                                                self.FM_param.plot_ids)
+                                                self.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
@@ -186,15 +202,15 @@ class FlowMatchingLitModule(LightningModule):
         elif reduction == 'batch':
             chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
 
-        if self.FM_param.mode == "both":
-            return (chl_loss[:,0] + self.FM_param.wh * chl_loss[:,1]).unsqueeze(1)
+        if self.mode == "both":
+            return (chl_loss[:,0] + self.wh * chl_loss[:,1]).unsqueeze(1)
         else:
             return chl_loss
                 
     def test_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)
-        y = batch[self.FM_param.target]
+        # x = self.encode_data(batch, self.mode)
+        x = self.select_mode(batch, self.mode)
+        y = batch[self.target_index]
         self.shape  = x.shape
         loss        = self.conditional_flow_matching_loss(x)
         self.log("test/loss", loss, prog_bar=True)
@@ -202,25 +218,25 @@ class FlowMatchingLitModule(LightningModule):
         reconstruct = self.reconstruction(x)
         self.last_test_batch = [x, reconstruct, y]
 
-        if self.FM_param.ood:
+        if self.ood:
             # Calculate reconstruction loss used for OOD-detection
             losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
             self.test_losses.append(losses)
             self.test_labels.append(y)
 
         # Pick the last full batch or
-        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.FM_param.mode)
+        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
+            x = self.select_mode(batch, self.mode)
             self.last_test_batch = [x, reconstruct, y]
 
-        if self.FM_param.save_reconstructs:
-            if self.FM_param.latent:
+        if self.save_reconstructs:
+            if self.encode:
                 # self.vae.to("cpu")
                 # self.last_test_batch = [self.last_test_batch[0].cpu(),
                 #                        self.last_test_batch[1].cpu(),
                 #                        self.last_test_batch[2].cpu()]
-                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode).cpu()
-                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode).cpu()
+                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode).cpu()
+                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode).cpu()
                 self.last_test_batch[2] = self.last_test_batch[2].cpu()
             save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch)
         
@@ -231,20 +247,20 @@ class FlowMatchingLitModule(LightningModule):
 
         plot_loss(self, skip=1)
         
-        if self.FM_param.latent:
-            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode) 
-            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode)
+        if self.encode:
+            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode) 
+            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
         
-        if self.FM_param.mode == "both":
+        if self.mode == "both":
             self.visualize_reconstructs_2ch(self.last_test_batch[0], 
                                             self.last_test_batch[1], 
-                                            self.FM_param.plot_ids)
+                                            self.plot_ids)
         else:
             self.visualize_reconstructs_1ch(self.last_test_batch[0], 
                                             self.last_test_batch[1], 
-                                            self.FM_param.plot_ids)
+                                            self.plot_ids)
 
-        if self.FM_param.ood:
+        if self.ood:
             plot_histogram(self)
 
         # Clear variables
@@ -284,18 +300,18 @@ class FlowMatchingLitModule(LightningModule):
         def f(t: float, x):
             return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
         
-        if self.FM_param.solver_lib == 'torchdiffeq':
-            if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver == 'implicit_adams':
-                samples = odeint(f, x_0, t=torch.linspace(0, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, method=self.FM_param.solver, rtol=1e-5, atol=1e-5)
+        if self.solver_lib == 'torchdiffeq':
+            if self.solver == 'euler' or self.solver == 'rk4' or self.solver == 'midpoint' or self.solver == 'explicit_adams' or self.solver == 'implicit_adams':
+                samples = odeint(f, x_0, t=torch.linspace(0, 1, 2).to(self.device), options={'step_size': self.step_size}, method=self.solver, rtol=1e-5, atol=1e-5)
             else:
-                samples = odeint(f, x_0, t=torch.linspace(0, 1, 2).to(self.device), method=self.FM_param.solver, options={'max_num_steps': 1//self.FM_param.step_size}, rtol=1e-5, atol=1e-5)
+                samples = odeint(f, x_0, t=torch.linspace(0, 1, 2).to(self.device), method=self.solver, options={'max_num_steps': 1//self.step_size}, rtol=1e-5, atol=1e-5)
             samples = samples[1]
         else:
             t=0
-            for i in tqdm(range(int(1/self.FM_param.step_size)), desc='Sampling', leave=False):
+            for i in tqdm(range(int(1/self.step_size)), desc='Sampling', leave=False):
                 v = self(x_0, torch.full(x_0.shape[:1], t, device=self.device))
-                x_0 = x_0 + self.FM_param.step_size * v
-                t += self.FM_param.step_size
+                x_0 = x_0 + self.step_size * v
+                t += self.step_size
             samples = x_0
         
         if self.vae is not None:
@@ -308,8 +324,8 @@ class FlowMatchingLitModule(LightningModule):
     @torch.no_grad()
     def reconstruction(self, x):
         
-        sigma_min = self.FM_param.sigma_min
-        tstart = 1 - self.FM_param.reconstruct
+        sigma_min = self.sigma_min
+        tstart = 1 - self.reconstruct
         e = torch.rand_like(x, device=self.device)
         
         xt = (1-(1-sigma_min)*tstart)*e + x*tstart
@@ -317,22 +333,22 @@ class FlowMatchingLitModule(LightningModule):
         def f(t: float, x):
             return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
         
-        if self.FM_param.solver_lib == 'torchdiffeq':
-            if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' \
-            or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver== 'implicit_adams':
+        if self.solver_lib == 'torchdiffeq':
+            if self.solver == 'euler' or self.solver == 'rk4' or self.solver == 'midpoint' \
+            or self.solver == 'explicit_adams' or self.solver== 'implicit_adams':
                 
-                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, \
-                                 method=self.FM_param.solver, rtol=1e-5, atol=1e-5)
+                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), options={'step_size': self.step_size}, \
+                                 method=self.solver, rtol=1e-5, atol=1e-5)
             else:
-                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), method=self.FM_param.solver, \
-                                 options={'max_num_steps': 1//self.FM_param.step_size}, rtol=1e-5, atol=1e-5)
+                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), method=self.solver, \
+                                 options={'max_num_steps': 1//self.step_size}, rtol=1e-5, atol=1e-5)
             reconstruct = reconstruct[1]
         else:
             t=tstart
-            for i in range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))):
+            for i in range(int(self.reconstruct*(1/self.step_size))):
                 v = self(xt, torch.full(xt.shape[:1], t, device=self.device)).sample
-                xt = xt + self.FM_param.step_size * v
-                t += self.FM_param.step_size
+                xt = xt + self.step_size * v
+                t += self.step_size
             reconstruct = xt
         
         # if self.vae is not None:
@@ -368,7 +384,7 @@ class FlowMatchingLitModule(LightningModule):
         reconstruct = (reconstruct + 1) / 2
 
         # Convert rgb to grayscale for plotting
-        if self.FM_param.mode == 'rgb':
+        if self.mode == 'rgb':
             x              = rgb_to_grayscale(x)
             reconstruct    = rgb_to_grayscale(reconstruct)
             
@@ -425,7 +441,7 @@ class FlowMatchingLitModule(LightningModule):
         x = (x + 1) / 2
         reconstruct = (reconstruct + 1) / 2
 
-        if self.FM_param.latent:
+        if self.encode:
             x_gray = rgb_to_grayscale(x[:,:3])
             x = torch.cat((x_gray, x[:,3:]), dim=1)
             
@@ -434,7 +450,7 @@ class FlowMatchingLitModule(LightningModule):
             
         # Calculate pixel-wise squared error per channel + normalize
 
-        error_idv = ssim_for_batch(x, reconstruct, self.FM_param.win_size)
+        error_idv = ssim_for_batch(x, reconstruct, self.win_size)
         # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
