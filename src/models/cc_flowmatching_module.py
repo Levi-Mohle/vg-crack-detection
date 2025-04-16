@@ -47,7 +47,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # Configure FM related parameters dict
         self.n_classes          = FM_param.n_classes
         self.encode             = FM_param.encode
-        self.pretrained         = FM_param.pretrained
+        self.pretrained_dir     = FM_param.pretrained_dir
         self.step_size          = FM_param.step_size
         self.dropout_prob       = FM_param.dropout_prob
         self.guidance_strength  = FM_param.guidance_strength
@@ -55,7 +55,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.batch_size         = FM_param.batch_size
         self.save_reconstructs  = FM_param.save_reconstructs
         self.plot_n_epoch       = FM_param.plot_n_epoch
-        self.target_index       = FM_param.target
+        self.target_index       = FM_param.target_index
         self.solver_lib         = FM_param.solver_lib
         self.solver             = FM_param.solver
         self.mode               = FM_param.mode
@@ -70,7 +70,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         # In case when data is pre-encoded
         if self.encode:
-            self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained_dir,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -121,7 +121,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         
         # Whether to use class information or not
         if self.n_classes != None:
-            y = batch[self.target]
+            y = batch[self.target_index]
         else:
             y = None
         return x, y
@@ -253,7 +253,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 
         # Pick the last full batch or first 
         if (x.shape[0] == self.batch_size) or (batch_idx == 0):
-            self.last_test_batch = [x, reconstructs, batch[self.target]]
+            self.last_test_batch = [x, reconstructs, batch[self.target_index]]
 
         if self.ood:
             # Calculate reconstruction loss used for OOD-detection
@@ -269,7 +269,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
             # Append scores
             self.test_losses.append(ood_score)
-            self.test_labels.append(batch[self.target])
+            self.test_labels.append(batch[self.target_index])
                 
         if self.save_reconstructs:
             if self.encode:
@@ -280,7 +280,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 else:
                     reconstructs = self.decode_data(reconstructs, self.mode).cpu()
             
-            y = batch[self.target].cpu()
+            y = batch[self.target_index].cpu()
             if self.n_classes is not None:
                 cfg = True
             else:

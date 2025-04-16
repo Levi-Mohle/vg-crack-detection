@@ -49,7 +49,7 @@ FM_param:
   pretrained_dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
   reconstruct: 1
   save_reconstructs: false
-  target: 1
+  target_index: 1
   mode: rgb
   wh: 1
   plot: false

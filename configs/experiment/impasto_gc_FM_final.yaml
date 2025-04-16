@@ -29,7 +29,7 @@ callbacks:
         monitor: "val/loss"
 
 model:
-    _target_: src.models.cc_flowmatching_module2.ClassConditionedFlowMatchingLitModule
+    _target_: src.models.cc_flowmatching_module.ClassConditionedFlowMatchingLitModule
     optimizer:
       lr: 1e-5
     unet:
@@ -48,15 +48,16 @@ model:
     FM_param:
       encode: true
       pretrained_dir: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
-      # pretrained: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
+      # pretrained_dir: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
       step_size: 0.01
       dropout_prob: 0.1
       guidance_strength: 0.5
       reconstruct: 0.5
       save_reconstructs: false
       plot_n_epoch: 25
-      target: 2
+      target_index: 2
       solver_lib: torchdiffeq
+      solver: euler
       mode: both
       wh: 1
       plot: true
