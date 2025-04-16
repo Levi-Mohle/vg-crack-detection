@@ -433,4 +433,23 @@ for i, ax in enumerate(axes.flatten()):
     ax.axis("off")
     # plt.colorbar(im, ax=ax)
 fig.tight_layout()
+# %% Plotting MSE
+
+id        = 9
+xgray     = to_gray_0_1(x)
+rgray     = to_gray_0_1(reconstructs)
+# Taking MSE
+mse       = torch.square(xgray-rgray)
+
+# Taking SSIM
+_, ssim_img             = ssim_for_batch(xgray, rgray)
+
+images = torch.concat([xgray, rgray, mse, torch.tensor(ssim_img)], dim=1)
+fig, axes = plt.subplots(4,2, figsize=(10,20))
+for i, ax in enumerate(axes.flatten()):
+    ax.imshow(images[id, i])
+    ax.axis("off")
+    # plt.colorbar(im, ax=ax)
+fig.tight_layout()
+
 # %%
