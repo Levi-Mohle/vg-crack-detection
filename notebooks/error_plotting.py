@@ -30,7 +30,9 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 # input_file_name = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-02-17_real_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-28_cDDPM_0.8_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-14_cDDIM2_0.4_realBI_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-14_cDDIM2_0.4_realBI_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realAB_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realBI_1.4_reconstructs.h5"
 
 cfg = False
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
@@ -40,6 +42,7 @@ reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
 
 # Plot some mini-patches
 dataloader = DataLoader(reconstruct_dataset, batch_size=16, shuffle=False)
+
 # %% Load 1 batch of data
 
 if cfg:
@@ -205,15 +208,15 @@ def post_process_ssim2(x0, ssim_img):
     for idx in range(ssim_img.shape[0]):
         
         # Sobel filter on height map
-        sobel_filt[idx] = sobel(x0[idx,1].cpu().numpy())
-        sobel_filt[idx] = (sobel_filt[idx] > .02).astype(int)
+        # sobel_filt[idx] = sobel(x0[idx,1].cpu().numpy())
+        # sobel_filt[idx] = (sobel_filt[idx] > .02).astype(int)
         for i in range(ssim_img.shape[1]):
 
             # Thresholding
-            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=91)).astype(int)
+            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=94)).astype(int)
             
             # Morphology filters
-            # ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
+            ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
 
             # ssim_filt[idx,i] = morhpology.binary_opening(ssim_filt[idx,i])
             # ssim_filt[idx,i] = morhpology.dilation(ssim_filt[idx,i])
@@ -239,6 +242,32 @@ def post_process_ssim2(x0, ssim_img):
     ood_score = np.sum(ano_maps, axis=(1,2))
                 
     return ano_maps, ood_score
+
+def OOD_score(x0, x1, x2):
+    """
+    Given the original sample x0 and its reconstructions x1 and x2, 
+    this function returns the filtered anomaly map and OOD-score to be
+    used in classification. If comparison is made between x0 and x1 or x2,
+    provide x1 = x0.
+
+    Args:
+        x0 (2D tensor) : input sample (Bx2xHxW)
+        x1 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        x2 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        
+
+    Returns:
+        ano_maps (2D tensor) : filtered anomaly map (Bx1xHxW)
+        ood_score (1D tensor) : out-of-distribution scores (Bx1)
+    
+    """
+    # Obtain SSIM between x1 and x2
+    _, ssim_img             = ssim_for_batch(x1, x2)
+    # Change ssim to mse for RGB
+    ssim_img[:,0] = torch.square(x1[:,0] - x2[:,0])
+    # Calculate anomaly maps and OOD-score
+    ano_maps, ood_score     = post_process_ssim2(x0, ssim_img)
+    return ano_maps, ood_score 
 
 def get_ood_scores(dataloader):
     targets     = []
@@ -358,29 +387,9 @@ def threshold_mover(y_score, y_true, step_backward=0):
     print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
     print("##############################################")
 
-def OOD_score(x0, x1, x2):
-    """
-    Given the original sample x0 and its reconstructions x1 and x2, 
-    this function returns the filtered anomaly map and OOD-score to be
-    used in classification. If comparison is made between x0 and x1 or x2,
-    provide x1 = x0.
 
-    Args:
-        x0 (2D tensor) : input sample (Bx2xHxW)
-        x1 (2D tensor) : reconstruction of x0 (Bx2xHxW)
-        x2 (2D tensor) : reconstruction of x0 (Bx2xHxW)
-        
 
-    Returns:
-        ano_maps (2D tensor) : filtered anomaly map (Bx1xHxW)
-        ood_score (1D tensor) : out-of-distribution scores (Bx1)
-    
-    """
-    # Obtain SSIM between x1 and x2
-    _, ssim_img             = ssim_for_batch(x1, x2)
-    # Calculate anomaly maps and OOD-score
-    ano_maps, ood_score     = post_process_ssim2(x0, ssim_img)
-    return ano_maps, ood_score# Classifying
+# Classifying
 # classify(dataloader)
 y_score, y_true = get_ood_scores(dataloader)
 
@@ -435,7 +444,7 @@ for i, ax in enumerate(axes.flatten()):
 fig.tight_layout()
 # %% Plotting MSE
 
-id        = 9
+id        = 1
 xgray     = to_gray_0_1(x)
 rgray     = to_gray_0_1(reconstructs)
 # Taking MSE
