@@ -63,12 +63,12 @@ model:
       reconstruct: .4
       wh: 1
       plot_n_epoch: 20
-      plot_ids: [1,5,6]
+      plot_ids: []
       encode: true
       pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       ood: true
-      use_cond: false
-      condition_weight: 2
+      use_cond: true
+      condition_weight: 1.4
       skip_steps: 25
       eta: 1
       save_reconstructs: false
@@ -84,7 +84,7 @@ trainer:
 data:
   batch_size: 16
   variant: Enc_512x512
-  crack: synthetic
+  crack: realBI
   transform: null
       # _target_:
 

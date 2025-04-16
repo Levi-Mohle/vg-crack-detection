@@ -726,7 +726,7 @@ def post_process_ssim(x0, ssim_img):
         for i in range(ssim_img.shape[1]):
             
             # Thresholding
-            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
+            ssim_filt[idx,i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=94)).astype(int)
             
             # Morphology filters
             ssim_filt[idx,i] = morphology.binary_erosion(ssim_filt[idx,i])

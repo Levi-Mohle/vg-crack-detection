@@ -329,7 +329,7 @@ class DenoisingDiffusionLitModule(LightningModule):
                 
                 alpha_prod       = self.noise_scheduler.alphas_cumprod[i]
                 alpha_prod_prev  = self.noise_scheduler.alphas_cumprod[j]
-                sigma = self.eta * torch.sqrt((1 - alpha_prod / alpha_prod_prev) * (1 - alpha_prod_prev) / (1 - alpha_prod))
+                sigma = self.eta * torch.sqrt((1 - alpha_prod_prev) / (1 - alpha_prod) * (1 - alpha_prod / alpha_prod_prev)) 
                 
                 yt = self.noise_scheduler.add_noise(y, e, t)
                 
