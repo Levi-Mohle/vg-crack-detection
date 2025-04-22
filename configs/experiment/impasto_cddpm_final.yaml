@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: impasto
-  - override /model: ddpm
+  - override /model: denoisingdiffusion
   - override /callbacks: default
   - override /trainer: default
 

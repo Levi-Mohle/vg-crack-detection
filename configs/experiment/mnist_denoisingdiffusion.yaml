@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: mnist_ad
-  - override /model: ddpm
+  - override /model: denoisingdiffusion
   - override /callbacks: default
   - override /trainer: default
 

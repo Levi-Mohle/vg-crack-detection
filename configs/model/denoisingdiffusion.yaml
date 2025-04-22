@@ -1,4 +1,4 @@
-_target_: src.models.ddpm_module.DenoisingDiffusionLitModule
+_target_: src.models.denoisingdiffusion_module.DenoisingDiffusionLitModule
 
 optimizer:
   _target_: torch.optim.AdamW
