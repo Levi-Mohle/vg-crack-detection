@@ -79,17 +79,19 @@ class FlowMatchingLitModule(LightningModule):
         # Specify fontsize for plots
         self.fs = 16
 
+        # Specify log and image directories
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
 
+        # Define file name for saving reconstructs
         if self.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
             self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
         
         self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
-        self.test_loss = MeanMetric()
+        self.val_loss   = MeanMetric()
+        self.test_loss  = MeanMetric()
 
         # Used for inspecting learning curve
         self.train_epoch_loss   = []
