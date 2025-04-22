@@ -19,7 +19,7 @@ import src.models.components.utils.evaluation as evaluation
 import src.models.components.utils.post_process as post_process
 import src.models.components.utils.visualization as visualization
 import src.models.components.utils.h5_support as h5_support
-import tqdm
+
 
 # For flowmatching
 from flow_matching.path.scheduler import CondOTScheduler
@@ -37,7 +37,7 @@ class FlowMatchingLitModule(LightningModule):
         compile,
         paths: DictConfig,
     ):
-        """Flow matching model, implemented from https://github.com/facebookresearch/flow_matching
+        """Flow matching models, implemented from https://github.com/facebookresearch/flow_matching
 
         Args:
             unet (torch.nn.Module) : unet architecture, configured with its own parameters 

@@ -12,7 +12,12 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.components.utils.evaluation import *
+
+# Local imports
+import src.models.components.utils.evaluation as evaluation
+import src.models.components.utils.post_process as post_process
+import src.models.components.utils.visualization as visualization
+import src.models.components.utils.h5_support as h5_support
 
 
 class DenoisingDiffusionLitModule(LightningModule):
@@ -27,10 +32,19 @@ class DenoisingDiffusionLitModule(LightningModule):
         compile,
         paths: DictConfig,
     ):
-        """ImageFlow.
+        """Diffusion models, ranging from DDPM, DDIM and conditioned versions
 
         Args:
-
+            unet (torch.nn.Module) : unet architecture, configured with its own parameters 
+                                    under model.unet in config file
+            optimizer (torch.optim.Optimizer) : optimizer for training neural network
+            scheduler (torch.optim.lr_scheduler) : scheduler of the learning rate
+            criterion (torch.nn.Module) : loss function
+            noise_scheduler (diffusers.schedulers.DDPMScheduler) : class for noise scheduler. Parameters
+                                                                    configured under noise_scheduler
+            DDPM_param (DictConfig) : Diffusion related parameters
+            compile (Boolean) : For faster training if True
+            paths (DictConfig) : Config file containing relative paths for saving images/models etc.
         """
         super().__init__()
 
@@ -42,6 +56,8 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.criterion          = criterion
 
         # Configure DDPM related parameters dict
+        self.DDPM_param         = DDPM_param
+
         self.mode               = DDPM_param.mode
         self.target             = DDPM_param.target
         self.reconstruct        = DDPM_param.reconstruct
@@ -61,6 +77,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.plot               = DDPM_param.plot
         self.win_size           = DDPM_param.win_size
 
+        # In case when data is pre-encoded
         if self.encode:
             self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
                                                       local_files_only=True,
@@ -75,17 +92,19 @@ class DenoisingDiffusionLitModule(LightningModule):
         # Specify fontsize for plots
         self.fs = 16
 
+        # Specify log and image directories
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
         
+        # Define file name for saving reconstructs
         if self.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
             self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
 
         self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
-        self.test_loss = MeanMetric()
+        self.val_loss   = MeanMetric()
+        self.test_loss  = MeanMetric()
 
         # Used for inspecting learning curve
         self.train_epoch_loss   = []
@@ -187,7 +206,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample once per 5 epochs
-            plot_loss(self, skip=2)
+            evaluation.plot_loss(self, skip=2)
             
             # x, y = self.last_val_batch
             # _, reconstruct = self.partial_diffusion(x, self.reconstruct)
@@ -210,17 +229,6 @@ class DenoisingDiffusionLitModule(LightningModule):
             #     #                                 self.plot_ids)
             #     pass
         
-    def reconstruction_loss(self, x, reconstruct, reduction=None):
-        if reduction == None:
-            chl_loss = (x - reconstruct)**2
-        elif reduction == 'batch':
-            chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
-
-        if self.mode == "both":
-            return (chl_loss[:,0] + self.wh * chl_loss[:,1]).unsqueeze(1)
-        else:
-            return chl_loss
-        
     def test_step(self, batch, batch_idx):
 
         if batch_idx == 0:
@@ -240,8 +248,8 @@ class DenoisingDiffusionLitModule(LightningModule):
             x1 = self.decode_data(reconstruct, self.mode) # Only pick non-crack reconstructions
  
             # Convert rgb channels to grayscale and revert normalization to [0,1]
-            x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
-            _, ood_score    = OOD_score(x0=x0, x1=x0, x2=x1)
+            x0, x1          = post_process.to_gray_0_1(x0), post_process.to_gray_0_1(x1)
+            _, ood_score    = post_process.OOD_score(x0=x0, x1=x0, x2=x1)
 
             # Append scores
             self.test_losses.append(ood_score)
@@ -256,12 +264,12 @@ class DenoisingDiffusionLitModule(LightningModule):
                 self.last_test_batch[0] = self.decode_data(x, self.mode).cpu()
                 self.last_test_batch[1] = self.decode_data(reconstruct, self.mode).cpu()
                 self.last_test_batch[2] = y.cpu()
-            save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=False) # TODO make cfg related to self.n_classes
+            h5_support.save_reconstructions_to_h5(self.reconstruct_dir, self.last_test_batch, cfg=False) # TODO make cfg related to self.n_classes
             
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         
-        plot_loss(self, skip=1)
+        evaluation.plot_loss(self, skip=1)
 
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
@@ -270,8 +278,8 @@ class DenoisingDiffusionLitModule(LightningModule):
             # Save OOD-scores and true labels for later use
             np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
             
-            plot_histogram(y_score, y_true, save_dir = self.log_dir)
-            plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            evaluation.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
             
         if self.plot:
             if self.encode and not(self.save_reconstructs):
@@ -279,13 +287,13 @@ class DenoisingDiffusionLitModule(LightningModule):
                 self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
             
             if self.mode == "both":
-                visualize_reconstructs_2ch(self = self, 
-                                            x = self.last_test_batch[0], 
-                                            reconstruct = self.last_test_batch[1],
-                                            target = self.last_test_batch[2],
-                                            plot_ids = self.plot_ids,
-                                            ood = self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
-                                            )
+                visualization.visualize_reconstructs_2ch(self = self, 
+                                                x = self.last_test_batch[0], 
+                                                reconstruct = self.last_test_batch[1],
+                                                target = self.last_test_batch[2],
+                                                plot_ids = self.plot_ids,
+                                                ood = self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
+                                                )
             else:
                 # self.visualize_reconstructs_1ch(self.last_test_batch[0], 
                 #                                 self.last_test_batch[1], 
