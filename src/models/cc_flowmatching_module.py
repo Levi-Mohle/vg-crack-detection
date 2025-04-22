@@ -13,7 +13,12 @@ from torchvision.transforms.functional import rgb_to_grayscale
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.components.utils.evaluation import *
+
+# Local imports
+import src.models.components.utils.evaluation as evaluation
+import src.models.components.utils.post_process as post_process
+import src.models.components.utils.visualization as visualization
+import src.models.components.utils.h5_support as h5_support
 import tqdm
 
 # For flowmatching
@@ -193,7 +198,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
-            plot_loss(self, skip=2)
+            visualization.plot_loss(self, skip=2)
 
             x, y = self.last_val_batch
             if self.n_classes!=None:
@@ -215,11 +220,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                         self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
                         
                 if self.mode == "both":
-                    class_reconstructs_2ch(self, 
-                                           self.last_val_batch[0],
-                                           self.last_val_batch[1],
-                                           self.last_val_batch[2], 
-                                           self.plot_ids)
+                    visualization.class_reconstructs_2ch(self, 
+                                                        self.last_val_batch[0],
+                                                        self.last_val_batch[1],
+                                                        self.last_val_batch[2], 
+                                                        self.plot_ids)
                 
     def reconstruction_loss(self, x, reconstruct, reduction=None):
         if reduction == None:
@@ -264,8 +269,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
             
             # Convert rgb channels to grayscale and revert normalization to [0,1]
-            x0, x1          = to_gray_0_1(x0), to_gray_0_1(x1)
-            _, ood_score    = OOD_score(x0=x0, x1=x0, x2=x1)
+            x0, x1          = post_process.to_gray_0_1(x0), post_process.to_gray_0_1(x1)
+            _, ood_score    = post_process.get_OOD_score(x0=x0, x1=x1)
 
             # Append scores
             self.test_losses.append(ood_score)
@@ -285,14 +290,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 cfg = True
             else:
                 cfg = False
-            save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=cfg)
+            h5_support.save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=cfg)
     
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Visualizations
         # Save last batch for visualization
 
-        plot_loss(self, skip=1)
+        visualization.plot_loss(self, skip=1)
 
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
@@ -301,8 +306,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             # Save OOD-scores and true labels for later use
             np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
             
-            plot_histogram(y_score, y_true, save_dir = self.log_dir)
-            plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
+            visualization.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            visualization.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
 
         if self.plot:
             if self.encode and not(self.save_reconstructs):
@@ -322,7 +327,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                     #                     self.plot_ids,
                     #                     self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
                     #                     )
-                    visualize_reconstructs_2ch(self, 
+                    visualization.visualize_reconstructs_2ch(self, 
                                                self.last_test_batch[0], 
                                                self.last_test_batch[1][0],
                                                self.last_test_batch[2],
@@ -330,7 +335,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                                                self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
                                                )    
                 else:
-                    visualize_reconstructs_2ch(self, 
+                    visualization.visualize_reconstructs_2ch(self, 
                                                self.last_test_batch[0], 
                                                self.last_test_batch[1],
                                                self.last_test_batch[2],
