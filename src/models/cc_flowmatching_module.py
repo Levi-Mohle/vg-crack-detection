@@ -202,11 +202,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
             x, y = self.last_val_batch
             if self.n_classes!=None:
-                # reconstructs = []
-                reconstructs = self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                        device=self.device))
-                # reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                #                                                         device=self.device)))
+                reconstructs = []
+                reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                        device=self.device)))
+                reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                        device=self.device)))
             else:
                 reconstructs = self.reconstruction(x, y)
                                 
@@ -217,9 +217,9 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                     self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
                                                                self.mode) 
                     if self.n_classes!=None:
-                        # for i in range(2): 
-                        #     self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
-                        self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
+                        for i in range(2): 
+                            self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
+                        # self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
                     else:
                         self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
 
@@ -252,11 +252,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
         # Reconstruct twice: with both 0 and 1 label
         if self.n_classes!=None:
-            # reconstructs = []
-            reconstructs = self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                device=self.device))
-            # reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-            #                                                         device=self.device)))
+            reconstructs = []
+            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                device=self.device)))
+            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                    device=self.device)))
         else:
             reconstructs = self.reconstruction(x, y)
                 
@@ -268,7 +268,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             # Calculate reconstruction loss used for OOD-detection
             x0 = self.decode_data(x, self.mode)
             if self.n_classes!=None:
-                x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions
+                x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
             else:
                 x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
             
@@ -284,18 +284,14 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             if self.encode:
                 x = self.decode_data(x, self.mode).cpu()
                 if self.n_classes != None:
-                    # for i in range(2): 
-                    #     reconstructs[i] = self.decode_data(reconstructs[i], self.mode).cpu()
-                    reconstructs = self.decode_data(reconstructs, self.mode).cpu()
+                    for i in range(2): 
+                        reconstructs[i] = self.decode_data(reconstructs[i], self.mode).cpu()
+                    # reconstructs = self.decode_data(reconstructs, self.mode).cpu()
                 else:
                     reconstructs = self.decode_data(reconstructs, self.mode).cpu()
             
             y = batch[self.target_index].cpu()
-            if self.n_classes is not None:
-                cfg = True
-            else:
-                cfg = False
-            h5_support.save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=cfg)
+            h5_support.save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=(self.n_classes != None))
     
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
@@ -318,28 +314,28 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             if self.encode and not(self.save_reconstructs):
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
                 if self.n_classes!=None:
-                    # for i in range(2): 
-                    #     self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
-                    self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
+                    for i in range(2): 
+                        self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
+                    # self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
                 else:
                     self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
             
             if self.mode == "both":
                 if self.n_classes!=None:
-                    # class_reconstructs_2ch(self, 
-                    #                     self.last_test_batch[0],
-                    #                     self.last_test_batch[1],
-                    #                     self.last_test_batch[2],
-                    #                     self.plot_ids,
-                    #                     self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
-                    #                     )
-                    visualization.visualize_reconstructs_2ch(self, 
-                                               self.last_test_batch[0], 
-                                               self.last_test_batch[1][0],
-                                               self.last_test_batch[2],
-                                               self.plot_ids,
-                                               self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
-                                               )    
+                    visualization.class_reconstructs_2ch(self, 
+                                            self.last_test_batch[0],
+                                            self.last_test_batch[1],
+                                            self.last_test_batch[2],
+                                            self.plot_ids,
+                                            self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
+                                            )
+                    # visualization.visualize_reconstructs_2ch(self, 
+                    #                            self.last_test_batch[0], 
+                    #                            self.last_test_batch[1][0],
+                    #                            self.last_test_batch[2],
+                    #                            self.plot_ids,
+                    #                            self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
+                    #                            )    
                 else:
                     visualization.visualize_reconstructs_2ch(self, 
                                                self.last_test_batch[0], 
