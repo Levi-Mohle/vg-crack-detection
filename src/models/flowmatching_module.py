@@ -57,6 +57,8 @@ class FlowMatchingLitModule(LightningModule):
         self.vf              = unet.to(self.device)
 
         # Configure FM related parameters dict
+        self.FM_param           = FM_param
+
         self.n_classes          = FM_param.n_classes
         self.encode             = FM_param.encode
         self.pretrained_dir     = FM_param.pretrained_dir

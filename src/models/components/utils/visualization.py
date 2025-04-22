@@ -152,7 +152,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None)
         # Calculate pixel-wise squared error per channel + normalize
 
         _, error_idv = ssim_for_batch(x, reconstruct, self.win_size)
-        # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
+        # error_idv = min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
         error_comb = reconstruction_loss(self.FM_param, x, reconstruct, reduction=None).cpu()
