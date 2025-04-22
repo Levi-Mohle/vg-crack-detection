@@ -202,11 +202,11 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
 
             x, y = self.last_val_batch
             if self.n_classes!=None:
-                reconstructs = []
-                reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
-                                                                        device=self.device)))
-                reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
-                                                                        device=self.device)))
+                # reconstructs = []
+                reconstructs = self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                        device=self.device))
+                # reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                #                                                         device=self.device)))
             else:
                 reconstructs = self.reconstruction(x, y)
                                 
@@ -216,9 +216,13 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
                 if self.encode:
                     self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
                                                                self.mode) 
-                    for i in range(2): 
-                        self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
-                        
+                    if self.n_classes!=None:
+                        # for i in range(2): 
+                        #     self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
+                        self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
+                    else:
+                        self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
+
                 if self.mode == "both":
                     visualization.class_reconstructs_2ch(self, 
                                                         self.last_val_batch[0],
@@ -264,7 +268,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             # Calculate reconstruction loss used for OOD-detection
             x0 = self.decode_data(x, self.mode)
             if self.n_classes!=None:
-                x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
+                x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions
             else:
                 x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
             
@@ -280,8 +284,9 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             if self.encode:
                 x = self.decode_data(x, self.mode).cpu()
                 if self.n_classes != None:
-                    for i in range(2): 
-                        reconstructs[i] = self.decode_data(reconstructs[i], self.mode).cpu()
+                    # for i in range(2): 
+                    #     reconstructs[i] = self.decode_data(reconstructs[i], self.mode).cpu()
+                    reconstructs = self.decode_data(reconstructs, self.mode).cpu()
                 else:
                     reconstructs = self.decode_data(reconstructs, self.mode).cpu()
             
