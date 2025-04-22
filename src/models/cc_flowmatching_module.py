@@ -313,8 +313,9 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             if self.encode and not(self.save_reconstructs):
                 self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
                 if self.n_classes!=None:
-                    for i in range(2): 
-                        self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
+                    # for i in range(2): 
+                    #     self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
+                    self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
                 else:
                     self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
             
