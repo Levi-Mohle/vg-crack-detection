@@ -198,7 +198,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
-            visualization.plot_loss(self, skip=2)
+            evaluation.plot_loss(self, skip=2)
 
             x, y = self.last_val_batch
             if self.n_classes!=None:
@@ -297,7 +297,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
         # Visualizations
         # Save last batch for visualization
 
-        visualization.plot_loss(self, skip=1)
+        evaluation.plot_loss(self, skip=1)
 
         if self.ood:
             y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
@@ -306,8 +306,8 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             # Save OOD-scores and true labels for later use
             np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
             
-            visualization.plot_histogram(y_score, y_true, save_dir = self.log_dir)
-            visualization.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            evaluation.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
 
         if self.plot:
             if self.encode and not(self.save_reconstructs):
