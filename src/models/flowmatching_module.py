@@ -64,6 +64,7 @@ class FlowMatchingLitModule(LightningModule):
         self.dropout_prob       = FM_param.dropout_prob
         self.guidance_strength  = FM_param.guidance_strength
         self.reconstruct        = FM_param.reconstruct
+        self.wh                 = FM_param.wh
         self.batch_size         = FM_param.batch_size
         self.save_reconstructs  = FM_param.save_reconstructs
         self.plot_n_epoch       = FM_param.plot_n_epoch

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import os
+from torch import mean 
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
@@ -9,7 +10,18 @@ def min_max_normalize(self, x, dim=(0,2,3)):
     min_val = x.amin(dim=dim, keepdim=True)
     max_val = x.amax(dim=dim, keepdim=True)
     return (x - min_val) / (max_val - min_val + 1e-8)
-        
+
+def reconstruction_loss(self, x, reconstruct, reduction=None):
+    if reduction == None:
+        chl_loss = (x - reconstruct)**2
+    elif reduction == 'batch':
+        chl_loss = mean((x - reconstruct)**2, dim=(2,3))
+
+    if self.FM_param.mode == "both":
+        return (chl_loss[:,0] + self.FM_param.wh * chl_loss[:,1]).unsqueeze(1)
+    else:
+        return chl_loss
+              
 def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, ood=None, fs=12):
     x = to_gray_0_1(x).cpu()
     # x = self.min_max_normalize(x, dim=(2,3)).cpu()
@@ -143,7 +155,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None)
         # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
-        error_comb = self.reconstruction_loss(x, reconstruct, reduction=None).cpu()
+        error_comb = reconstruction_loss(self, x, reconstruct, reduction=None).cpu()
         # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
         
         if ood is None:
