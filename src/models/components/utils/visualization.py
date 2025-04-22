@@ -6,30 +6,30 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
 from src.models.components.utils.post_process import to_gray_0_1, ssim_for_batch
 
-def min_max_normalize(self, x, dim=(0,2,3)):
+def min_max_normalize(x, dim=(0,2,3)):
     min_val = x.amin(dim=dim, keepdim=True)
     max_val = x.amax(dim=dim, keepdim=True)
     return (x - min_val) / (max_val - min_val + 1e-8)
 
-def reconstruction_loss(self, x, reconstruct, reduction=None):
+def reconstruction_loss(param, x, reconstruct, reduction=None):
     if reduction == None:
         chl_loss = (x - reconstruct)**2
     elif reduction == 'batch':
         chl_loss = mean((x - reconstruct)**2, dim=(2,3))
 
-    if self.FM_param.mode == "both":
-        return (chl_loss[:,0] + self.FM_param.wh * chl_loss[:,1]).unsqueeze(1)
+    if param.mode == "both":
+        return (chl_loss[:,0] + param.wh * chl_loss[:,1]).unsqueeze(1)
     else:
         return chl_loss
               
 def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, ood=None, fs=12):
     x = to_gray_0_1(x).cpu()
-    # x = self.min_max_normalize(x, dim=(2,3)).cpu()
+    # x = min_max_normalize(x, dim=(2,3)).cpu()
     
     ssim_orig_vs_reconstruct = []
     for i, reconstruct in enumerate(reconstructs):
         reconstructs[i] = to_gray_0_1(reconstruct).cpu()
-        # reconstructs[i] = self.min_max_normalize(reconstruct, dim=(2,3)).cpu()
+        # reconstructs[i] = min_max_normalize(reconstruct, dim=(2,3)).cpu()
 
         # Calculate SSIM between original sample and all reconstructed labels
         _, ssim_img = ssim_for_batch(x, reconstructs[i], self.win_size)
@@ -155,13 +155,13 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None)
         # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
-        error_comb = reconstruction_loss(self, x, reconstruct, reduction=None).cpu()
-        # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
+        error_comb = reconstruction_loss(self.FM_param, x, reconstruct, reduction=None).cpu()
+        # error_comb = min_max_normalize(error_comb, dim=(2,3))
         
         if ood is None:
             ood = [None] * len(plot_ids)
 
-        img = [self.min_max_normalize(x, dim=(2,3)).cpu(), self.min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
+        img = [min_max_normalize(x, dim=(2,3)).cpu(), min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
         extent = [0,4,0,4]
         for i in plot_ids:
             fig = plt.figure(constrained_layout=True, figsize=(15,7))
