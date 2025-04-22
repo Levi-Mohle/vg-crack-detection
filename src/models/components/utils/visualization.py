@@ -11,14 +11,14 @@ def min_max_normalize(x, dim=(0,2,3)):
     max_val = x.amax(dim=dim, keepdim=True)
     return (x - min_val) / (max_val - min_val + 1e-8)
 
-def reconstruction_loss(param, x, reconstruct, reduction=None):
+def reconstruction_loss(x, reconstruct, wh, mode, reduction=None):
     if reduction == None:
         chl_loss = (x - reconstruct)**2
     elif reduction == 'batch':
         chl_loss = mean((x - reconstruct)**2, dim=(2,3))
 
-    if param.mode == "both":
-        return (chl_loss[:,0] + param.wh * chl_loss[:,1]).unsqueeze(1)
+    if mode == "both":
+        return (chl_loss[:,0] + wh * chl_loss[:,1]).unsqueeze(1)
     else:
         return chl_loss
               
@@ -155,7 +155,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None)
         # error_idv = min_max_normalize(error_idv, dim=(2,3))
 
         # Calculate pixel-wise squared error combined + normalize
-        error_comb = reconstruction_loss(self.FM_param, x, reconstruct, reduction=None).cpu()
+        error_comb = reconstruction_loss(x, reconstruct, self.wh, self.mode, reduction=None).cpu()
         # error_comb = min_max_normalize(error_comb, dim=(2,3))
         
         if ood is None:
