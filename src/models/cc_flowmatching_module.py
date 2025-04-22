@@ -270,7 +270,7 @@ class ClassConditionedFlowMatchingLitModule(LightningModule):
             
             # Convert rgb channels to grayscale and revert normalization to [0,1]
             x0, x1          = post_process.to_gray_0_1(x0), post_process.to_gray_0_1(x1)
-            _, ood_score    = post_process.get_OOD_score(x0=x0, x1=x1)
+            ood_score       = post_process.get_OOD_score(x0=x0, x1=x1)
 
             # Append scores
             self.test_losses.append(ood_score)

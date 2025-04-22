@@ -29,7 +29,7 @@ callbacks:
         monitor: "val/loss"
 
 model:
-    _target_: src.models.cc_flowmatching_module2.ClassConditionedFlowMatchingLitModule
+    _target_: src.models.cc_flowmatching_module.ClassConditionedFlowMatchingLitModule
     optimizer:
       lr: 1e-5
     unet:
