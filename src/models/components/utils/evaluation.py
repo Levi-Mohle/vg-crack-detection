@@ -173,7 +173,7 @@ def print_confusion_matrix(y_score, y_true, thresholds):
     print(f"Given threshold value @ best F1-score: {best_threshold}")
     print(f"{'Accuracy:':<20}{accuracy:.3f}")
     print(f"{'Precision:':<20}{cm[1,1]/(cm[0,1]+cm[1,1]):.3f}")
-    print(f"{'Recall:':<20}{cm[1,1]/(cm[1,0]+cm[1,1])::.3f}")
+    print(f"{'Recall:':<20}{cm[1,1]/(cm[1,0]+cm[1,1]):.3f}")
     print(f"{'Misclassification:':<20}{cm[0,1]+cm[1,0]}")
     print("##############################################")
 
