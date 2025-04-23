@@ -27,6 +27,7 @@ CAE_param:
     wh: 1
     mode: "rgb"
     plot_ids: [0,1,16,17]
+    ood: false
     
 compile: false
 

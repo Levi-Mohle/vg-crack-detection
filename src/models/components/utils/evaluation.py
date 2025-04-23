@@ -43,20 +43,6 @@ def plot_loss(self, skip):
     # Close the plot to free up memory
     plt.close()
 
-def plot_loss(self, skip):
-
-    epochs = [i for i in range(1, self.current_epoch + 1)]
-    plt.plot(epochs, [t.cpu().numpy() for t in self.train_epoch_loss], marker='o', linestyle = '-', label = "Training")
-    plt.plot(epochs, [t.cpu().numpy() for t in self.val_epoch_loss][skip:], marker='o', linestyle = '-', label = "Validation")
-    plt.xlabel('Epochs', fontsize = self.fs)
-    plt.ylabel('Loss [-]', fontsize = self.fs)
-    plt.legend()
-    plt.title('Training and Validation Loss', fontsize = self.fs)
-
-    plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_loss.png")
-    plt.savefig(plt_dir)
-    plt.close()
-
 def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
     """
     Plot classification metrics including Precision-Recall curve and ROC curve, 

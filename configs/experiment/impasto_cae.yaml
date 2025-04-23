@@ -38,8 +38,9 @@ model:
   CAE_param:
     target_index: 2
     wh: 1
-    mode: "rgb"
+    mode: "both"
     plot_ids: [0]
+    ood: true
     
 trainer:
   min_epochs: 5

@@ -8,7 +8,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.components.utils.evaluation import *
+
+# Local imports
+import src.models.components.utils.evaluation as evaluation
 
 class ConvAutoEncoderLitModule(LightningModule):
     def __init__(
@@ -39,6 +41,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.wh             = CAE_param.wh
         self.mode           = CAE_param.mode
         self.plot_ids       = CAE_param.plot_ids
+        self.ood            = CAE_param.ood
 
         # Specify fontsize for plots
         self.fs = 16
@@ -102,12 +105,21 @@ class ConvAutoEncoderLitModule(LightningModule):
         """Lightning hook that is called when a test epoch ends."""
         
         # Visualizations
-        plot_loss(self)
+        evaluation.plot_loss(self, skip=1)
         if self.mode == "both":
             self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids)
         else:
             self.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
-        plot_histogram(self)
+        
+        if self.ood:
+            y_score = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
+            y_true  = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int), axis=1)
+
+            # Save OOD-scores and true labels for later use
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
+            
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            evaluation.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
 
         # Clear variables
         self.train_epoch_loss.clear()
