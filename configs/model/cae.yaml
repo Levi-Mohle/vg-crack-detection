@@ -28,7 +28,7 @@ CAE_param:
     mode: "rgb"
     plot_ids: [0,1,16,17]
     ood: false
-    self.win_size: 5
+    win_size: 5
     
 compile: false
 
