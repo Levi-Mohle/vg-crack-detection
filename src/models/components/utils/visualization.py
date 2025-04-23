@@ -178,10 +178,11 @@ def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, ood=None, fs
         fig.savefig(plt_dir)
         plt.close()
 
-def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None):
+def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None, to_gray=True):
 
-        x           = to_gray_0_1(x).cpu()
-        reconstruct = to_gray_0_1(reconstruct).cpu()
+        if to_gray:
+            x           = to_gray_0_1(x).cpu()
+            reconstruct = to_gray_0_1(reconstruct).cpu()
             
         # Calculate pixel-wise squared error per channel + normalize
 

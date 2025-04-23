@@ -108,7 +108,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         # Visualizations
         evaluation.plot_loss(self, skip=1)
         if self.mode == "both":
-            visualization.visualize_reconstructs_2ch(self, self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids)
+            visualization.visualize_reconstructs_2ch(self, self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids, to_gray=False)
         else:
             visualization.visualize_reconstructs_1ch(self, self.last_test_batch[0], self.last_test_batch[1], self.plot_ids)
         
