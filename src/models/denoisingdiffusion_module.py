@@ -64,7 +64,7 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.plot_n_epoch       = DDPM_param.plot_n_epoch
         self.plot_ids           = DDPM_param.plot_ids
         self.encode             = DDPM_param.encode
-        self.pretrained         = DDPM_param.pretrained
+        self.pretrained_dir     = DDPM_param.pretrained_dir
         self.ood                = DDPM_param.ood
         self.max_epochs         = DDPM_param.max_epochs
         self.batch_size         = DDPM_param.batch_size

@@ -63,7 +63,7 @@ model:
       plot_n_epoch: 20
       plot_ids: [1,5,6]
       encode: true
-      pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
+      pretrained_dir: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       ood: true
       use_cond: false
       condition_weight: 2
