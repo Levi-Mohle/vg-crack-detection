@@ -133,7 +133,14 @@ class DeepSVDDLitModule(LightningModule):
         evaluation.plot_loss(self, skip=1)
 
         if self.ood:
-            evaluation.plot_histogram(self)
+            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
+            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+            
+            # Save OOD-scores and true labels for later use
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
+            
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+
 
         # Clear variables
         self.train_epoch_loss.clear()
