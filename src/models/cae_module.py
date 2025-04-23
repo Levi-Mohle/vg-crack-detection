@@ -34,6 +34,12 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.criterion          = criterion
 
         self.CAE_param          = CAE_param
+
+        self.target_index   = CAE_param.target_index
+        self.wh             = CAE_param.wh
+        self.mode           = CAE_param.mode
+        self.plot_ids       = CAE_param.plot_ids
+
         # Specify fontsize for plots
         self.fs = 16
 
@@ -57,14 +63,14 @@ class ConvAutoEncoderLitModule(LightningModule):
         return self.model(x)
     
     def training_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.CAE_param.mode)
+        x = self.select_mode(batch, self.mode)
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.CAE_param.mode)
+        x = self.select_mode(batch, self.mode)
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("val/loss", loss, prog_bar=True)
@@ -78,8 +84,8 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
             
     def test_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.CAE_param.mode)
-        y = batch[self.CAE_param.target]
+        x = self.select_mode(batch, self.mode)
+        y = batch[self.target_index]
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("test/loss", loss, prog_bar=True)
@@ -97,8 +103,8 @@ class ConvAutoEncoderLitModule(LightningModule):
         
         # Visualizations
         plot_loss(self)
-        if self.CAE_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.CAE_param.plot_ids)
+        if self.mode == "both":
+            self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids)
         else:
             self.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
         plot_histogram(self)
@@ -124,8 +130,8 @@ class ConvAutoEncoderLitModule(LightningModule):
         elif reduction == 'batch':
             chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
 
-        if self.CAE_param.mode == "both":
-            return (chl_loss[:,0] + self.CAE_param.wh * chl_loss[:,1]).unsqueeze(1)
+        if self.mode == "both":
+            return (chl_loss[:,0] + self.wh * chl_loss[:,1]).unsqueeze(1)
         else:
             return chl_loss
             
