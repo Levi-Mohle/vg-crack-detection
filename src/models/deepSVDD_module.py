@@ -39,10 +39,17 @@ class DeepSVDDLitModule(LightningModule):
         # Configure dSVDD related parameters dict
         self.dSVDD_param = dSVDD_param
 
-        self.center = center
-        self.R = self.dSVDD_param.R
+        self.center             = center
+        self.R                  = dSVDD_param.R
+        self.encode             = dSVDD_param.encode
+        self.pretrained_dir     = dSVDD_param.pretrained_dir
+        self.batch_size         = dSVDD_param.batch_size
+        self.plot_n_epoch       = dSVDD_param.plot_n_epoch
+        self.target_index       = dSVDD_param.target_index
+        self.mode               = dSVDD_param.mode
+        self.ood                = dSVDD_param.ood
 
-        if self.dSVDD_param.latent:
+        if self.encode:
             self.vae =  AutoencoderKL.from_pretrained(self.dSVDD_param.pretrained,
                                                       local_files_only=True,
                                                       use_safetensors=True

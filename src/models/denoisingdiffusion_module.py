@@ -19,7 +19,6 @@ import src.models.components.utils.post_process as post_process
 import src.models.components.utils.visualization as visualization
 import src.models.components.utils.h5_support as h5_support
 
-
 class DenoisingDiffusionLitModule(LightningModule):
     def __init__(
         self, 

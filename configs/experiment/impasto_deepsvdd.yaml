@@ -45,9 +45,9 @@ model:
     #   num_cycles: 0.5
     dSVDD_param:
       mode: both
-      pretrained: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
+      pretrained_dir: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL'
       plot_n_epoch: 5
-      latent: true
+      encode: true
       ood: true
       rep_dim: 2048
     
