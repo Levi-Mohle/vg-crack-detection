@@ -36,7 +36,7 @@ model:
     feature_maps: [64, 32, 16]
     latent_dim: 1
   CAE_param:
-    target: 2
+    target_index: 2
     wh: 1
     mode: "rgb"
     plot_ids: [0]
@@ -49,10 +49,10 @@ trainer:
 
 data:
   batch_size: 32
-  rgb_transform:
-    _target_: src.data.components.transforms.normalize_0_1_grayscale_idv
-  height_transform:
-    _target_: src.data.components.transforms.normalize_height_0_1_idv
+  variant: 512x512
+  crack: realBI
+  transform:
+    _target_: src.data.components.transforms.CNNTransform
 
 extras:
   print_config: false
