@@ -108,9 +108,9 @@ class ConvAutoEncoderLitModule(LightningModule):
         # Visualizations
         evaluation.plot_loss(self, skip=1)
         if self.mode == "both":
-            visualization.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids)
+            visualization.visualize_reconstructs_2ch(self, self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids)
         else:
-            visualization.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.plot_ids)
+            visualization.visualize_reconstructs_1ch(self, self.last_test_batch[0], self.last_test_batch[1], self.plot_ids)
         
         if self.ood:
             y_score = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
