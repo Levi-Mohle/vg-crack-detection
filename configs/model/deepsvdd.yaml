@@ -25,7 +25,7 @@ net:
   # rep_dim: 4096
 
 center:
-    _target_: src.models.components.deepSVDD_net.LatentCenterVector
+    _target_: src.models.components.deepsvdd_net.LatentCenterVector
     rep_dim: 512
 
 dSVDD_param:

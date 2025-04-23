@@ -31,7 +31,7 @@ model:
     optimizer:
       lr: 1e-4
     net:
-      _target_: src.models.components.deepSVDD_net.DeeperSVDD
+      _target_: src.models.components.deepsvdd_net.DeeperSVDD
       in_channels: 8
       pretrained: true
       # rep_dim: 512
