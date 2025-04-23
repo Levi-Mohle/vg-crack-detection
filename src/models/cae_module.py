@@ -115,8 +115,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         
         if self.ood:
             y_score = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
-            print(self.test_labels)
-            y_true  = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int), axis=1)
+            y_true  = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
 
             # Save OOD-scores and true labels for later use
             np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
