@@ -1,4 +1,4 @@
-_target_: src.models.deepsvdd_module.DeepSVDDLitModule
+_target_: src.models.deepSVDD_module.DeepSVDDLitModule
 
 optimizer:
   _target_: torch.optim.Adam
@@ -19,13 +19,13 @@ scheduler:
 #   num_cycles: 0.5
 
 net:
-  _target_: src.models.components.deepsvdd_net.DeepSVDD
+  _target_: src.models.components.deepSVDD_net.DeepSVDD
   in_channels: 8
   pretrained: false
   # rep_dim: 4096
 
 center:
-    _target_: src.models.components.deepsvdd_net.LatentCenterVector
+    _target_: src.models.components.deepSVDD_net.LatentCenterVector
     rep_dim: 512
 
 dSVDD_param:
