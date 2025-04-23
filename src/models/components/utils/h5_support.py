@@ -1,14 +1,25 @@
 import os
 import h5py
 
+import os
+
 def save_reconstructions_to_h5(output_file_name, batch, cfg=False):
+    """
+    Save reconstructions to an HDF5 file. If the file does not exist, create a new HDF5 file. 
+    If the file exists, append to the existing HDF5 file.
+
+    Args:
+        output_file_name (str): The name of the output HDF5 file.
+        batch (torch.Tensor): The batch of reconstructions to be saved.
+        cfg (bool, optional): Configuration flag, default is False.
+
+    """
     if not os.path.exists(output_file_name):
-        # Creating new h5 file
+        # Creating new HDF5 file
         create_h5f_reconstruct(output_file_name, batch, cfg)
     else:
-        # Appending h5 file
+        # Appending to existing HDF5 file
         append_h5f_reconstruct(output_file_name, batch, cfg)
-    return 0
 
 def create_h5f_reconstruct(output_filename_full_h5, batch, cfg):    
     """

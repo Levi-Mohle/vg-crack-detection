@@ -1,25 +1,59 @@
 import matplotlib.pyplot as plt
 import os
-from torch import mean 
+import torch
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
 from src.models.components.utils.post_process import to_gray_0_1, ssim_for_batch
 
-def min_max_normalize(x, dim=(0,2,3)):
+def min_max_normalize(x, dim=(0, 2, 3)):
+    """
+    Apply min-max normalization to a tensor along specified dimensions.
+
+    Args:
+        x (torch.Tensor): Input tensor to be normalized.
+        dim (tuple, optional): Dimensions along which to compute the min and max values. 
+        Default is (0, 2, 3).
+
+    Returns:
+        torch.Tensor: Normalized tensor with values scaled to the range [0, 1].
+    """
+    # Compute the minimum value along the specified dimensions, keeping the dimensions for broadcasting
     min_val = x.amin(dim=dim, keepdim=True)
+    
+    # Compute the maximum value along the specified dimensions, keeping the dimensions for broadcasting
     max_val = x.amax(dim=dim, keepdim=True)
+    
+    # Apply min-max normalization and return the normalized tensor
     return (x - min_val) / (max_val - min_val + 1e-8)
 
 def reconstruction_loss(x, reconstruct, wh, mode, reduction=None):
-    if reduction == None:
-        chl_loss = (x - reconstruct)**2
-    elif reduction == 'batch':
-        chl_loss = mean((x - reconstruct)**2, dim=(2,3))
+    """
+    Calculate the reconstruction loss between the input tensor and the reconstructed tensor.
 
+    Args:
+        x (torch.Tensor): The input tensor.
+        reconstruct (torch.Tensor): The reconstructed tensor.
+        wh (float): Weighting factor for the second channel loss.
+        mode (str): Mode of loss calculation. If "both", combines the losses of the first and second channels.
+        reduction (str, optional): Specifies the reduction to apply to the output. 
+        If 'batch', averages the loss over the batch. Default is None.
+
+    Returns:
+        torch.Tensor: The calculated reconstruction loss.
+    """
+    if reduction is None:
+        # Calculate the element-wise squared difference
+        chl_loss = (x - reconstruct) ** 2
+    elif reduction == 'batch':
+        # Calculate the mean squared difference over the spatial dimensions
+        chl_loss = torch.mean((x - reconstruct) ** 2, dim=(2, 3))
+    
     if mode == "both":
-        return (chl_loss[:,0] + wh * chl_loss[:,1]).unsqueeze(1)
+        # Combine the losses of the first and second channels with weighting
+        return (chl_loss[:, 0] + wh * chl_loss[:, 1]).unsqueeze(1)
     else:
+        # Return the calculated loss
         return chl_loss
               
 def class_reconstructs_2ch(self, x, reconstructs, target, plot_ids, ood=None, fs=12):

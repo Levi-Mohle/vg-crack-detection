@@ -298,7 +298,7 @@ class FlowMatchingLitModule(LightningModule):
         evaluation.plot_loss(self, skip=1)
 
         if self.ood:
-            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
+            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor
             y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
             
             # Save OOD-scores and true labels for later use

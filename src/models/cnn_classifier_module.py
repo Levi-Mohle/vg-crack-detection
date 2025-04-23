@@ -20,9 +20,16 @@ class CNNClassifierLitModule(LightningModule):
         compile,
         paths: DictConfig,
     ):
-        """Flow matching.
+        """Convolutional Neural Network for image classification.
 
         Args:
+            cnn (torch.nn.Module) : cnn architecture, configured with its own parameters 
+                                    under model.cnn in config file
+            optimizer (torch.optim.Optimizer) : optimizer for training neural network
+            scheduler (torch.optim.lr_scheduler) : scheduler of the learning rate
+            cnn_param (DictConfig) : CNN related parameters
+            compile (Boolean) : For faster training if True
+            paths (DictConfig) : Config file containing relative paths for saving images/models etc.
 
         """
         super().__init__()
@@ -32,7 +39,7 @@ class CNNClassifierLitModule(LightningModule):
 
         self.cnn              = cnn.to(self.device)
 
-        # Configure FM related parameters dict
+        # Configure CNN related parameters dict
         self.n_classes      = cnn_param.n_classes
         self.mode           = cnn_param.mode 
         self.target         = cnn_param.target
@@ -41,18 +48,6 @@ class CNNClassifierLitModule(LightningModule):
         self.batch_size     = cnn_param.batch_size
         self.save_model     = cnn_param.save_model
 
-        # if self.latent:
-        #     self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
-        #                                               local_files_only=True,
-        #                                               use_safetensors=True
-        #                                              ).to(self.device)
-        #     # Make sure to freeze parameters 
-        #     for param in self.vae.parameters():
-        #         param.requires_grad= False
-        # else:
-        #     self.vae = None
-
-        # Specify fontsize for plots
         self.fs = 16
 
         self.log_dir = paths.log_dir
@@ -75,7 +70,6 @@ class CNNClassifierLitModule(LightningModule):
         self.test_labels = []
 
     def forward(self, x):
-        # Convert class labels to Long Tensor for embedding
         return self.cnn(x)
     
     def select_mode(self, batch, mode):
@@ -144,8 +138,6 @@ class CNNClassifierLitModule(LightningModule):
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
-        # Visualizations
-        # Save last batch for visualization
 
         plot_loss(self, skip=1)
 

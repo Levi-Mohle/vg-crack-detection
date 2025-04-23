@@ -6,6 +6,31 @@ from skimage.filters import sobel
 import skimage.morphology as morphology
 
 def to_gray_0_1(x):
+    """
+    Convert the first 3 channels (RGB) of the input tensor to grayscale, 
+    concatenate the result with the remaining channels, 
+    and normalize the tensor to the range [0, 1].
+
+    Args:
+        x (torch.Tensor): Input tensor with at least 4 channels, where the first 3 channels represent 
+        RGB values and the fourth channel represents height or another feature.
+
+    Returns:
+        torch.Tensor: Tensor with the first 3 channels converted to grayscale, 
+        concatenated with the remaining channels, and normalized to the range [0, 1].
+    """
+    # Convert the first 3 channels (RGB) to grayscale
+    x_gray = rgb_to_grayscale(x[:, :3])
+    
+    # Concatenate the grayscale result with the remaining channels
+    x = torch.cat((x_gray, x[:, 3:]), dim=1)
+    
+    # Normalize the tensor to the range [0, 1]
+    x = (x + 1) / 2
+    
+    return x
+
+def to_gray_0_1(x):
      # Convert first 3 channels (rgb) to gray-scale
      x_gray = rgb_to_grayscale(x[:,:3])
      # Concatentate result with height channel
@@ -15,23 +40,63 @@ def to_gray_0_1(x):
      return x
 
 def ssim_for_batch(batch, r_batch, win_size=5):
+    """
+    Calculate the Structural Similarity Index (SSIM) for a batch of images.
+
+    Args:
+        batch (torch.Tensor): Batch of images to be compared.
+        r_batch (torch.Tensor): Reference batch of images.
+        win_size (int, optional): The size of the window to use for SSIM calculation. Default is 5.
+
+    Returns:
+        ssim_batch (numpy.ndarray): Array containing the SSIM values for each image in the batch.
+        ssim_batch_img (numpy.ndarray): Array containing the SSIM images for each image in the batch.
+    """
+    # Convert the batches from PyTorch tensors to NumPy arrays
     batch   = batch.cpu().numpy()
     r_batch = r_batch.cpu().numpy()
+    
+    # Get the batch size
     bs = batch.shape[0]
     
-    ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
-    ssim_batch_img = np.zeros_like(batch)
+    # Initialize arrays to store SSIM values and SSIM images
+    ssim_batch      = np.zeros((batch.shape[0], batch.shape[1]))
+    ssim_batch_img  = np.zeros_like(batch)
+    
+    # Loop through each image in the batch
     for i in range(bs):
         for j in range(batch.shape[1]):
-            ssim,  img_ssim = structural_similarity(batch[i,j], 
-                                r_batch[i,j],
-                                win_size=win_size,
-                                data_range=1,
-                                full=True)
+            # Calculate SSIM and SSIM image for the current image
+            ssim, img_ssim = structural_similarity(batch[i, j], 
+                                                   r_batch[i, j],
+                                                   win_size=win_size,
+                                                   data_range=1,
+                                                   full=True)
+            # Invert the SSIM image
             ssim_batch_img[i, j] = img_ssim * -1
-            ssim_batch[i, j]     = np.sum(ssim_batch_img[i, j] > 0)
+            # Count the number of positive values in the inverted SSIM image
+            ssim_batch[i, j] = np.sum(ssim_batch_img[i, j] > 0)
     
     return ssim_batch, ssim_batch_img
+
+# def ssim_for_batch(batch, r_batch, win_size=5):
+#     batch   = batch.cpu().numpy()
+#     r_batch = r_batch.cpu().numpy()
+#     bs = batch.shape[0]
+    
+#     ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
+#     ssim_batch_img = np.zeros_like(batch)
+#     for i in range(bs):
+#         for j in range(batch.shape[1]):
+#             ssim,  img_ssim = structural_similarity(batch[i,j], 
+#                                 r_batch[i,j],
+#                                 win_size=win_size,
+#                                 data_range=1,
+#                                 full=True)
+#             ssim_batch_img[i, j] = img_ssim * -1
+#             ssim_batch[i, j]     = np.sum(ssim_batch_img[i, j] > 0)
+    
+#     return ssim_batch, ssim_batch_img
 
 def post_processing(ssim_img):
     """
