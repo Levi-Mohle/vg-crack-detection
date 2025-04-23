@@ -1,14 +1,13 @@
 import torch
-from diffusers.models import AutoencoderKL
 import numpy as np
 import os
-from datetime import datetime
 import time
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.components.utils.evaluation import *
-import tqdm
+
+# Local imports
+import src.models.components.utils.evaluation as evaluation
 
 class CNNClassifierLitModule(LightningModule):
     def __init__(
@@ -35,14 +34,13 @@ class CNNClassifierLitModule(LightningModule):
         super().__init__()
 
         self.save_hyperparameters(logger=False)
-        self.save_hyperparameters(ignore=['unet'])
 
         self.cnn              = cnn.to(self.device)
 
         # Configure CNN related parameters dict
         self.n_classes      = cnn_param.n_classes
         self.mode           = cnn_param.mode 
-        self.target         = cnn_param.target
+        self.target_index   = cnn_param.target_index
         self.ood            = cnn_param.ood
         self.plot_n_epoch   = cnn_param.plot_n_epoch
         self.batch_size     = cnn_param.batch_size
@@ -80,7 +78,7 @@ class CNNClassifierLitModule(LightningModule):
         elif mode == "rgb":
             x = batch[0].to(torch.float)
         
-        y = self.one_hot_encode(batch[self.target])
+        y = self.one_hot_encode(batch[self.target_index])
 
         return x, y
     
@@ -119,7 +117,7 @@ class CNNClassifierLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
-            plot_loss(self, skip=2)
+            evaluation.plot_loss(self, skip=2)
          
     def test_step(self, batch, batch_idx):
 
@@ -139,7 +137,7 @@ class CNNClassifierLitModule(LightningModule):
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
 
-        plot_loss(self, skip=1)
+        evaluation.plot_loss(self, skip=1)
 
         if self.ood:
             y_score = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
@@ -148,8 +146,8 @@ class CNNClassifierLitModule(LightningModule):
             # Save OOD-scores and true labels for later use
             np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
             
-            plot_histogram(y_score, y_true, save_dir = self.log_dir)
-            plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            evaluation.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
 
         if self.save_model:
             torch.save(self.cnn.state_dict(), os.path.join(self.log_dir, "cnn_model.pth"))

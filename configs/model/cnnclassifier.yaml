@@ -18,7 +18,7 @@ cnn_param:
   n_classes: ${model.cnn.n_classes}
   plot_n_epoch: 5
   batch_size: ${data.batch_size}
-  target: 2
+  target_index: 2
   mode: both
   ood: false
   save_model: false
