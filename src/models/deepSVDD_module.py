@@ -10,8 +10,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.components.utils.evaluation import *
 
+# Local imports
+import src.models.components.utils.evaluation as evaluation
 
 class DeepSVDDLitModule(LightningModule):
     def __init__(
@@ -111,7 +112,7 @@ class DeepSVDDLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
         if (self.current_epoch % self.dSVDD_param.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample once per 5 epochs
-            plot_loss(self, skip=2)
+            evaluation.lot_loss(self, skip=2)
 
     def test_step(self, batch, batch_idx):
         x = self.select_mode(batch, self.dSVDD_param.mode)
@@ -129,10 +130,10 @@ class DeepSVDDLitModule(LightningModule):
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
 
-        plot_loss(self, skip=1)
+        evaluation.plot_loss(self, skip=1)
 
         if self.dSVDD_param.ood:
-            plot_histogram(self)
+            evaluation.plot_histogram(self)
 
         # Clear variables
         self.train_epoch_loss.clear()
