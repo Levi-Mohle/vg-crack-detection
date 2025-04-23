@@ -60,10 +60,8 @@ trainer:
 data:
   batch_size: 16
   variant: Enc_512x512
-  rgb_transform: null
-    # _target_: src.data.components.transforms.diffuser_normalize
-  height_transform: null
-    # _target_: src.data.components.transforms.diffuser_normalize_height_idv
+  crack: realBI
+  transform: null
 
 extras:
   print_config: false
