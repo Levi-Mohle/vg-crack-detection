@@ -43,6 +43,7 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.mode           = CAE_param.mode
         self.plot_ids       = CAE_param.plot_ids
         self.ood            = CAE_param.ood
+        self.win_size       = CAE_param.win_size
 
         # Specify fontsize for plots
         self.fs = 16
