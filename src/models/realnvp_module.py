@@ -159,10 +159,10 @@ class RealNVPLitModule(LightningModule):
         if batch_idx == 0:
             noise = torch.randn((1, z.shape[1], z.shape[2], z.shape[3]), 
                             dtype=torch.float32)
-            image_path = self.logger._artifact_location + "/sample_0.png"
-            _, x_hat, _ = self.net(noise, reverse=True)
-            save_image(x_hat, image_path)
-            self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
+            # image_path = self.logger._artifact_location + "/sample_0.png"
+            # _, x_hat, _ = self.net(noise, reverse=True)
+            # save_image(x_hat, image_path)
+            # self.logger.experiment.log_artifact(local_path=image_path, run_id=self.logger.run_id)
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
@@ -206,8 +206,8 @@ class RealNVPLitModule(LightningModule):
     def _log_histogram(self):
 
         # TODO issue when running eval.py: does not run validation step and therefore does not have val_scores
-        val_scores = np.array(self.last_val_losses)
-        test_scores = np.array(self.test_losses)
+        val_scores = np.array([t.cpu().numpy() for t in self.last_val_losses])
+        test_scores = np.array([t.cpu().numpy() for t in self.test_losses])
 
         y_true = np.concatenate([np.zeros_like(val_scores), np.ones_like(test_scores)], axis=0)
         y_score = np.concatenate([val_scores, test_scores], axis=0)
@@ -235,12 +235,16 @@ class RealNVPLitModule(LightningModule):
                                       estimator_name='Model')
         disp_roc.plot(ax=axes[1])
         axes[1].set_title('ROC')
+
+        # Define the directory and filename for saving the plot
+        plt_dir = os.path.join(self.image_dir, "0_histogram.png")
         
+        # Save the plot as an image file
+        fig.savefig(plt_dir)
         # Logging plot as figure to mlflow
-        image_path = self.logger._artifact_location + "/hist_ROC.png"
-        fig.savefig(image_path)
-        self.logger.experiment.log_artifact(local_path = image_path,
-                                            run_id=self.logger.run_id)
+        # image_path = self.logger._artifact_location + "/hist_ROC.png"
+        # self.logger.experiment.log_artifact(local_path = image_path,
+        #                                     run_id=self.logger.run_id)
 
 
     def configure_optimizers(self) -> Dict[str, Any]:

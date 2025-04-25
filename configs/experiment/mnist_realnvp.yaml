@@ -16,6 +16,17 @@ tags: ["mnist_ad", "real_nvp"]
 
 seed: 12345
 
+callbacks:
+    early_stopping:
+        monitor: "val/loss"
+        patience: 30
+        mode: "min"
+    model_summary:
+      max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
+        
 trainer:
   min_epochs: 5
   max_epochs: 20
@@ -27,7 +38,7 @@ model:
     lr: 0.001
   compile: false
   criterion:
-    _target_: src.models.components.loss_functions.losses.NLL_Typicality_Loss
+    _target_: src.models.components.loss_functions.losses.RealNVPLoss
   net:
     num_blocks: 4
     mid_channels: 32
