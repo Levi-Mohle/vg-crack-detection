@@ -118,8 +118,8 @@ class NormalizingFlowLitModule(LightningModule):
         plt.savefig(plt_dir)
         plt.close()
         # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+        # if self.logger.__class__.__name__ == "MLFlowLogger":
+        #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
         # os.remove(image_path)
 
     def test_step(self, batch, batch_idx):
@@ -186,9 +186,9 @@ class NormalizingFlowLitModule(LightningModule):
         fig.savefig(plt_dir)
         
         # Logging plot as figure to mlflow
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path = self.image_dir,
-                                                run_id=self.logger.run_id)
+        # if self.logger.__class__.__name__ == "MLFlowLogger":
+        #     self.logger.experiment.log_artifact(local_path = self.image_dir,
+        #                                         run_id=self.logger.run_id)
         # Remove image from folder (saved to logger)
         # os.remove(image_path)
         

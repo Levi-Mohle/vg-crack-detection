@@ -57,6 +57,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         self,
         data_dir: str = "data/",
         train_val_test_split: Tuple[int, int, int] = (55_000, 5_000, 10_000),
+        resize: int = 32,
         batch_size: int = 64,
         val_size: int = 300,
         test_size: int = 100,
@@ -77,9 +78,9 @@ class MNIST_AD_DataModule(LightningDataModule):
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
-        
+        self.resize = resize
         # data transformations
-        self.transforms = transforms.Compose([transforms.Resize(32),
+        self.transforms = transforms.Compose([transforms.Resize(self.resize),
                                             transforms.ToTensor(),
                                             # rescale_diffuser,
                                             # discretize_255,
