@@ -78,7 +78,7 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         # In case when data is pre-encoded
         if self.encode:
-            self.vae =  AutoencoderKL.from_pretrained(self.pretrained,
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained_dir,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -232,6 +232,9 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         if batch_idx == 0:
             self.start_time = time.time()
+            self.ttotal_recon = 0
+            self.ttotal_decode = 0
+            self.ttotal_pp = 0
         # x = self.encode_data(batch, self.mode)
         x, y = self.select_mode(batch, self.mode)
         residual, noise = self(x)
@@ -239,17 +242,27 @@ class DenoisingDiffusionLitModule(LightningModule):
         self.log("test/loss", loss, prog_bar=True)
 
         # Reconstruct test samples
+        self.t0_recon = time.time()
         _, reconstruct = self.partial_diffusion(x, self.reconstruct)
-
+        self.t1_recon = time.time()
+        self.ttotal_recon += self.t1_recon - self.t0_recon
+        
         if self.ood:
+
+            t0_decode = time.time()
             # Calculate reconstruction loss used for OOD-detection
             x0 = self.decode_data(x, self.mode)
             x1 = self.decode_data(reconstruct, self.mode) # Only pick non-crack reconstructions
- 
+            t1_decode = time.time()
+            self.ttotal_decode += t1_decode - t0_decode
+
+            t0_pp = time.time()
             # Convert rgb channels to grayscale and revert normalization to [0,1]
             x0, x1          = post_process.to_gray_0_1(x0), post_process.to_gray_0_1(x1)
             ood_score       = post_process.get_OOD_score(x0=x0, x1=x1)
-
+            t1_pp = time.time()
+            self.ttotal_pp += t1_pp - t0_pp
+            
             # Append scores
             self.test_losses.append(ood_score)
             self.test_labels.append(y)
@@ -301,7 +314,10 @@ class DenoisingDiffusionLitModule(LightningModule):
 
         self.end_time = time.time()
         inference_time = self.end_time - self.start_time
-        print(f"Inference time: {inference_time:.4f} seconds")
+        print(f"{'Total inference time:':<30}{inference_time:.3f} seconds")
+        print(f"{'Reconstruct inference time:':<30}{self.ttotal_recon:.3f} seconds")
+        print(f"{'Decode inference time:':<30}{self.ttotal_decode:.3f} seconds")
+        print(f"{'Post-process inference time:':<30}{self.ttotal_pp:.3f} seconds")
         
         # Clear variables
         self.train_epoch_loss.clear()
