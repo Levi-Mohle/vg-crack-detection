@@ -10,7 +10,7 @@ from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torch.utils.data import DataLoader
 from skimage.metrics import structural_similarity
-from scipy.signal import convolve2d
+from sklearn.metrics import roc_curve, roc_auc_score
 from torchvision.transforms import transforms
 import skimage.morphology as morhpology
 from tqdm import tqdm
@@ -20,7 +20,12 @@ wd = Path(__file__).parent.parent
 sys.path.append(str(wd))
 
 from src.data.components.transforms import *
-from src.models.components.utils.evaluation import *
+# Local imports
+import src.models.components.utils.evaluation as evaluation
+import src.models.components.utils.post_process as post_process
+import src.models.components.utils.visualization as visualization
+import src.models.components.utils.h5_support as h5_support
+
 from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstructs
 
 # %% Load data
@@ -63,10 +68,10 @@ def class_reconstructs_2ch(x, reconstructs, target, plot_ids, win_size=5, fs=12)
     ssim_orig_vs_reconstruct = []
     for i, reconstruct in enumerate(reconstructs):
         # Calculate SSIM between original sample and all reconstructed labels
-        _, ssim_img = ssim_for_batch(x, reconstructs[i], win_size)
+        _, ssim_img = post_process.ssim_for_batch(x, reconstructs[i], win_size)
         ssim_orig_vs_reconstruct.append(ssim_img) # (ssim_img > -0.1).astype(int)
         
-    _, ssim_l0_vs_l1 = ssim_for_batch(reconstructs[0], reconstructs[1], win_size)
+    _, ssim_l0_vs_l1 = post_process.ssim_for_batch(reconstructs[0], reconstructs[1], win_size)
 
     extent = [0,4,0,4]
     for i in plot_ids:
@@ -262,7 +267,7 @@ def OOD_score(x0, x1, x2):
     
     """
     # Obtain SSIM between x1 and x2
-    _, ssim_img             = ssim_for_batch(x1, x2)
+    _, ssim_img             = post_process.ssim_for_batch(x1, x2)
     # Change ssim to mse for RGB
     ssim_img[:,0] = torch.square(x1[:,0] - x2[:,0])
     # Calculate anomaly maps and OOD-score
@@ -281,7 +286,7 @@ def get_ood_scores(dataloader):
 
             # ssim, _, _ = OOD_proxy(r0, r1)
             # _, ssim = OOD_proxy_filtered(x, r0)
-            x, r0       = to_gray_0_1(x), to_gray_0_1(r0)
+            x, r0       = post_process.to_gray_0_1(x), post_process.to_gray_0_1(r0)
             _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
 
             predictions.append(ood_score)
@@ -294,7 +299,7 @@ def get_ood_scores(dataloader):
 
             # ssim, _, _ = OOD_proxy(r0, r1)
             # _, ssim = OOD_proxy_filtered(x, r0)
-            x, r0       = to_gray_0_1(x), to_gray_0_1(r0)
+            x, r0       = post_process.to_gray_0_1(x), post_process.to_gray_0_1(r0)
             _, ood_score = OOD_score(x0=x, x1=x, x2=r0)
 
             predictions.append(ood_score)
@@ -312,7 +317,7 @@ def classify(dataloader):
     # classify_metrics(y_score, y_true)
     # plot_histogram(y_score, y_true)
     _, _, thresholds    = roc_curve(y_true, y_score)
-    print_confusion_matrix(y_score, y_true, thresholds)
+    evaluation.print_confusion_matrix(y_score, y_true, thresholds)
 
 def plotting(x, ssim, post, idx=0):
     z = np.concatenate([x, ssim, post], axis=1)
@@ -351,41 +356,41 @@ def plotting_lifted_edge(x, recon, y, idx=0):
 
     return sobel
 
-def threshold_mover(y_score, y_true, step_backward=0):
+# def threshold_mover(y_score, y_true, step_backward=0):
 
-    auc_score           = roc_auc_score(y_true, y_score)
-    _, _, thresholds    = roc_curve(y_true, y_score)
-    np.append(thresholds, -np.inf)
+#     auc_score           = roc_auc_score(y_true, y_score)
+#     _, _, thresholds    = roc_curve(y_true, y_score)
+#     np.append(thresholds, -np.inf)
 
-    best_accuracy = 0
-    best_threshold = None
+#     best_accuracy = 0
+#     best_threshold = None
 
-    for i, th in enumerate(thresholds):
-        y_pred      = (y_score >= th).astype(int)
-        accuracy    = np.mean(y_pred == y_true)
+#     for i, th in enumerate(thresholds):
+#         y_pred      = (y_score >= th).astype(int)
+#         accuracy    = np.mean(y_pred == y_true)
 
-        if accuracy > best_accuracy:
-            best_y_pred     = y_pred
-            best_accuracy   = accuracy
-            best_threshold  = th
-            best_i          = i
+#         if accuracy > best_accuracy:
+#             best_y_pred     = y_pred
+#             best_accuracy   = accuracy
+#             best_threshold  = th
+#             best_i          = i
 
-    y_pred      = (y_score >= thresholds[best_i+step_backward]).astype(int)
-    accuracy    = np.mean(y_pred == y_true)
+#     y_pred      = (y_score >= thresholds[best_i+step_backward]).astype(int)
+#     accuracy    = np.mean(y_pred == y_true)
     
-    cm = confusion_matrix(y_true, y_pred)
-    name_true = ["No crack true", "Crack true"]
-    name_pred = ["No crack pred", "Crack pred"]
-    cm_df = DataFrame(cm, index=name_true, columns=name_pred)
+#     cm = confusion_matrix(y_true, y_pred)
+#     name_true = ["No crack true", "Crack true"]
+#     name_pred = ["No crack pred", "Crack pred"]
+#     cm_df = DataFrame(cm, index=name_true, columns=name_pred)
 
-    print("##############################################")
-    print(f"Confusion Matrix for best accuracy {accuracy:.3f}:")
-    print(cm_df)
-    print("")
-    print(f"Given best threshold value: {thresholds[best_i+step_backward]}")
-    print(f"AUC score: {auc_score:.3f}")
-    print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
-    print("##############################################")
+#     print("##############################################")
+#     print(f"Confusion Matrix for best accuracy {accuracy:.3f}:")
+#     print(cm_df)
+#     print("")
+#     print(f"Given best threshold value: {thresholds[best_i+step_backward]}")
+#     print(f"AUC score: {auc_score:.3f}")
+#     print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
+#     print("##############################################")
 
 
 
@@ -394,7 +399,7 @@ def threshold_mover(y_score, y_true, step_backward=0):
 y_score, y_true = get_ood_scores(dataloader)
 
 # %%
-plot_classification_metrics(y_score, y_true)
+evaluation.plot_classification_metrics(y_score, y_true)
 # plot_histogram(y_score, y_true)
 # print(y_score)
 # print(y_true)
@@ -408,9 +413,9 @@ print(idx)
 # Plotting post process results
 idx = 59
 if cfg:
-    _, ssim_img             = ssim_for_batch(x, reconstructs[0])
+    _, ssim_img             = post_process.ssim_for_batch(x, reconstructs[0])
 else:
-    _, ssim_img             = ssim_for_batch(x, reconstructs)
+    _, ssim_img             = post_process.ssim_for_batch(x, reconstructs)
 ano_maps, ood_score     = post_process_ssim(x, ssim_img)
 plotting(x, ssim_img, np.expand_dims(ano_maps, axis=1), idx=idx)
 print(np.sum(ood_score[idx]))
@@ -420,7 +425,7 @@ plt.imshow(sobel_filt)
 # %%
 i = 11
 # x, r0 = rgb.numpy(), r_rgb.numpy()
-x, r0       = to_gray_0_1(rgb).numpy(), to_gray_0_1(r_rgb).numpy()
+x, r0       = post_process.to_gray_0_1(rgb).numpy(), post_process.to_gray_0_1(r_rgb).numpy()
 ssim,  img_ssim = structural_similarity(x[i], 
                                         r0[i],
                                         win_size=5,
@@ -445,13 +450,13 @@ fig.tight_layout()
 # %% Plotting MSE
 
 id        = 1
-xgray     = to_gray_0_1(x)
-rgray     = to_gray_0_1(reconstructs)
+xgray     = post_process.to_gray_0_1(x)
+rgray     = post_process.to_gray_0_1(reconstructs)
 # Taking MSE
 mse       = torch.square(xgray-rgray)
 
 # Taking SSIM
-_, ssim_img             = ssim_for_batch(xgray, rgray)
+_, ssim_img             = post_process.ssim_for_batch(xgray, rgray)
 
 images = torch.concat([xgray, rgray, mse, torch.tensor(ssim_img)], dim=1)
 fig, axes = plt.subplots(4,2, figsize=(10,20))

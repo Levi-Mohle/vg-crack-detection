@@ -4,13 +4,13 @@ This repository contains Python code for training and evaluating generative mach
 
 ## Table of Contents
 
-- Introduction
-- [Installation] Usage
-- Dataset
-- Model Training
-- [Evaluation](#evaluationontributing
+- [Introduction](#introduction)
+- [Installation](#installation)
+- [Dataset](#dataset)
+- [Model Training](#model-training)
+- [Evaluation](#evaluation)
 - License
-- Acknowledgements
+- [Acknowledgements](#acknowledgements)
 
 ## Introduction
 
@@ -21,21 +21,22 @@ This project aims to develop and evaluate generative machine learning models for
 To get started, clone this repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/yourusername/your-repo-name.git
-cd your-repo-name
-pip install -r requirements.txt
+git clone https://github.com/levimohle/ml-crack-detection-van-gogh.git
+cd ml-crack-detection-van-gogh
+pip install -r requirements.yaml
 ```
 
 ## Dataset
+
 
 ## Model Training
 
 ```bash
 # Example command to train the model
-python train.py --config config/train_config.yaml
+python train.py experiment=impasto_cddpm_final trainer=ddp trainer.devices=2
 
 # Example command to evaluate the model
-python evaluate.py --model_path models/best_model.pth --data_path data/test
+python eval.py +experiment=impasto_cddpm_final trainer=gpu ckpt_path=/best_model.ckpt
 ```
 
 ## Evaluation
