@@ -83,7 +83,7 @@ def plot_classification_metrics(y_score, y_true, save_dir=None, fs=12):
     axes[1].set_title('ROC', fontsize=fs)
     axes[1].set_ylabel('True Positive Rate', fontsize=fs)
     axes[1].set_xlabel('False Positive Rate', fontsize=fs)
-    axes[1].legend([f"AUC {auc_score:.3f}"], fontsize=12)
+    axes[1].legend([f"AUC {auc_score:.4f}"], fontsize=12)
     axes[1].set_box_aspect(1)
     axes[1].plot([0, 1], [0, 1], ls="--")
     
@@ -120,8 +120,9 @@ def print_confusion_matrix(y_score, y_true, thresholds):
     auc_score = roc_auc_score(y_true, y_score)
     
     # Calculate ROC curve
-    fpr, tpr, _ = roc_curve(y_true, y_score)
+    fpr, tpr, thresholds = roc_curve(y_true, y_score)
     fpr95 = fpr[np.argmax(tpr >= 0.95)]
+    fpr95_threshold = thresholds[np.argmax(tpr >= 0.95)]
     
     # Append -inf to thresholds
     np.append(thresholds, -np.inf)
@@ -150,16 +151,17 @@ def print_confusion_matrix(y_score, y_true, thresholds):
     
     # Print the confusion matrix and various classification metrics
     print("##############################################")
-    print(f"Confusion Matrix for best F1-score {best_f1:.3f}:")
+    print(f"Confusion Matrix for best F1-score {best_f1:.4f}:")
     print(cm_df)
     print("")
-    print(f"{'AUC:':<20}{auc_score:.3f}")
-    print(f"{'FPR @ 95% Recall:':<20}{fpr95:.3f}")
+    print(f"{'AUC:':<20}{auc_score:.4f}")
+    print(f"{'FPR @ 95% Recall:':<20}{fpr95:.4f}")
+    print(f"{'Threshold at FPR @ 95% Recall: ':<40}{fpr95_threshold:.1f}")
     print("")
     print(f"Given threshold value @ best F1-score: {best_threshold}")
-    print(f"{'Accuracy:':<20}{accuracy:.3f}")
-    print(f"{'Precision:':<20}{cm[1,1]/(cm[0,1]+cm[1,1]):.3f}")
-    print(f"{'Recall:':<20}{cm[1,1]/(cm[1,0]+cm[1,1]):.3f}")
+    print(f"{'Accuracy:':<20}{accuracy:.4f}")
+    print(f"{'Precision:':<20}{cm[1,1]/(cm[0,1]+cm[1,1]):.4f}")
+    print(f"{'Recall:':<20}{cm[1,1]/(cm[1,0]+cm[1,1]):.4f}")
     print(f"{'Misclassification:':<20}{cm[0,1]+cm[1,0]}")
     print("##############################################")
 

@@ -30,15 +30,6 @@ def to_gray_0_1(x):
     
     return x
 
-def to_gray_0_1(x):
-     # Convert first 3 channels (rgb) to gray-scale
-     x_gray = rgb_to_grayscale(x[:,:3])
-     # Concatentate result with height channel
-     x = torch.cat((x_gray, x[:,3:]), dim=1)
-     # Normalize back to [0,1]
-     x = (x+1)/2
-     return x
-
 def ssim_for_batch(batch, r_batch, win_size=5):
     """
     Calculate the Structural Similarity Index (SSIM) for a batch of images.

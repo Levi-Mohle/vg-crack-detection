@@ -23,8 +23,6 @@ from src.data.components.transforms import *
 # Local imports
 import src.models.components.utils.evaluation as evaluation
 import src.models.components.utils.post_process as post_process
-import src.models.components.utils.visualization as visualization
-import src.models.components.utils.h5_support as h5_support
 
 from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstructs
 
@@ -37,7 +35,7 @@ from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstr
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-14_cDDIM2_0.4_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realAB_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realBI_1.4_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-28_cDDPM_0.4_realBI_1.4_reconstructs.h5"
 
 cfg = False
 reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
@@ -355,44 +353,6 @@ def plotting_lifted_edge(x, recon, y, idx=0):
     plt.show()
 
     return sobel
-
-# def threshold_mover(y_score, y_true, step_backward=0):
-
-#     auc_score           = roc_auc_score(y_true, y_score)
-#     _, _, thresholds    = roc_curve(y_true, y_score)
-#     np.append(thresholds, -np.inf)
-
-#     best_accuracy = 0
-#     best_threshold = None
-
-#     for i, th in enumerate(thresholds):
-#         y_pred      = (y_score >= th).astype(int)
-#         accuracy    = np.mean(y_pred == y_true)
-
-#         if accuracy > best_accuracy:
-#             best_y_pred     = y_pred
-#             best_accuracy   = accuracy
-#             best_threshold  = th
-#             best_i          = i
-
-#     y_pred      = (y_score >= thresholds[best_i+step_backward]).astype(int)
-#     accuracy    = np.mean(y_pred == y_true)
-    
-#     cm = confusion_matrix(y_true, y_pred)
-#     name_true = ["No crack true", "Crack true"]
-#     name_pred = ["No crack pred", "Crack pred"]
-#     cm_df = DataFrame(cm, index=name_true, columns=name_pred)
-
-#     print("##############################################")
-#     print(f"Confusion Matrix for best accuracy {accuracy:.3f}:")
-#     print(cm_df)
-#     print("")
-#     print(f"Given best threshold value: {thresholds[best_i+step_backward]}")
-#     print(f"AUC score: {auc_score:.3f}")
-#     print(f"Recall: {cm[1,1]/(cm[1,0]+cm[1,1])}")
-#     print("##############################################")
-
-
 
 # Classifying
 # classify(dataloader)
