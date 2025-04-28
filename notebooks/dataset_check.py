@@ -13,8 +13,8 @@ wd = Path(__file__).parent.parent
 sys.path.append(str(wd))
 
 from src.data.components.transforms import *
-from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetCustom
-from notebooks.preprocess_latent_space.synthetic_cracks import *
+from notebooks.utils.dataset import HDF5PatchesDatasetCustom
+from notebooks.utils.synthetic_cracks import *
 
 # %% Load the data & model
 # data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"

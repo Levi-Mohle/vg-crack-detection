@@ -23,8 +23,8 @@ import torchvision.transforms.v2 as transforms
 import torchvision.transforms.functional as TF
 
 from src.data.components.transforms import *
-from notebooks.preprocess_latent_space.latent_space import encode_2ch, encode_
-from notebooks.preprocess_latent_space.dataset import   append_h5f_enc, create_h5f_enc, \
+from notebooks.utils.latent_space import encode_2ch, encode_
+from notebooks.utils.dataset import   append_h5f_enc, create_h5f_enc, \
                                                         append_h5f, create_h5f
 
 def crop_mask(bin_mask, margin=10):
@@ -418,82 +418,84 @@ def add_synthetic_cracks_to_h5(dataloader, masks, p, filename, add_cracks=True, 
 
 def encode_and_augment2h5(dataloader, filename, vae, device="cpu"):
     """
+    Encode and augment samples from a dataloader, and save the results to an HDF5 file.
 
     Args:
+        dataloader (torch.utils.data.DataLoader): DataLoader providing batches of samples.
+        filename (str): Name of the output HDF5 file.
+        vae (torch.nn.Module): Variational Autoencoder model used for encoding.
+        device (str, optional): Device to perform computations on. Default is "cpu".
 
-        
-    Returns:
-        
     """
     for i, (rgb, height, id) in enumerate(tqdm(dataloader)):
-
         # Transform normal samples
-        rgb                 = normalize_rgb(rgb)
-        height              = rescale_diffuser_height_idv(height)
+        rgb = normalize_rgb(rgb)
+        height = rescale_diffuser_height_idv(height)
         
-        # Augment
+        # Augment samples with random flips
         p = random.random()
         if p <= 1/3:
-            rgb_aug    = TF.hflip(rgb)
+            rgb_aug = TF.hflip(rgb)
             height_aug = TF.hflip(height)
         elif p > 2/3:
-            rgb_aug    = TF.vflip(rgb)
+            rgb_aug = TF.vflip(rgb)
             height_aug = TF.vflip(height)
         else:
-            rgb_aug    = TF.vflip(TF.hflip(rgb))
+            rgb_aug = TF.vflip(TF.hflip(rgb))
             height_aug = TF.vflip(TF.hflip(height))
-
-        # Encode samples
+        
+        # Encode samples using the VAE model
         rgb_aug, height_aug = encode_2ch(vae, rgb_aug, height_aug, device=device)
-        rgb, height         = encode_2ch(vae, rgb, height, device=device)
-
-        id = np.zeros(2*rgb.shape[0])
-        # Add all samples to new h5 file
+        rgb, height = encode_2ch(vae, rgb, height, device=device)
+        
+        # Initialize target array
+        id = np.zeros(2 * rgb.shape[0])
+        
+        # Save samples to HDF5 file
         if not os.path.exists(filename):
-            # Creating new h5 file
+            # Create new HDF5 file
             create_h5f_enc(filename, 
-                        rgb          = rgb,
-                        rgb_cracks   = rgb_aug,
-                        height       = height,
-                        height_cracks= height_aug,
-                        target       = id
-                        )
+                           rgb=rgb,
+                           rgb_cracks=rgb_aug,
+                           height=height,
+                           height_cracks=height_aug,
+                           target=id)
         else:
-            # Appending h5 file
+            # Append to existing HDF5 file
             append_h5f_enc(filename, 
-                        rgb          = rgb,
-                        rgb_cracks   = rgb_aug,
-                        height       = height,
-                        height_cracks= height_aug,
-                        target       = id
-                        )
+                           rgb=rgb,
+                           rgb_cracks=rgb_aug,
+                           height=height,
+                           height_cracks=height_aug,
+                           target=id)
 
 def encode_and_add2h5(dataloader, filename, vae, device="cpu"):
     """
+    Encode samples from a dataloader and save the results to an HDF5 file.
 
     Args:
+        dataloader (torch.utils.data.DataLoader): DataLoader providing batches of samples.
+        filename (str): Name of the output HDF5 file.
+        vae (torch.nn.Module): Variational Autoencoder model used for encoding.
+        device (str, optional): Device to perform computations on. Default is "cpu".
 
-        
-    Returns:
-        
     """
     for i, (rgb, height, id) in enumerate(tqdm(dataloader)):
         # Transform and encode normal samples
-        rgb                 = normalize_rgb(rgb)
-        height              = rescale_diffuser_height_idv(height)
-        rgb, height         = encode_2ch(vae, rgb, height, device=device)
-
+        rgb = normalize_rgb(rgb)
+        height = rescale_diffuser_height_idv(height)
+        rgb, height = encode_2ch(vae, rgb, height, device=device)
+        
+        # Save samples to HDF5 file
         if not os.path.exists(filename):
-            # Creating new h5 file
+            # Create new HDF5 file
             create_h5f_enc(filename, 
-                        rgb          = rgb,
-                        height       = height,
-                        target       = id
-                        )
+                           rgb=rgb,
+                           height=height,
+                           target=id)
         else:
-            # Appending h5 file
+            # Append to existing HDF5 file
             append_h5f_enc(filename, 
-                        rgb          = rgb,
-                        height       = height,
-                        target       = id
-                        )
+                           rgb=rgb,
+                           height=height,
+                           target=id)

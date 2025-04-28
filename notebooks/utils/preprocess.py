@@ -2,7 +2,9 @@
 Routines to create a preprocessed dataset consisting of mini-patches from a keyence file
 
     Source Name : preprocess.py
-    Contents    : 
+    Contents    : Functions and class to transform HDF5 files from the CAS tool into
+                    a PyTorch Dataset class with mini-patches. Copied from olive-groves/vg
+                    GitHub repository
     Date        : 2025
 
  """

@@ -1,3 +1,14 @@
+"""
+Functions to encode and decode image from and to a latent space, 
+using a pretrained VAE
+
+    Source Name : latent_space.py
+    Contents    : Encoding and decoding functions for both single and dual channel
+                    encoding/decoding
+    Date        : 2025
+
+ """
+
 import torch
 
 def encode_decode(vae, rgb, height, device="cpu"):

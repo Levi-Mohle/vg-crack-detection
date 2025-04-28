@@ -2,7 +2,8 @@
 File io routines for the Keyence height sensor
 
     Source Name : keyence.py
-    Contents    : routines for accessing Keyence sensor data files
+    Contents    : routines for accessing Keyence sensor data files. Copied from olive-groves/vg
+                    GitHub repository
     Date        : 2023
 
     In brief, these are the groups and datasets inside a Keyence h5 file:
