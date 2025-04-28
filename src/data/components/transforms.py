@@ -149,7 +149,7 @@ class Augmentation(transforms.Transform):
 
     def forward(self, rgb, height):
         rgb     = torch.tensor(rgb)
-        height  = torch.tensor(height)
+        height  = torch.tensor(height).to(torch.float32)
 
         if random.random() < self.p:
             rgb     = TF.hflip(rgb)

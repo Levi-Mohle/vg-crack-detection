@@ -16,8 +16,8 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
-from notebooks.preprocess_latent_space.dataset import create_h5f_enc, append_h5f_enc
-from notebooks.preprocess_latent_space.latent_space import *
+from notebooks.utils.dataset import create_h5f_enc, append_h5f_enc
+from notebooks.utils.latent_space import *
 
  
 local = False

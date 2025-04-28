@@ -24,7 +24,7 @@ from src.data.components.transforms import *
 import src.models.components.utils.evaluation as evaluation
 import src.models.components.utils.post_process as post_process
 
-from notebooks.preprocess_latent_space.dataset import HDF5PatchesDatasetReconstructs
+from notebooks.utils.dataset import HDF5PatchesDatasetReconstructs
 
 # %% Load data
 

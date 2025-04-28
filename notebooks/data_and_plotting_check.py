@@ -15,9 +15,9 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
-from src.models.components.utils.evaluation import ssim_for_batch
+from src.models.components.utils.post_process import ssim_for_batch
 # %% Load the data
-lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto",
+lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\ml-crack-detection-van-gogh\data\impasto",
                                     batch_size         = 16,
                                     variant            = "512x512_local",
                                     transform          = Augmentation()
@@ -25,7 +25,7 @@ lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Cod
 lightning_data.setup()
 loader = lightning_data.test_dataloader()
 
-img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
+img_dir = "/data/storage_crack_detection/ml-crack-detection-van-gogh/notebooks/images"
 
 # %% Plot a batch
 
@@ -43,15 +43,15 @@ for i, ax in enumerate(axes.flatten()):
     # ax.imshow(rgb_cracks[i].permute(1,2,0))
     ax.imshow(height[i,0])
     ax.axis("off")
-# %% Check range of values
-avg_diff_gray   = torch.zeros(7)
-avg_diff_height = torch.zeros(7)
+# %% Check range of values (only relevant in case of [0,1] or [-1,1] normalization)
+avg_diff_gray   = []
+avg_diff_height = []
 
 for i, (gray, height, id) in enumerate(loader):
-    avg_diff_gray[i]    = gray.max() - gray.min()
-    avg_diff_height[i]  = height.max() - height.min()
-print(f"mean diff gray: {torch.mean(avg_diff_gray):.2f}")
-print(f"mean diff height: {torch.mean(avg_diff_height):.2f}")
+    avg_diff_gray.append((gray.max() - gray.min()).item())
+    avg_diff_height.append((height.max() - height.min()).item())
+print(f"mean diff gray: {torch.mean(torch.tensor(avg_diff_gray).to(torch.float32)):.2f}")
+print(f"mean diff height: {torch.mean(torch.tensor(avg_diff_height).to(torch.float32)):.2f}")
 
 # %%
 

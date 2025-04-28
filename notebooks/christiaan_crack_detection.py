@@ -15,10 +15,10 @@ from src.models.components.utils.evaluation import *
 # %% Load
 
 # Define directories
-data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
-output_dir    = r"C:\Users\lmohle\Documents\2_Coding\data\output"
+data_dir        = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+output_dir      = r"C:\Users\lmohle\Documents\2_Coding\data\output"
 
-# Read input
+# Read input (only needed for true labels)
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
                                     batch_size         = 80,
                                     variant            = "512x512",
@@ -39,6 +39,7 @@ df_results = pd.read_csv(os.path.join(output_dir, file_name))
 
 # %% Get OOD scores from results .csv
 
+# Using Sum(|Area * dHeight|) as OOD measure
 df_results["ood"] = np.abs(df_results["Area_um2"] * df_results["HeightDifference_um"])
 # df_results["ood"] = np.abs(df_results["Area_um2"])
 # df_results["ood"] = np.abs(df_results["HeightDifference_um"])
