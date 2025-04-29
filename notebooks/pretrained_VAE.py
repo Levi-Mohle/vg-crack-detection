@@ -20,15 +20,14 @@ from notebooks.utils.dataset import create_h5f_enc, append_h5f_enc
 import notebooks.utils.latent_space as latent_space
 
  
-local = True
-
+local = False
+data_dir = os.path.join(wd, "data", "impasto")
+img_dir  = os.path.join(wd, "notebooks", "images")
 if local:
     model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
-    data_dir = r"C:\Users\lmohle\Documents\2_Coding\ml-crack-detection-van-gogh\data\impasto"
     device="cpu"
 else:
     model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
-    data_dir = r"/data/storage_crack_detection/ml-crack-detection-van-gogh/data/impasto"
     device = "cuda"
 
 vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
@@ -46,35 +45,59 @@ train_loader    = lightning_data.train_dataloader()
 val_loader      = lightning_data.val_dataloader()
 test_loader     = lightning_data.test_dataloader()
 
-img_dir = "/data/storage_crack_detection/ml-crack-detection-van-gogh/notebooks/images"
-
-# Encode only
-
-start_time = time.time()
-for rgb, height, _ in tqdm(test_loader):
-    enc1, enc2 = latent_space.encode_2ch(vae, rgb, height, device)
-end_time = time.time()
-inference_time = end_time - start_time
-print(f"Inference time: {inference_time:.4f} seconds")
-
-# %% Encode - Decode data
-
 def undo_norm(x):
     x = (x + 1.) / 2.
     x = x.clamp(0., 1.)
     return x
-# %% Plot results rgb
 
+# # %% Check error / SSIM before and after encoding-decoding
+
+# # Initialize SSIM settings
+# ssim = SSIM(gaussian_kernel=False,
+#             data_range=1,
+#             kernel_size=5).to(device)
+
+# # Create empty lists to store SSIM scores
+# ssim_RGB    = []
+# ssim_HEIGHT = []
+
+# # Loop to encode & decode images and comparing result with SSIM 
+# for rgb, height, _ in (pbar := tqdm(test_loader)):
+#     recon_rgb, recon_height = latent_space.encode_decode(vae, rgb, height, device)
+
+#     ssim_RGB.append(ssim(rgb, recon_rgb))
+#     ssim_HEIGHT.append(ssim(height, recon_height))
+
+#     mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
+#     mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
+    
+#     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
+
+# # Compute standard deviation
+# std_rgb = torch.std(torch.tensor(ssim_RGB),axis=0)
+# std_height = torch.std(torch.tensor(ssim_HEIGHT),axis=0)
+
+# # Print mean + std
+# print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
+# print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")
+
+# %% Encode - Decode data + plot results
+
+# Encode and decode the data
 for rgb, height, _ in test_loader:
     recon_rgb, recon_height = latent_space.encode_decode(vae, rgb, height, device)
     
-    recon_rgb = undo_norm(recon_rgb)
+    recon_rgb    = undo_norm(recon_rgb)
     recon_height = undo_norm(recon_height)
     break
-
+ 
+# Undo normalization on input samples
 rgb2 = undo_norm(rgb)
+height2 = undo_norm(height)
 
 for i in range(rgb.shape[0]):
+    
+    # RGB
     fig, axes = plt.subplots(1, 2, figsize=(12,8))
     axes[0].imshow(rgb2[i].permute(1,2,0))
     # axes[0].set_title(f"Original mini patch", fontsize=16)
@@ -89,10 +112,7 @@ for i in range(rgb.shape[0]):
     fig.savefig(plt_dir)
     plt.close()
     
-    # %% Plot results height
-    
-    height2 = undo_norm(height)
-    
+    # HEIGT
     fig, axes = plt.subplots(1, 2, figsize=(12,8))
     axes[0].imshow(height2[i,0])
     # axes[0].set_title(f"Original mini patch", fontsize=16)
@@ -107,40 +127,6 @@ for i in range(rgb.shape[0]):
     fig.savefig(plt_dir)
     plt.close()
 
-# ONLY DECODING
-
-# for rgb, height, _ in train_loader:
-#     recon_rgb, recon_height = decode(vae, rgb.float(), height.float(), device)
-    
-#     recon_rgb = undo_norm(recon_rgb)
-#     recon_height = undo_norm(recon_height)
-#     break
-
-# i = 3
-# fig, axes = plt.subplots(1, 1, figsize=(12,8))
-
-# axes[0].imshow(recon_rgb[i].permute(1,2,0))
-# axes[0].set_title(f"Reconstructed", fontsize=16)
-# axes[0].axis('off')
-
-# plt_dir = os.path.join(img_dir, "test_rgb")
-# fig.savefig(plt_dir)
-# plt.close()
-
-# # %% Plot results height
-
-# i, j = 3, 2
-# fig, axes = plt.subplots(1, 1, figsize=(12,8))
-
-# axes[0].imshow(recon_height[i,0])
-# axes[0].set_title(f"Reconstructed", fontsize=16)
-# axes[0].axis('off')
-
-# plt_dir = os.path.join(img_dir, "test_height")
-# fig.savefig(plt_dir)
-# plt.close()
-
-
 # %% Save encoded dataset as h5 file
 
 # output_filename_full_h5 = r"/data/storage_crack_detection/ml-crack-detection-van-gogh/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
@@ -154,32 +140,3 @@ for i in range(rgb.shape[0]):
 #     else:
 #         # Appending h5 file
 #         append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
-# %% Check error / SSIM before and after encoding-decoding
-
-# Initialize SSIM settings
-# ssim = SSIM(gaussian_kernel=False,
-#             data_range=1,
-#             kernel_size=11).to(device)
-
-# # Create empty lists to store SSIM scores
-# ssim_RGB    = []
-# ssim_HEIGHT = []
-
-# # Loop to encode & decode images and comparing result with SSIM 
-# for rgb, height, _ in (pbar := tqdm(train_loader)):
-#     recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
-
-#     ssim_RGB.append(ssim(rgb, recon_rgb))
-#     ssim_HEIGHT.append(ssim(height, recon_height))
-
-#     mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
-#     mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
-    
-#     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
-
-# std_rgb = torch.std(torch.tensor(ssim_RGB),axis=0)
-# std_height = torch.std(torch.tensor(ssim_HEIGHT),axis=0)
-
-# # Print mean + std
-# print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
-# print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")
