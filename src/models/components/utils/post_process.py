@@ -70,25 +70,6 @@ def ssim_for_batch(batch, r_batch, win_size=5):
     
     return ssim_batch, ssim_batch_img
 
-# def ssim_for_batch(batch, r_batch, win_size=5):
-#     batch   = batch.cpu().numpy()
-#     r_batch = r_batch.cpu().numpy()
-#     bs = batch.shape[0]
-    
-#     ssim_batch     = np.zeros((batch.shape[0],batch.shape[1]))
-#     ssim_batch_img = np.zeros_like(batch)
-#     for i in range(bs):
-#         for j in range(batch.shape[1]):
-#             ssim,  img_ssim = structural_similarity(batch[i,j], 
-#                                 r_batch[i,j],
-#                                 win_size=win_size,
-#                                 data_range=1,
-#                                 full=True)
-#             ssim_batch_img[i, j] = img_ssim * -1
-#             ssim_batch[i, j]     = np.sum(ssim_batch_img[i, j] > 0)
-    
-#     return ssim_batch, ssim_batch_img
-
 def post_processing(ssim_img):
     """
     Given the input sample x0 and anomaly maps produced with SSIM,

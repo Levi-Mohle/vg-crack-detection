@@ -17,18 +17,18 @@ sys.path.append(str(wd))
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
 from notebooks.utils.dataset import create_h5f_enc, append_h5f_enc
-from notebooks.utils.latent_space import *
+import notebooks.utils.latent_space as latent_space
 
  
-local = False
+local = True
 
 if local:
     model_dir = r"C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL"
-    data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+    data_dir = r"C:\Users\lmohle\Documents\2_Coding\ml-crack-detection-van-gogh\data\impasto"
     device="cpu"
 else:
     model_dir = r"/data/storage_crack_detection/Pretrained_models/AutoEncoderKL"
-    data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
+    data_dir = r"/data/storage_crack_detection/ml-crack-detection-van-gogh/data/impasto"
     device = "cuda"
 
 vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device)
@@ -36,76 +36,76 @@ vae =  AutoencoderKL.from_pretrained(model_dir, local_files_only=True).to(device
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = data_dir,
                                     variant="512x512",
-                                    crack="realBI",
+                                    crack="realAB",
                                     batch_size = 18,
                                     transform = DiffuserTransform()
                                     )
 lightning_data.setup()
 
-train_loader = lightning_data.train_dataloader()
-val_loader = lightning_data.val_dataloader()
-test_loader = lightning_data.test_dataloader()
+train_loader    = lightning_data.train_dataloader()
+val_loader      = lightning_data.val_dataloader()
+test_loader     = lightning_data.test_dataloader()
 
-img_dir = "/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
+img_dir = "/data/storage_crack_detection/ml-crack-detection-van-gogh/notebooks/images"
 
 # Encode only
 
 start_time = time.time()
 for rgb, height, _ in tqdm(test_loader):
-    enc1, enc2 = encode_2ch(vae, rgb, height, device)
+    enc1, enc2 = latent_space.encode_2ch(vae, rgb, height, device)
 end_time = time.time()
 inference_time = end_time - start_time
 print(f"Inference time: {inference_time:.4f} seconds")
 
 # %% Encode - Decode data
 
-# def undo_norm(x):
-#     x = (x + 1.) / 2.
-#     x = x.clamp(0., 1.)
-#     return x
-# # %% Plot results rgb
+def undo_norm(x):
+    x = (x + 1.) / 2.
+    x = x.clamp(0., 1.)
+    return x
+# %% Plot results rgb
 
-# for rgb, height, _ in test_loader:
-#     recon_rgb, recon_height = encode_decode(vae, rgb, height, device)
+for rgb, height, _ in test_loader:
+    recon_rgb, recon_height = latent_space.encode_decode(vae, rgb, height, device)
     
-#     recon_rgb = undo_norm(recon_rgb)
-#     recon_height = undo_norm(recon_height)
-#     break
+    recon_rgb = undo_norm(recon_rgb)
+    recon_height = undo_norm(recon_height)
+    break
 
-# rgb2 = undo_norm(rgb)
+rgb2 = undo_norm(rgb)
 
-# for i in range(rgb.shape[0]):
-#     fig, axes = plt.subplots(1, 2, figsize=(12,8))
-#     axes[0].imshow(rgb2[i].permute(1,2,0))
-#     # axes[0].set_title(f"Original mini patch", fontsize=16)
-#     axes[0].axis('off')
+for i in range(rgb.shape[0]):
+    fig, axes = plt.subplots(1, 2, figsize=(12,8))
+    axes[0].imshow(rgb2[i].permute(1,2,0))
+    # axes[0].set_title(f"Original mini patch", fontsize=16)
+    axes[0].axis('off')
     
-#     axes[1].imshow(recon_rgb[i].permute(1,2,0))
-#     # axes[1].set_title(f"Reconstructed", fontsize=16)
-#     axes[1].axis('off')
+    axes[1].imshow(recon_rgb[i].permute(1,2,0))
+    # axes[1].set_title(f"Reconstructed", fontsize=16)
+    axes[1].axis('off')
 
-#     plt.tight_layout()
-#     plt_dir = os.path.join(img_dir, f"test_rgb_{i}")
-#     fig.savefig(plt_dir)
-#     plt.close()
+    plt.tight_layout()
+    plt_dir = os.path.join(img_dir, f"test_rgb_{i}")
+    fig.savefig(plt_dir)
+    plt.close()
     
-#     # %% Plot results height
+    # %% Plot results height
     
-#     height2 = undo_norm(height)
+    height2 = undo_norm(height)
     
-#     fig, axes = plt.subplots(1, 2, figsize=(12,8))
-#     axes[0].imshow(height2[i,0])
-#     # axes[0].set_title(f"Original mini patch", fontsize=16)
-#     axes[0].axis('off')
+    fig, axes = plt.subplots(1, 2, figsize=(12,8))
+    axes[0].imshow(height2[i,0])
+    # axes[0].set_title(f"Original mini patch", fontsize=16)
+    axes[0].axis('off')
     
-#     axes[1].imshow(recon_height[i,0])
-#     # axes[1].set_title(f"Reconstructed", fontsize=16)
-#     axes[1].axis('off')
+    axes[1].imshow(recon_height[i,0])
+    # axes[1].set_title(f"Reconstructed", fontsize=16)
+    axes[1].axis('off')
 
-#     plt.tight_layout()
-#     plt_dir = os.path.join(img_dir, f"test_height_{i}")
-#     fig.savefig(plt_dir)
-#     plt.close()
+    plt.tight_layout()
+    plt_dir = os.path.join(img_dir, f"test_height_{i}")
+    fig.savefig(plt_dir)
+    plt.close()
 
 # ONLY DECODING
 
@@ -143,7 +143,7 @@ print(f"Inference time: {inference_time:.4f} seconds")
 
 # %% Save encoded dataset as h5 file
 
-# output_filename_full_h5 = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
+# output_filename_full_h5 = r"/data/storage_crack_detection/ml-crack-detection-van-gogh/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
 # for rgb, height, _ in tqdm(test_loader):
 
 #     enc_rgb, enc_height = encode(vae, rgb, height)
