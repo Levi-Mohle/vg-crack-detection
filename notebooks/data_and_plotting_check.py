@@ -22,9 +22,9 @@ from src.data.components.transforms import Augmentation, CNNTransform
 # %% Load the data
 lightning_data = IMPASTO_DataModule(data_dir = r"C:\Users\lmohle\Documents\2_Coding\ml-crack-detection-van-gogh\data\impasto",
                                     batch_size         = 16,
-                                    variant            = "Enc_mix_512x512",
+                                    variant            = "512x512",
                                     transform          = None,
-                                    crack              = "synthetic"
+                                    crack              = "realAB"
                                     )
 lightning_data.setup()
 loader = lightning_data.test_dataloader()
@@ -45,12 +45,14 @@ for i, ax in enumerate(axes.flatten()):
     # ax.imshow(rgb_cracks[i].permute(1,2,0))
     ax.imshow(rgb[i].permute(1,2,0))
     ax.axis("off")
+fig.tight_layout()
 
 fig, axes = plt.subplots(4,4)
 for i, ax in enumerate(axes.flatten()):
     # ax.imshow(rgb_cracks[i].permute(1,2,0))
     ax.imshow(height[i,0])
     ax.axis("off")
+fig.tight_layout()
 
 # Plot individual patch
 idx  = 0
