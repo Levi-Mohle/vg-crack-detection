@@ -14,7 +14,7 @@ This repository contains Python code for training and evaluating generative mach
 
 ## Introduction
 
-This project aims to develop and evaluate generative machine learning models for detecting cracks in paintings by Vincent van Gogh. The models are trained on a dataset of high-resolution images of Van Gogh's paintings, with the goal of identifying and highlighting areas of deterioration.
+This project aims to develop and evaluate generative machine learning models for detecting cracks in paintings by Vincent van Gogh. The models are trained on a dataset of high-resolution images of reproductions of Van Gogh's paintings, with the goal of identifying and highlighting cracks with lifted edges.
 
 ## Installation
 
