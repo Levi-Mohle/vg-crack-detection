@@ -1,3 +1,13 @@
+"""
+Script to apply the baseline crack detection algorithm to the 
+impasto dataset, together with plotting intermediate results
+
+    Source Name : baseline_crack_detecting.py
+    Contents    : Functions to run detection algorithm iteratively and 
+                    obtain classification metrics
+    Date        : 2025
+
+ """
 # %% Load libraries
 import torch
 import numpy as np
@@ -16,25 +26,18 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
-from notebooks.utils.crack_detection import *
+from notebooks.utils.baseline_crack_detection import *
 from src.models.components.utils.evaluation import *
 # %% Load the data
 
-# Choose if run from local machine (true) or SURF cloud (false)
-local = True
-
-if local:
-    data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
-    save_loc = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\notebooks\images"
-    variant = "512x512_local"
-else:
-    data_dir = r"/data/storage_crack_detection/lightning-hydra-template/data/impasto"
-    save_loc = r"/data/storage_crack_detection/lightning-hydra-template/notebooks/images"
-    variant = "512x512"
+# Define directories
+local       = False
+data_dir    = os.path.join(wd, "data", "impasto")
+img_dir     = os.path.join(wd, "notebooks", "images")
 
 lightning_data = IMPASTO_DataModule(data_dir           = data_dir,
                                     batch_size         = 16,
-                                    variant            = variant,
+                                    variant            = "512x512",
                                     crack              = "synthetic"
                                     )
 
@@ -121,18 +124,13 @@ for i, (rgb, height, id) in enumerate(tqdm(loader)):
 
 y_score = np.array(y_score)
 y_true = np.concatenate([y.numpy() for y in y_true]).astype(int)
-# %% Get classification metrics
-
-# plot_histogram(y_score, y_true, save_loc)
-classify_metrics(y_score, y_true)
-plot_classification_metrics(y_score, y_true)
 
 end_time = time.time()
 inference_time = end_time - start_time
 print(f"Inference time: {inference_time:.4f} seconds")
+# %% Get classification metrics
 
-th = 169
-FN = ((y_score >= th) == False) & y_true
-idx = np.where(FN == 1)[0]
-print(idx)
-# %%
+classify_metrics(y_score, y_true)
+plot_histogram(y_score, y_true)
+plot_classification_metrics(y_score, y_true)
+

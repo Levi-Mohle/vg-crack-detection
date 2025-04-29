@@ -1,3 +1,13 @@
+"""
+Script for generating various plots intended to be used in
+university thesis
+
+    Source Name : report_plotting.py
+    Contents    : Functions for plotting
+    Date        : 2025
+
+ """
+
 # %% Load libraries
 import torch
 import numpy as np
@@ -9,12 +19,9 @@ import matplotlib.patches as patches
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torch.utils.data import DataLoader
-from torchvision.transforms import transforms
 from skimage.filters import sobel
-import skimage.morphology as morhpology
-from tqdm import tqdm
-from PIL import Image
-from cv2 import inpaint, INPAINT_NS
+import skimage.morphology as morphology
+import PIL
 
 # add main folder to working directory
 wd = Path(__file__).parent.parent
@@ -22,16 +29,15 @@ sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
 from src.data.components.transforms import *
-from src.models.components.utils.evaluation import *
-from notebooks.utils.synthetic_cracks import *
+from src.models.components.utils.post_process import ssim_for_batch
 from notebooks.utils.dataset import HDF5PatchesDatasetReconstructs
 
 # Choose if run from local machine or SURF cloud
 local = True
 # %% Load the data
 
+data_dir = os.path.join(wd, "data", "impasto")
 if local:
-    data_dir = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
     MPEG_path   = r"C:\Users\lmohle\Documents\2_Coding\data\Datasets\MPEG400"
 else:
     MPEG_path   = r"/data/storage_crack_detection/datasets/MPEG400"
@@ -158,7 +164,7 @@ for idx in range(ssim_img.shape[0]):
     sobel_filt[idx] = (sobel_filt[idx] > .02).astype(int)
     for i in range(ssim_img.shape[1]):
         ssim_filt[idx, i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=95)).astype(int)
-        ssim_filt[idx,i] = morhpology.binary_erosion(ssim_filt[idx,i])
+        ssim_filt[idx,i] = morphology.binary_erosion(ssim_filt[idx,i])
 
     ano_maps[idx] = (
                     (ssim_filt[idx,0]   == 1) & 
@@ -167,7 +173,7 @@ for idx in range(ssim_img.shape[0]):
                     ).astype(int)
     
     # Opening (Erosion + Dilation) to remove noise + connect shapes
-    ano_maps[idx] = morhpology.opening(ano_maps[idx])
+    ano_maps[idx] = morphology.opening(ano_maps[idx])
 
 idx     = 9
 fig, axes = plt.subplots(2,1, figsize=(12,8))
@@ -216,10 +222,10 @@ gt_dirs     = [os.path.join(MPEG_path, "MPEG400-GT", "png", f) \
                 if cat_name in f]
 for (img_dir, gt_dir) in zip(img_dirs, gt_dirs):
     # Open, invert and transform to grayscale
-    orig_img = np.array(PIL.ImageOps.invert(Image.open(img_dir)).convert('L'))
+    orig_img = np.array(PIL.ImageOps.invert(PIL.Image.open(img_dir)).convert('L'))
     orig_img = (orig_img > 100).astype(np.uint8)
 
-    gt_img = np.array(Image.open(gt_dir).convert('L'))
+    gt_img = np.array(PIL.Image.open(gt_dir).convert('L'))
     gt_img = (gt_img > 100).astype(np.uint8)
     
     # Thickening the skeletal image to improve shape extraction
@@ -255,7 +261,7 @@ fs =14
 fig, axes = plt.subplots(1,2, figsize=(10,15), width_ratios=[1,1.08])
 extent = [0,24,0,24]
 for i, ax in enumerate(axes.flatten()):
-    img = Image.open(dirs[i])
+    img = PIL.Image.open(dirs[i])
     if i ==1:
         img = np.array(img)
         img = (img.astype(np.float32)) * 25*10**(-4)

@@ -1,10 +1,19 @@
+"""
+Script to encode images to a smaller latent space, using a
+pre-trained VAE. Includes functions to test quality of autoencoding,
+plotting functions and possibility to save encodings in new HDF5 file
+
+    Source Name : autoencoding.py
+    Contents    : Functions to encode, decode, plot and save images
+    Date        : 2025
+
+ """
 # %% Load libraries + pretrained VAE
 import torch
 from diffusers.models import AutoencoderKL
 import numpy as np
 import os
 import sys
-import time
 from pathlib import Path
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -19,7 +28,7 @@ from src.data.components.transforms import *
 from notebooks.utils.dataset import create_h5f_enc, append_h5f_enc
 import notebooks.utils.latent_space as latent_space
 
- 
+# Define directories
 local = False
 data_dir = os.path.join(wd, "data", "impasto")
 img_dir  = os.path.join(wd, "notebooks", "images")
@@ -50,36 +59,36 @@ def undo_norm(x):
     x = x.clamp(0., 1.)
     return x
 
-# # %% Check error / SSIM before and after encoding-decoding
+# %% Check error / SSIM before and after encoding-decoding
 
-# # Initialize SSIM settings
-# ssim = SSIM(gaussian_kernel=False,
-#             data_range=1,
-#             kernel_size=5).to(device)
+# Initialize SSIM settings
+ssim = SSIM(gaussian_kernel=False,
+            data_range=1,
+            kernel_size=5).to(device)
 
-# # Create empty lists to store SSIM scores
-# ssim_RGB    = []
-# ssim_HEIGHT = []
+# Create empty lists to store SSIM scores
+ssim_RGB    = []
+ssim_HEIGHT = []
 
-# # Loop to encode & decode images and comparing result with SSIM 
-# for rgb, height, _ in (pbar := tqdm(test_loader)):
-#     recon_rgb, recon_height = latent_space.encode_decode(vae, rgb, height, device)
+# Loop to encode & decode images and comparing result with SSIM 
+for rgb, height, _ in (pbar := tqdm(test_loader)):
+    recon_rgb, recon_height = latent_space.encode_decode(vae, rgb, height, device)
 
-#     ssim_RGB.append(ssim(rgb, recon_rgb))
-#     ssim_HEIGHT.append(ssim(height, recon_height))
+    ssim_RGB.append(ssim(rgb, recon_rgb))
+    ssim_HEIGHT.append(ssim(height, recon_height))
 
-#     mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
-#     mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
+    mean_rgb    = sum(ssim_RGB) / len(ssim_RGB)
+    mean_height = sum(ssim_HEIGHT) / len(ssim_HEIGHT)
     
-#     pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
+    pbar.set_description(f"{mean_rgb:.2f}, {mean_height:.2f}")
 
-# # Compute standard deviation
-# std_rgb = torch.std(torch.tensor(ssim_RGB),axis=0)
-# std_height = torch.std(torch.tensor(ssim_HEIGHT),axis=0)
+# Compute standard deviation
+std_rgb = torch.std(torch.tensor(ssim_RGB),axis=0)
+std_height = torch.std(torch.tensor(ssim_HEIGHT),axis=0)
 
-# # Print mean + std
-# print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
-# print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")
+# Print mean + std
+print(f"The mean SSIM for RGB image: {mean_rgb:.5f}, std: {std_rgb:.5f}")
+print(f"The mean SSIM for height images: {mean_height:.5f}, std: {std_height:.5f}")
 
 # %% Encode - Decode data + plot results
 
@@ -129,14 +138,14 @@ for i in range(rgb.shape[0]):
 
 # %% Save encoded dataset as h5 file
 
-# output_filename_full_h5 = r"/data/storage_crack_detection/ml-crack-detection-van-gogh/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
-# for rgb, height, _ in tqdm(test_loader):
+output_filename_full_h5 = r"/data/storage_crack_detection/ml-crack-detection-van-gogh/data/impasto/2025-01-07_Enc_Real_Crack512x512_test.h5"
+for rgb, height, _ in tqdm(test_loader):
 
-#     enc_rgb, enc_height = encode(vae, rgb, height)
+    enc_rgb, enc_height = latent_space.encode(vae, rgb, height)
 
-#     if not os.path.exists(output_filename_full_h5):
-#         # Creating new h5 file
-#         create_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
-#     else:
-#         # Appending h5 file
-#         append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
+    if not os.path.exists(output_filename_full_h5):
+        # Creating new h5 file
+        create_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)
+    else:
+        # Appending h5 file
+        append_h5f_enc(output_filename_full_h5, enc_rgb, enc_height)

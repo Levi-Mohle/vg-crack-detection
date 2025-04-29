@@ -1,3 +1,12 @@
+"""
+Script for combining split HDF5 files
+
+    Source Name : report_plotting.py
+    Contents    : Function for combining HDF5 files
+    Date        : 2025
+
+ """
+
 from utils.dataset import combine_h5_files
 
 input_folder    = r"/data/storage_rtx2080/repos/lightning-hydra-template/data/impasto/512x512/splits"

@@ -2,7 +2,7 @@
 Script to post-process decoded reconstructions obtained 
 from the machine learning model 
 
-    Source Name : dataset.py
+    Source Name : post_processing.py
     Contents    : Post processing + plotting functions
     Date        : 2025
 

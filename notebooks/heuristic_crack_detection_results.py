@@ -1,3 +1,12 @@
+"""
+Script load csv file results from a classical computervision algorithm,
+a heuristic method, and evaluate results according to the metrics
+
+    Source Name : heuristic_crack_detection_result.py
+    Contents    : Functions to load csv data and evaluate results
+    Date        : 2025
+
+ """
 # %%
 import pandas as pd
 import numpy as np
@@ -10,12 +19,12 @@ wd = Path(__file__).parent.parent
 sys.path.append(str(wd))
 
 from src.data.impasto_datamodule import IMPASTO_DataModule
-from src.models.components.utils.evaluation import *
+from src.models.components.utils.evaluation import classify_metrics
 
 # %% Load
 
 # Define directories
-data_dir        = r"C:\Users\lmohle\Documents\2_Coding\lightning-hydra-template\data\impasto"
+data_dir        = r"C:\Users\lmohle\Documents\2_Coding\ml-crack-detection-van-gogh\data\impasto"
 output_dir      = r"C:\Users\lmohle\Documents\2_Coding\data\output"
 
 # Read input (only needed for true labels)
@@ -35,7 +44,7 @@ y_true = id.numpy()
 
 # Read output
 file_name   = "christiaan_results.csv"
-df_results = pd.read_csv(os.path.join(output_dir, file_name))
+df_results  = pd.read_csv(os.path.join(output_dir, file_name))
 
 # %% Get OOD scores from results .csv
 
@@ -54,4 +63,6 @@ for j, id in enumerate(np_summed[:,0]):
 
 # %% Apply evaluation metrics
 classify_metrics(ood_scores, y_true)
+
+
 # %%
