@@ -14,7 +14,7 @@ h5py
 opencv-contrib-python
 pytest
 pmtiles
-sonref
+jsonref
 jsonschema-fill-default
 
 # --------- machine learning --------- #
