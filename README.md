@@ -7,6 +7,7 @@ This repository contains Python code for training and evaluating generative mach
 - [Introduction](#introduction)
 - [Installation](#installation)
 - [Dataset](#dataset)
+- [Models](#models)
 - [Model Training](#model-training)
 - [Evaluation](#evaluation)
 - [Citation](#citation)
@@ -18,6 +19,10 @@ This repository contains Python code for training and evaluating generative mach
 This project aims to develop and evaluate generative machine learning models for detecting cracks in paintings by Vincent van Gogh. The models are trained on a dataset of high-resolution images of reproductions of Van Gogh's paintings, with the goal of identifying and highlighting cracks with lifted edges. More specifically, generative models are used for reconstruction-based out of distribution detection, therefore this repository features multiple generative models for that purpose.
 
 This repository is forked from [HERE](https://github.com/ashleve/lightning-hydra-template), a convenient template for machine learning related experiments. Any documentation regarding training, validating and testing machine learning models, can be found in there. The READme of this repository is also included in the `docs` folder
+
+<p align="center">
+  <img src="imgs/inference.png" width="60%" alt='Inference pipeline' title="Reconstruction based OOD detection">
+</p>
 
 ## Installation
 
@@ -31,26 +36,71 @@ pip install -r requirements.yaml
 
 ## Dataset
 
-The dataset contains RGB images and height maps of 512x512 px, from reproductions of Van Gogh paintings. Below some examples are included.
+The dataset contains RGB images and height maps of 512x512 px, from reproductions of Van Gogh paintings. Below some examples are included. 
 
 <p align="center">
-  <img src="imgs/rgb_example.png" width="40%" alt='RGB images'>
-  <img src="imgs/height_example.png" width="40%" alt='Height images'>
+  <img src="imgs/rgb_example.png" width="40%" alt='RGB images' title="RGB image patches">
+  <img src="imgs/height_example.png" width="40%" alt='Height images' title="Height image patches">
 </p>
 
-## Model Training
+The patches are taken from 2 paintings made by Harm Belt, called _Almond Blossom_ and _Big Impasto_, shown below
+
+<p align="center">
+  <img src="imgs/almondblossom_comp.png" width="35%" alt='Almond blossom painting' title='Almond blossom painting'>
+  <img src="imgs/bigimpasto_comp.png" width="35%" alt='Big Impasto painting' title='Big Impasto painting'>
+</p>
+
+## Models
+
+### Generative Models
+#### DDPMs
+
+- Vanilla DDPM [`paper`](https://arxiv.org/abs/2006.11239)
+- DDIM [`paper`](https://arxiv.org/abs/2010.02502)
+- conditioned DDPM [`paper`](https://arxiv.org/abs/2305.15956) | Proposed Method
+
+#### Flow Matching
+
+- Flow Matching [`paper`](https://arxiv.org/abs/2006.11239)
+- guided Flow Matching [`paper`](https://arxiv.org/abs/2006.11239)
+
+#### Normalizing Flows
+
+-Vanilla Flow [`paper`](https://arxiv.org/abs/1505.05770)rea;
+-RealNVP [`paper`](https://arxiv.org/abs/1605.08803)
+
+### Deterministic Models
+#### Convolutional Auto Encoder
+
+- CAE
+
+#### CNN classifier
+
+- InceptionV4 [`paper`](https://arxiv.org/abs/1602.07261)
+
+#### Deep Support Vector Data Description
+
+- DeepSVDD [`paper`](https://proceedings.mlr.press/v80/ruff18a.html)
+
+
+
+## Training
+
+All model parameters are described in a `.yaml` file in the `configs\experiment`, which can be specified when running the PyTorch Lightning template. See `docs/README_LightningHydraTemplate.md` for more specific training commands/features of this template.
 
 ```bash
-# Example command to train the model
+# Example command to train the model with 2 GPUs
 python train.py experiment=impasto_cddpm_final trainer=ddp trainer.devices=2
 
-# Example command to evaluate the model
+# Example command to evaluate the model on single GPU
 python eval.py +experiment=impasto_cddpm_final trainer=gpu ckpt_path=/best_model.ckpt
 ```
 
 ## Evaluation
 
 ## Acknowledgements
+
+The [`GenerativeZoo`](https://github.com/caetas/GenerativeZoo) repository has a great collection of generative models and has been used as a basis for building my own generative models. Please make sure to visit this repository if you are in need of generative models.
 
 ## Citation
 If you publish work that uses the work presented in this repository, please cite ml-crack-detection-van-gogh as follows:
@@ -82,7 +132,7 @@ year = {2025},
 
 MIT License
 
-Copyright (c) [2025] [Levi Mohle]
+Copyright (c) [2025] [Levi Möhle]
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
