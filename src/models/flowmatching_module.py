@@ -4,6 +4,7 @@ from diffusers.models import AutoencoderKL
 import numpy as np
 import os
 from datetime import datetime
+import time
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -12,8 +13,19 @@ from torchvision.transforms.functional import rgb_to_grayscale
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.support_functions.evaluation import *
-import tqdm
+
+# Local imports
+import src.models.components.utils.evaluation as evaluation
+import src.models.components.utils.post_process as post_process
+import src.models.components.utils.visualization as visualization
+import src.models.components.utils.h5_support as h5_support
+
+
+# For flowmatching
+from flow_matching.path.scheduler import CondOTScheduler
+from flow_matching.path import AffineProbPath
+from flow_matching.solver import Solver, ODESolver
+from flow_matching.utils import ModelWrapper
 
 class FlowMatchingLitModule(LightningModule):
     def __init__(
@@ -22,30 +34,57 @@ class FlowMatchingLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         FM_param: DictConfig,
-        OT,
         compile,
         paths: DictConfig,
     ):
-        """Flow matching.
+        """Flow matching models, implemented from https://github.com/facebookresearch/flow_matching
 
         Args:
-
+            unet (torch.nn.Module) : unet architecture, configured with its own parameters 
+                                    under model.unet in config file
+            optimizer (torch.optim.Optimizer) : optimizer for training neural network
+            scheduler (torch.optim.lr_scheduler) : scheduler of the learning rate
+            FM_param (DictConfig) : Flow matching related parameters
+            compile (Boolean) : For faster training if True
+            paths (DictConfig) : Config file containing relative paths for saving images/models etc.
         """
         super().__init__()
 
         self.save_hyperparameters(logger=False)
         self.save_hyperparameters(ignore=['unet'])
 
-        self.unet              = unet
+        # Configure NN for predicting vector field
+        self.vf              = unet.to(self.device)
 
         # Configure FM related parameters dict
-        self.FM_param          = FM_param
-        
-        # Configure Optimal Transport
-        self.ot_sampler = OT
+        self.FM_param           = FM_param
 
-        if self.FM_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.FM_param.pretrained,
+        self.n_classes          = FM_param.n_classes
+        self.encode             = FM_param.encode
+        self.pretrained_dir     = FM_param.pretrained_dir
+        self.step_size          = FM_param.step_size
+        self.dropout_prob       = FM_param.dropout_prob
+        self.guidance_strength  = FM_param.guidance_strength
+        self.reconstruct        = FM_param.reconstruct
+        self.wh                 = FM_param.wh
+        self.batch_size         = FM_param.batch_size
+        self.save_reconstructs  = FM_param.save_reconstructs
+        self.plot_n_epoch       = FM_param.plot_n_epoch
+        self.target_index       = FM_param.target_index
+        self.solver_lib         = FM_param.solver_lib
+        self.solver             = FM_param.solver
+        self.mode               = FM_param.mode
+        self.plot               = FM_param.plot
+        self.plot_ids           = FM_param.plot_ids
+        self.ood                = FM_param.ood
+        self.win_size           = FM_param.win_size
+
+        # instantiate an affine path object for flowmatching
+        self.path = AffineProbPath(scheduler=CondOTScheduler())
+
+        # In case when data is pre-encoded
+        if self.encode:
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained_dir,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -58,17 +97,19 @@ class FlowMatchingLitModule(LightningModule):
         # Specify fontsize for plots
         self.fs = 16
 
+        # Specify log and image directories
         self.log_dir = paths.log_dir
         self.image_dir = os.path.join(self.log_dir, "images")
         os.makedirs(self.image_dir, exist_ok=True)
 
-        if self.FM_param.save_reconstructs:
+        # Define file name for saving reconstructs
+        if self.save_reconstructs:
             time = datetime.today().strftime('%Y-%m-%d')
             self.reconstruct_dir = os.path.join(self.image_dir, time + "_reconstructs.h5")
         
         self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
-        self.test_loss = MeanMetric()
+        self.val_loss   = MeanMetric()
+        self.test_loss  = MeanMetric()
 
         # Used for inspecting learning curve
         self.train_epoch_loss   = []
@@ -78,8 +119,11 @@ class FlowMatchingLitModule(LightningModule):
         self.test_losses = []
         self.test_labels = []
 
-    def forward(self, x, t):
-        return self.unet(x, t)
+    def forward(self, x, t, y=None):
+        # Convert class labels to Long Tensor for embedding
+        if self.n_classes != None:
+            y = y.type(torch.LongTensor).to(self.device)
+        return self.vf(x=x, timesteps=t, y=y)
     
     def select_mode(self, batch, mode):
         if mode == "both":
@@ -88,10 +132,16 @@ class FlowMatchingLitModule(LightningModule):
             x = batch[1].to(torch.float)
         elif mode == "rgb":
             x = batch[0].to(torch.float)
-        return x
+        
+        # Whether to use class information or not
+        if self.n_classes != None:
+            y = batch[self.target_index]
+        else:
+            y = None
+        return x, y
     
     def encode_data(self, batch, mode):
-        if self.FM_param.latent:
+        if self.encode:
             if mode == "both":
                 x1 = batch[0]
                 x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)
@@ -108,7 +158,7 @@ class FlowMatchingLitModule(LightningModule):
                 with torch.no_grad():
                     x = self.vae.encode(x).latent_dist.sample().mul_(0.18215)
         else:
-            x = self.select_mode(batch, mode)
+            x, _ = self.select_mode(batch, mode)
         return x
     
     def decode_data(self, z, mode):
@@ -129,27 +179,24 @@ class FlowMatchingLitModule(LightningModule):
             return x
         
     def training_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)   
-        y = batch[self.FM_param.target]     
-        loss = self.conditional_flow_matching_loss(x)
+        # x = self.encode_data(batch, self.mode)
+        x, y  = self.select_mode(batch, self.mode)     
+        loss = self.conditional_flow_matching_loss(x, y)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)
-        y = batch[self.FM_param.target] 
-        loss = self.conditional_flow_matching_loss(x)
+        # x = self.encode_data(batch, self.mode)
+        x, y = self.select_mode(batch, self.mode)
+        loss = self.conditional_flow_matching_loss(x, y)
         self.log("val/loss", loss, prog_bar=True)
 
-        # Reconstruct test samples
-        reconstruct = self.reconstruction(x)
-
-        # Pick the second last batch (which is full)
-        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.FM_param.mode)
-            self.last_val_batch = [x, reconstruct]
+         # Only sample every n epochs
+        if (self.current_epoch % self.plot_n_epoch == 0) \
+            & (self.current_epoch != 0):
+            # Pick the second last batch (which is full)
+            if (x.shape[0] == self.batch_size) or (batch_idx == 0):
+                self.last_val_batch = [x, y]
 
     def on_train_epoch_end(self) -> None:
         """Lightning hook that is called when a training epoch ends."""
@@ -158,510 +205,249 @@ class FlowMatchingLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % self.FM_param.plot_n_epoch == 0) \
+        if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample every n epochs
-            plot_loss(self, skip=2)
-            if self.FM_param.latent:
-                self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
-                                                           self.FM_param.mode) 
-                self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], 
-                                                           self.FM_param.mode)    
-            if self.FM_param.mode == "both":
-                self.visualize_reconstructs_2ch(self.last_val_batch[0], 
-                                                self.last_val_batch[1],  
-                                                self.FM_param.plot_ids)
-            else:
-                self.visualize_reconstructs_1ch(self.last_val_batch[0], 
-                                                self.last_val_batch[1], 
-                                                self.FM_param.plot_ids)
-                
-    def reconstruction_loss(self, x, reconstruct, reduction=None):
-        if reduction == None:
-            chl_loss = (x - reconstruct)**2
-        elif reduction == 'batch':
-            chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
+            evaluation.plot_loss(self, skip=2)
 
-        if self.FM_param.mode == "both":
-            return (chl_loss[:,0] + self.FM_param.wh * chl_loss[:,1]).unsqueeze(1)
-        else:
-            return chl_loss
-                
+            x, y = self.last_val_batch
+            if self.n_classes!=None:
+                reconstructs = []
+                reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                        device=self.device)))
+                reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                        device=self.device)))
+            else:
+                reconstructs = self.reconstruction(x, y)
+                                
+            self.last_val_batch = [x, reconstructs, y]
+
+            if self.plot:
+                if self.encode:
+                    self.last_val_batch[0] = self.decode_data(self.last_val_batch[0], 
+                                                               self.mode) 
+                    if self.n_classes!=None:
+                        for i in range(2): 
+                            self.last_val_batch[1][i] = self.decode_data(self.last_val_batch[1][i], self.mode)
+                        # self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
+                    else:
+                        self.last_val_batch[1] = self.decode_data(self.last_val_batch[1], self.mode)
+
+                if self.mode == "both":
+                    visualization.class_reconstructs_2ch(self, 
+                                                        self.last_val_batch[0],
+                                                        self.last_val_batch[1],
+                                                        self.last_val_batch[2], 
+                                                        self.plot_ids)
+         
     def test_step(self, batch, batch_idx):
-        # x = self.encode_data(batch, self.FM_param.mode)
-        x = self.select_mode(batch, self.FM_param.mode)
-        y = batch[self.FM_param.target]
-        self.shape  = x.shape
-        loss        = self.conditional_flow_matching_loss(x)
+
+        if batch_idx == 0:
+            self.start_time = time.time()
+        # x = self.encode_data(batch, self.mode)
+        x, y = self.select_mode(batch, self.mode)
+        loss        = self.conditional_flow_matching_loss(x, y)
         self.log("test/loss", loss, prog_bar=True)
 
-        reconstruct = self.reconstruction(x)
-        self.last_test_batch = [x, reconstruct, y]
+        # Reconstruct twice: with both 0 and 1 label
+        if self.n_classes!=None:
+            reconstructs = []
+            reconstructs.append(self.reconstruction(x, y=torch.zeros(x.shape[0], 
+                                                                device=self.device)))
+            reconstructs.append(self.reconstruction(x, y=torch.ones(x.shape[0], 
+                                                                    device=self.device)))
+        else:
+            reconstructs = self.reconstruction(x, y)
+                
+        # Pick the last full batch or first 
+        if (x.shape[0] == self.batch_size) or (batch_idx == 0):
+            self.last_test_batch = [x, reconstructs, batch[self.target_index]]
 
-        if self.FM_param.ood:
+        if self.ood:
             # Calculate reconstruction loss used for OOD-detection
-            losses = self.reconstruction_loss(x, reconstruct, reduction='batch')
-            self.test_losses.append(losses)
-            self.test_labels.append(y)
+            x0 = self.decode_data(x, self.mode)
+            if self.n_classes!=None:
+                x1 = self.decode_data(reconstructs[0], self.mode) # Only pick non-crack reconstructions
+            else:
+                x1 = self.decode_data(reconstructs, self.mode) # Only pick non-crack reconstructions   
+            
+            # Convert rgb channels to grayscale and revert normalization to [0,1]
+            x0, x1          = post_process.to_gray_0_1(x0), post_process.to_gray_0_1(x1)
+            ood_score       = post_process.get_OOD_score(x0=x0, x1=x1)
 
-        # Pick the last full batch or
-        if (x.shape[0] == self.FM_param.batch_size) or (batch_idx == 0):
-            x = self.select_mode(batch, self.FM_param.mode)
-            self.last_test_batch = [x, reconstruct, y]
-
-        if self.FM_param.save_reconstructs:
-            if self.FM_param.latent:
-                # self.vae.to("cpu")
-                # self.last_test_batch = [self.last_test_batch[0].cpu(),
-                #                        self.last_test_batch[1].cpu(),
-                #                        self.last_test_batch[2].cpu()]
-                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode).cpu()
-                self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode).cpu()
-                self.last_test_batch[2] = self.last_test_batch[2].cpu()
-            save_anomaly_maps(self.reconstruct_dir, self.last_test_batch)
-        
+            # Append scores
+            self.test_losses.append(ood_score)
+            self.test_labels.append(batch[self.target_index])
+                
+        if self.save_reconstructs:
+            if self.encode:
+                x = self.decode_data(x, self.mode).cpu()
+                if self.n_classes != None:
+                    for i in range(2): 
+                        reconstructs[i] = self.decode_data(reconstructs[i], self.mode).cpu()
+                    # reconstructs = self.decode_data(reconstructs, self.mode).cpu()
+                else:
+                    reconstructs = self.decode_data(reconstructs, self.mode).cpu()
+            
+            y = batch[self.target_index].cpu()
+            h5_support.save_reconstructions_to_h5(self.reconstruct_dir, [x, reconstructs, y], cfg=(self.n_classes != None))
+    
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         # Visualizations
         # Save last batch for visualization
+        evaluation.plot_loss(self, skip=1)
 
-        plot_loss(self, skip=1)
+        if self.ood:
+            y_score = np.concatenate([t for t in self.test_losses]) # use t.cpu().numpy() if Tensor
+            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+            
+            # Save OOD-scores and true labels for later use
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
+            
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            evaluation.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
+
+        if self.plot:
+            if self.encode and not(self.save_reconstructs):
+                self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.mode)
+                if self.n_classes!=None:
+                    for i in range(2): 
+                        self.last_test_batch[1][i] = self.decode_data(self.last_test_batch[1][i], self.mode)
+                    # self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
+                else:
+                    self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.mode)
+            
+            if self.mode == "both":
+                if self.n_classes!=None:
+                    visualization.class_reconstructs_2ch(self, 
+                                            self.last_test_batch[0],
+                                            self.last_test_batch[1],
+                                            self.last_test_batch[2],
+                                            self.plot_ids,
+                                            self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2],
+                                            )
+                else:
+                    visualization.visualize_reconstructs_2ch(self, 
+                                               self.last_test_batch[0], 
+                                               self.last_test_batch[1],
+                                               self.last_test_batch[2],
+                                               self.plot_ids,
+                                               self.test_losses[-1] if self.test_losses[-1].shape[0] == self.batch_size else self.test_losses[-2], 
+                                               )
+
+        self.end_time = time.time()
+        inference_time = self.end_time - self.start_time
+        print(f"Inference time: {inference_time:.4f} seconds")
         
-        if self.FM_param.latent:
-            self.last_test_batch[0] = self.decode_data(self.last_test_batch[0], self.FM_param.mode) 
-            self.last_test_batch[1] = self.decode_data(self.last_test_batch[1], self.FM_param.mode)
-        
-        if self.FM_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], 
-                                            self.last_test_batch[1], 
-                                            self.FM_param.plot_ids)
-        else:
-            self.visualize_reconstructs_1ch(self.last_test_batch[0], 
-                                            self.last_test_batch[1], 
-                                            self.FM_param.plot_ids)
-
-        if self.FM_param.ood:
-            plot_histogram(self)
-
         # Clear variables
         self.train_epoch_loss.clear()
         self.val_epoch_loss.clear()
         self.test_losses.clear()
         self.test_labels.clear()
 
-    def conditional_flow_matching_loss(self, x):
+    def conditional_flow_matching_loss(self, x_1, y):
         '''
         Conditional flow matching loss
         :param x: input image
         '''
-        sigma_min   = self.FM_param.sigma_min
-        t           = torch.rand(x.shape[0], device=self.device)
-        noise       = torch.randn_like(x)
-        w           = self.FM_param.guidance_strength
+        t           = torch.rand(x_1.shape[0], device=self.device)
+        
+        if self.n_classes != None:
+            y1          = y.detach().clone()
+            # Randomly change class labels to n + 1 for Classifier Free Guidance
+            indices     = torch.randperm(x_1.shape[0])[:int(self.dropout_prob*x_1.shape[0])]
+            y1[indices]  = self.n_classes - 1
+        else:
+            y1 = None
 
-        if self.FM_param.method == "iCFM":
-            # indepedent Conditional Flow Matching Tong et al.
-            x_t = (1 - (1 - sigma_min) * t[:, None, None, None]) * noise + t[:, None, None, None] * x
-            ut = x - (1 - sigma_min) * noise
-            vt = self(x_t, t).sample
-        elif self.FM_param.method == "ot":
-            # Optimal Transport Flow Matching Tong et al. 
-            t, x_t, ut = self.sample_location_and_conditional_flow(noise, x, t)
-            vt = self(x_t, t).sample
+        # Generate noise
+        x_0       = torch.randn_like(x_1, device=self.device)
+
+        # sample probability path
+        path_sample = self.path.sample(t=t, x_0=x_0, x_1=x_1)
+        
+        # Predict vector field
+        vt = self(path_sample.x_t, path_sample.t, y1)
+        # Actual vector field 
+        ut = path_sample.dx_t
 
         return (vt - ut).square().mean()
-    
-    def sample_xt(self, x0, x1, t, epsilon):
-        """
-        Draw a sample from the probability path N(t * x1 + (1 - t) * x0, sigma), see (Eq.14) [1].
-
-        Parameters
-        ----------
-        x0 : Tensor, shape (bs, *dim)
-            represents the source minibatch
-        x1 : Tensor, shape (bs, *dim)
-            represents the target minibatch
-        t : FloatTensor, shape (bs)
-        epsilon : Tensor, shape (bs, *dim)
-            noise sample from N(0, 1)
-
-        Returns
-        -------
-        xt : Tensor, shape (bs, *dim)
-
-        References
-        ----------
-        [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
-        """
-        mu_t = t[:, None, None, None] * x1 + (1 - t[:, None, None, None]) * x0
-        sigma_t = self.FM_param.sigma_min
-        return mu_t + sigma_t * epsilon
-    
-    def sample_location_and_conditional_flow(self, x0, x1, t=None, return_noise=False):
-        r"""
-        Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
-        and the conditional vector field ut(x1|x0) = x1 - x0, see Eq.(15) [1]
-        with respect to the minibatch OT plan $\Pi$.
-
-        Parameters
-        ----------
-        x0 : Tensor, shape (bs, *dim)
-            represents the source minibatch
-        x1 : Tensor, shape (bs, *dim)
-            represents the target minibatch
-        (optionally) t : Tensor, shape (bs)
-            represents the time levels
-            if None, drawn from uniform [0,1]
-        return_noise : bool
-            return the noise sample epsilon
-
-        Returns
-        -------
-        t : FloatTensor, shape (bs)
-        xt : Tensor, shape (bs, *dim)
-            represents the samples drawn from probability path pt
-        ut : conditional vector field ut(x1|x0) = x1 - x0
-        (optionally) epsilon : Tensor, shape (bs, *dim) such that xt = mu_t + sigma_t * epsilon
-
-        References
-        ----------
-        [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
-        """
-        x0, x1  = self.ot_sampler.sample_plan(x0, x1)
-        noise   = torch.randn_like(x0)
-        xt      = self.sample_xt(x0, x1, t, noise)
-        ut      = x1 - x0
-        
-        if return_noise:
-            return t, xt, ut, noise
-        else:
-            return t, xt, ut
-
-    def guided_sample_location_and_conditional_flow(
-        self, x0, x1, y0=None, y1=None, t=None, return_noise=False
-    ):
-        r"""
-        Compute the sample xt (drawn from N(t * x1 + (1 - t) * x0, sigma))
-        and the conditional vector field ut(x1|x0) = x1 - x0, see Eq.(15) [1]
-        with respect to the minibatch OT plan $\Pi$.
-
-        Parameters
-        ----------
-        x0 : Tensor, shape (bs, *dim)
-            represents the source minibatch
-        x1 : Tensor, shape (bs, *dim)
-            represents the target minibatch
-        y0 : Tensor, shape (bs) (default: None)
-            represents the source label minibatch
-        y1 : Tensor, shape (bs) (default: None)
-            represents the target label minibatch
-        (optionally) t : Tensor, shape (bs)
-            represents the time levels
-            if None, drawn from uniform [0,1]
-        return_noise : bool
-            return the noise sample epsilon
-
-        Returns
-        -------
-        t : FloatTensor, shape (bs)
-        xt : Tensor, shape (bs, *dim)
-            represents the samples drawn from probability path pt
-        ut : conditional vector field ut(x1|x0) = x1 - x0
-        (optionally) epsilon : Tensor, shape (bs, *dim) such that xt = mu_t + sigma_t * epsilon
-
-        References
-        ----------
-        [1] Improving and Generalizing Flow-Based Generative Models with minibatch optimal transport, Preprint, Tong et al.
-        """
-        x0, x1, y0, y1 = self.ot_sampler.sample_plan_with_labels(x0, x1, y0, y1)
-        if return_noise:
-            t, xt, ut, eps = super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
-            return t, xt, ut, y0, y1, eps
-        else:
-            t, xt, ut = super().sample_location_and_conditional_flow(x0, x1, t, return_noise)
-            return t, xt, ut, y0, y1
-        
-    def log_p_base(self, x, reduction='sum', dim=1):
-        log_p = -0.5 * torch.log(2. * self.PI) - 0.5 * x**2.
-        if reduction == 'mean':
-            return torch.mean(log_p, dim)
-        elif reduction == 'sum':
-            return torch.sum(log_p, dim)
-        else:
-            return log_p
-
-    def log_prob(self, x_1, reduction='mean'):
-        ts = torch.linspace(1., 0., int(1 / self.FM_param.step_size))
-
-        for t in ts:
-            if t == 1.:
-                x_t = x_1 * 1.
-                f_t = 0.
-            else:
-                x_t = x_t - self(x_t, t).sample * self.FM_param.step_size
-
-                self.unet.eval()
-                x = torch.FloatTensor(x_t.data)
-                x.requires_grad = True
-                e = torch.randn_like(x)
-                e_grad = torch.autograd.grad(self.unet(x).sum(), x, create_graph=True)[0]
-
-                e_grad_e = e_grad * e
-                f_t = e_grad_e.view(x.shape[0], -1).sum(dim=1)
-
-                self.unet.eval()
-
-        log_p_1 = self.log_p_base(x_t, reduction='sum') - f_t
-
-        if reduction == "mean":
-            return log_p_1.mean()
-        elif reduction == "sum":
-            return log_p_1.sum()
 
     @torch.no_grad()
-    def sample(self, n_samples):
+    def sample(self, n_samples, y):
         '''
         Sample images
         :param n_samples: number of samples
         '''
         x_0 = torch.randn(n_samples, self.shape[1], self.shape[2], self.shape[3], device=self.device)
-
-        def f(t: float, x):
-            return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
         
-        if self.FM_param.solver_lib == 'torchdiffeq':
-            if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver == 'implicit_adams':
-                samples = odeint(f, x_0, t=torch.linspace(0, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, method=self.FM_param.solver, rtol=1e-5, atol=1e-5)
-            else:
-                samples = odeint(f, x_0, t=torch.linspace(0, 1, 2).to(self.device), method=self.FM_param.solver, options={'max_num_steps': 1//self.FM_param.step_size}, rtol=1e-5, atol=1e-5)
-            samples = samples[1]
+        if self.n_classes!= None:
+            # Configure guidance_strength for Classifier Free Guidance
+            omega = self.guidance_strength
+            unknown_class = self.n_classes - 1
+            y_unconditional = (unknown_class * torch.ones(x_0.shape[0], device=self.device)).type(torch.LongTensor)
         else:
-            t=0
-            for i in tqdm(range(int(1/self.FM_param.step_size)), desc='Sampling', leave=False):
-                v = self(x_0, torch.full(x_0.shape[:1], t, device=self.device))
-                x_0 = x_0 + self.FM_param.step_size * v
-                t += self.FM_param.step_size
-            samples = x_0
-        
-        if self.vae is not None:
-            samples = self.vae.decode(samples / 0.18215).sample
-        samples = samples*0.5 + 0.5
-        samples = samples.clamp(0, 1)
+            w = 0
+            y_unconditional = None
 
-        return samples
+        class WrappedModel(ModelWrapper):
+            def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.Tensor, **extras):
+                # Define label vector for unconditional case
+                return (1-omega) * self.model(x, t, y_unconditional) + omega * self.model(x, t, y)
+
+        wrapped_vf = WrappedModel(self.vf)
+        
+        solver = ODESolver(velocity_model=wrapped_vf)
+        sol    = solver.sample(x_init=x_0,
+                                method=self.solver,
+                                step_size=self.step_size,
+                                return_intermediates=False)
+
+        return sol
     
     @torch.no_grad()
-    def reconstruction(self, x):
-        
-        sigma_min = self.FM_param.sigma_min
-        tstart = 1 - self.FM_param.reconstruct
-        e = torch.rand_like(x, device=self.device)
-        
-        xt = (1-(1-sigma_min)*tstart)*e + x*tstart
-        
-        def f(t: float, x):
-            return self(x, torch.full(x.shape[:1], t, device=self.device)).sample
-        
-        if self.FM_param.solver_lib == 'torchdiffeq':
-            if self.FM_param.solver == 'euler' or self.FM_param.solver == 'rk4' or self.FM_param.solver == 'midpoint' \
-            or self.FM_param.solver == 'explicit_adams' or self.FM_param.solver== 'implicit_adams':
-                
-                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), options={'step_size': self.FM_param.step_size}, \
-                                 method=self.FM_param.solver, rtol=1e-5, atol=1e-5)
-            else:
-                reconstruct = odeint(f, xt, t=torch.linspace(tstart, 1, 2).to(self.device), method=self.FM_param.solver, \
-                                 options={'max_num_steps': 1//self.FM_param.step_size}, rtol=1e-5, atol=1e-5)
-            reconstruct = reconstruct[1]
-        else:
-            t=tstart
-            for i in range(int(self.FM_param.reconstruct*(1/self.FM_param.step_size))):
-                v = self(xt, torch.full(xt.shape[:1], t, device=self.device)).sample
-                xt = xt + self.FM_param.step_size * v
-                t += self.FM_param.step_size
-            reconstruct = xt
-        
-        # if self.vae is not None:
-        #     reconstruct = self.vae.decode(reconstruct / 0.18215).sample
-        # reconstruct = reconstruct*0.5 + 0.5
-        # reconstruct = reconstruct.clamp(0, 1)
+    def reconstruction(self, x_1, y):
 
-        return reconstruct
-    
-    @torch.no_grad()
-    def visualize_samples(self, x):
-        # Create figure
-        grid = make_grid(x, nrow=int(np.sqrt(x.shape[0])))
-        plt.figure(figsize=(12,12))
-        plt.imshow(grid.permute(1,2,0).cpu().squeeze(), cmap='gray')
-        plt.axis('off')
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_epoch_sample.png")
-        plt.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        if self.logger.__class__.__name__ == "MLFlowLogger":
-            self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-        # os.remove(image_path)
+        tstart = 1 - self.reconstruct
+        T = torch.linspace(tstart, 1, 10).to(self.device)
+
+        x_0 = torch.rand_like(x_1, device=self.device)
+        x_t = x_1 * tstart + x_0 * (1-tstart)
+        
+        if self.n_classes!= None:
+            # Required for class embedding
+            y = y.type(torch.LongTensor).to(self.device)
+            # Configure guidance_strength for Classifier Free Guidance
+            w = self.guidance_strength
+            unknown_class = self.n_classes - 1
+            y_unconditional = (unknown_class * torch.ones(x_1.shape[0])).type(torch.LongTensor).to(self.device)
+        else:
+            w = 0
+            y_unconditional = None
+
+        device = self.device
+        class WrappedModel(ModelWrapper):
+            def forward(self, x: torch.Tensor, t: torch.Tensor, y: torch.LongTensor, **extras):
+                # Define label vector for unconditional case
+                t = t * torch.ones(x_1.shape[0], device=device)
+                return (1-w) * self.model(x, t, y_unconditional) + w * self.model(x, t, y)
+
+        wrapped_vf = WrappedModel(self.vf)
+        
+        solver = ODESolver(velocity_model=wrapped_vf)
+        sol    = solver.sample(time_grid=T,
+                                x_init=x_t,
+                                method=self.solver,
+                                step_size=self.step_size,
+                                return_intermediates=False,
+                                y = y)
+
+        return sol
     
     def min_max_normalize(self, x, dim=(0,2,3)):
         min_val = x.amin(dim=dim, keepdim=True)
         max_val = x.amax(dim=dim, keepdim=True)
         return (x - min_val) / (max_val - min_val + 1e-8)
-        
-    def visualize_reconstructs_1ch(self, x, reconstruct, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
-
-        # Convert rgb to grayscale for plotting
-        if self.FM_param.mode == 'rgb':
-            x              = rgb_to_grayscale(x)
-            reconstruct    = rgb_to_grayscale(reconstruct)
-            
-        # Calculate pixel-wise squared error per channel + normalize
-        error = ssim_for_batch(x, reconstruct)
-
-        img = [x.cpu(), reconstruct.cpu(), error]
-
-        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
-
-        fig, axes = plt.subplots(nrows=len(plot_ids), ncols=3, 
-                                 width_ratios=[1.08,1,1.08], 
-                                 figsize=(9, 3*len(plot_ids)))
-        
-        plt.subplots_adjust(wspace=0.2, hspace=-0.2)
-        extent = [0,4,0,4]
-        for i, id in enumerate(plot_ids):
-            for j in range(3):
-                if i == 0:
-                     axes[i, j].set_title(title[j], fontsize=self.fs-1)
-                # plot images
-                if j == 2:
-                     im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0)
-                else:
-                    im = axes[i, j].imshow(img[j][i,0], extent=extent, vmin=0, vmax=1)
-                # plot colorbars
-                if j != 1:
-                    divider = make_axes_locatable(axes[i,j])
-                    cax = divider.append_axes("right", size="5%", pad=0.1)
-                    plt.colorbar(im, cax=cax)
-                if i == len(plot_ids) - 1:
-                     axes[i,j].set_xlabel("X [mm]")
-                else:
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-
-                if j == 0:
-                     axes[i,j].set_ylabel("Y [mm]")
-                     axes[i,j].text(-0.4, 0.5, f"Sample {id}", fontsize= self.fs, rotation=90, va="center", ha="center", transform=axes[i,j].transAxes)
-                elif (i < len(plot_ids) - 1) & (j > 0):
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-                else:
-                     axes[i,j].tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-                
-                        
-        plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs.png")
-        fig.savefig(plt_dir)
-        plt.close()
-        # Send figure as artifact to logger
-        # if self.logger.__class__.__name__ == "MLFlowLogger":
-        #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-    
-    def visualize_reconstructs_2ch(self, x, reconstruct, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
-
-        if self.FM_param.latent:
-            x_gray = rgb_to_grayscale(x[:,:3])
-            x = torch.cat((x_gray, x[:,3:]), dim=1)
-            
-            reconstruct_gray = rgb_to_grayscale(reconstruct[:,:3])
-            reconstruct = torch.cat((reconstruct_gray, reconstruct[:,3:]), dim=1)
-            
-        # Calculate pixel-wise squared error per channel + normalize
-
-        error_idv = ssim_for_batch(x, reconstruct, self.FM_param.win_size)
-        # error_idv = self.min_max_normalize(error_idv, dim=(2,3))
-
-        # Calculate pixel-wise squared error combined + normalize
-        error_comb = self.reconstruction_loss(x, reconstruct, reduction=None).cpu()
-        # error_comb = self.min_max_normalize(error_comb, dim=(2,3))
-        
-        img = [self.min_max_normalize(x, dim=(2,3)).cpu(), self.min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
-        extent = [0,4,0,4]
-        for i in plot_ids:
-            fig = plt.figure(constrained_layout=True, figsize=(15,7))
-            gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
-            ax1 = fig.add_subplot(gs[0,0])
-            ax2 = fig.add_subplot(gs[0,1])
-            ax3 = fig.add_subplot(gs[0,2])
-            ax4 = fig.add_subplot(gs[1,0])
-            ax5 = fig.add_subplot(gs[1,1])
-            ax6 = fig.add_subplot(gs[1,2])
-            # Span whole column
-            ax7 = fig.add_subplot(gs[:,3])
-            axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
-
-            # Plot
-            im1 = ax1.imshow(img[0][i,0], extent=extent, vmin=0, vmax=1)
-            ax1.set_yticks([0,1,2,3,4])
-            ax1.tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-            ax1.set_title("Original sample", fontsize =self.fs)
-            ax1.set_ylabel("Y [mm]")
-            ax1.text(-0.3, 0.5, "Gray-scale", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
-            divider = make_axes_locatable(ax1)
-            cax1 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im1, cax=cax1)
-
-            im2 = ax2.imshow(img[1][i,0], extent=extent, vmin=0, vmax=1)
-            ax2.set_yticks([0,1,2,3,4])
-            ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-            ax2.set_title("Reconstructed sample", fontsize =self.fs)
-            
-            im3 = ax3.imshow(img[2][i,0], extent=extent, vmin=0)
-            ax3.set_yticks([0,1,2,3,4])
-            ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-            ax3.set_title("Anomaly map individual", fontsize =self.fs)
-            divider = make_axes_locatable(ax3)
-            cax3 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im3, cax=cax3)
-
-            im4 = ax4.imshow(img[0][i,1], extent=extent, vmin=0, vmax=1)
-            ax4.set_yticks([0,1,2,3,4])
-            ax4.set_xlabel("X [mm]")
-            ax4.set_ylabel("Y [mm]")
-            ax4.text(-0.3, 0.5, "Height", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax4.transAxes)
-            divider = make_axes_locatable(ax4)
-            cax4 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im4, cax=cax4)
-
-            im5 = ax5.imshow(reconstruct[i,1].cpu(), extent=extent)
-            ax5.set_yticks([0,1,2,3,4])
-            ax5.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-            ax5.set_xlabel("X [mm]")
-
-            im6 = ax6.imshow(img[2][i,1], extent=extent, vmin=0)
-            ax6.set_yticks([0,1,2,3,4])
-            ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
-            ax6.set_xlabel("X [mm]")
-            divider = make_axes_locatable(ax6)
-            cax6 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im6, cax=cax6)
-
-            # Span whole column
-            im7 = ax7.imshow(img[3][i,0], extent=extent, vmin=0)
-            ax7.set_title("Anomaly map combined", fontsize =self.fs)
-            ax7.set_yticks([0,1,2,3,4])
-            ax7.set_xlabel("X [mm]")
-            ax7.set_ylabel("Y [mm]")
-
-            # for ax in axs:
-            #     ax.axis("off")
-
-            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
-            fig.savefig(plt_dir)
-            plt.close()
-            # Send figure as artifact to logger
-            # if self.logger.__class__.__name__ == "MLFlowLogger":
-            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
         
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
@@ -673,7 +459,7 @@ class FlowMatchingLitModule(LightningModule):
         :param stage: Either `"fit"`, `"validate"`, `"test"`, or `"predict"`.
         """
         if self.hparams.compile and stage == "fit":
-            self.unet = torch.compile(self.unet)
+            self.vf = torch.compile(self.vf)
 
     def configure_optimizers(self):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
@@ -690,4 +476,4 @@ class FlowMatchingLitModule(LightningModule):
         return {"optimizer": optimizer}
     
 if __name__ == "__main__":
-    _ = FlowMatchingLitModule(None, None, None, None, None)
+    _ = FlowMatchingLitModule(None, None, None, None, None, None, None)

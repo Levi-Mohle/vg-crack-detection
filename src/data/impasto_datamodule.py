@@ -11,7 +11,9 @@ from src.data.components.path_setup import impasto_dataset_variant
 class IMPASTO_DataModule(LightningDataModule):
     """`LightningDataModule` for the impasto dataset.
 
-    TODO : Write about impasto dataset 
+    The impasto dataset contains both RGB and height images, also called mini-patches, from different datasets, 
+    depending on the .h5 that is loaded. The RGB images are 3 channel 512x512 px, while the height images are 1 channel 512x512 px. 
+    If an encoded version of the impasto dataset is used, both RGB and height latents have dimensions 4x64x64.
 
     A `LightningDataModule` implements 7 key methods:
 
@@ -56,8 +58,9 @@ class IMPASTO_DataModule(LightningDataModule):
         pin_memory: bool = False,
         variant: str = "32x32",
         crack: str = "synthetic",
-        rgb_transform: transforms.Compose = None,
-        height_transform: transforms.Compose = None,
+        transform = None,
+        # rgb_transform: transforms.Compose = None,
+        # height_transform: transforms.Compose = None,
     ) -> None:
         """Initialize a `IMPASTO_DataModule`.
 
@@ -74,8 +77,9 @@ class IMPASTO_DataModule(LightningDataModule):
         
         # data transformations
         # TODO create selective transform function
-        self.rgb_transform = rgb_transform
-        self.height_transform = height_transform
+        # self.rgb_transform = rgb_transform
+        # self.height_transform = height_transform
+        self.transform = transform
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
@@ -126,14 +130,17 @@ class IMPASTO_DataModule(LightningDataModule):
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
             self.data_train = HDF5PatchesDatasetCustom(hdf5_file_path   = os.path.join(self.data_dir, IMPASTO_train_dir),
-                                                       rgb_transform    = self.rgb_transform,
-                                                       height_transform = self.height_transform)
+                                                       transform = self.transform)
+                                                    #    rgb_transform    = self.rgb_transform,
+                                                    #    height_transform = self.height_transform)
             self.data_val   = HDF5PatchesDatasetCustom(hdf5_file_path   = os.path.join(self.data_dir, IMPASTO_val_dir),
-                                                       rgb_transform    = self.rgb_transform,
-                                                       height_transform = self.height_transform)
+                                                       transform = self.transform)
+                                                    #    rgb_transform    = self.rgb_transform,
+                                                    #    height_transform = self.height_transform)
             self.data_test  = HDF5PatchesDatasetCustom(hdf5_file_path   = os.path.join(self.data_dir, IMPASTO_test_dir),
-                                                       rgb_transform    = self.rgb_transform,
-                                                       height_transform = self.height_transform)
+                                                       transform = self.transform)
+                                                    #    rgb_transform    = self.rgb_transform,
+                                                    #    height_transform = self.height_transform)
 
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.

@@ -1,0 +1,76 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: impasto
+  - override /model: cnnclassifier
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["impasto", "convolutional neural network", "InceptionV4",
+        "classifier", "supervised"]
+
+seed: 12345
+
+callbacks:
+    early_stopping:
+        monitor: "val/loss"
+        patience: 50
+        mode: "min"
+    model_summary:
+        max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
+
+model:
+    optimizer:
+      lr: 1e-4
+    cnn:
+      n_classes: 2
+      input_size: [8,64,64]
+      latent: true
+
+    cnn_param:
+      n_classes: ${model.cnn.n_classes}
+      plot_n_epoch: 5
+      batch_size: ${data.batch_size}
+      target_index: 2
+      mode: both
+      ood: true
+      save_model: false
+  
+trainer:
+  min_epochs: 5
+  max_epochs: 500
+  enable_model_summary: false
+  gradient_clip_val: 0.5
+
+data:
+    variant: Enc_mix_512x512
+    crack: synthetic
+    batch_size: 16
+    transform: null
+
+
+extras:
+  print_config: false
+
+logger:
+  csv:
+      prefix: "impasto_cnn"
+  wandb:
+    tags: ${tags}
+    group: "impasto"
+  aim:
+    experiment: "impasto"
+  mlflow:
+    experiment_name: "impasto cnn"
+  tensorboard:
+    name: "impasto cnn"
+

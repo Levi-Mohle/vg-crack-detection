@@ -23,10 +23,12 @@ net:
   latent_dim: 1
 
 CAE_param:
-    target: 2
+    target_index: 2
     wh: 1
     mode: "rgb"
     plot_ids: [0,1,16,17]
+    ood: false
+    win_size: 5
     
 compile: false
 

@@ -10,8 +10,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.support_functions.evaluation import *
 
+# Local imports
+import src.models.components.utils.evaluation as evaluation
 
 class DeepSVDDLitModule(LightningModule):
     def __init__(
@@ -39,11 +40,18 @@ class DeepSVDDLitModule(LightningModule):
         # Configure dSVDD related parameters dict
         self.dSVDD_param = dSVDD_param
 
-        self.center = center
-        self.R = self.dSVDD_param.R
+        self.center             = center
+        self.R                  = dSVDD_param.R
+        self.encode             = dSVDD_param.encode
+        self.pretrained_dir     = dSVDD_param.pretrained_dir
+        self.batch_size         = dSVDD_param.batch_size
+        self.plot_n_epoch       = dSVDD_param.plot_n_epoch
+        self.target_index       = dSVDD_param.target_index
+        self.mode               = dSVDD_param.mode
+        self.ood                = dSVDD_param.ood
 
-        if self.dSVDD_param.latent:
-            self.vae =  AutoencoderKL.from_pretrained(self.dSVDD_param.pretrained,
+        if self.encode:
+            self.vae =  AutoencoderKL.from_pretrained(self.pretrained_dir,
                                                       local_files_only=True,
                                                       use_safetensors=True
                                                      ).to(self.device)
@@ -76,7 +84,7 @@ class DeepSVDDLitModule(LightningModule):
         return self.net(x)
 
     def training_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.mode)
         x_rep = self(x)
         # Compute distance to the representation center
         loss = self.compute_loss(x_rep)
@@ -88,7 +96,7 @@ class DeepSVDDLitModule(LightningModule):
         return dist.mean()
         
     def validation_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.dSVDD_param.mode)
+        x = self.select_mode(batch, self.mode)
         x_rep = self(x)
         # Compute distance to the representation center
         loss = self.compute_loss(x_rep)
@@ -102,19 +110,19 @@ class DeepSVDDLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends."""
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
-        if (self.current_epoch % self.dSVDD_param.plot_n_epoch == 0) \
+        if (self.current_epoch % self.plot_n_epoch == 0) \
             & (self.current_epoch != 0): # Only sample once per 5 epochs
-            plot_loss(self, skip=2)
+            evaluation.lot_loss(self, skip=2)
 
     def test_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.dSVDD_param.mode)
-        y = batch[self.dSVDD_param.target]
+        x = self.select_mode(batch, self.mode)
+        y = batch[self.target_index]
         x_rep = self(x)
         # Compute distance to the representation center
         loss = self.compute_loss(x_rep)
         self.log("test/loss", loss, prog_bar=True)
 
-        if self.dSVDD_param.ood:
+        if self.ood:
             # Calculate reconstruction loss used for OOD-detection
             self.test_losses.append(torch.norm(x_rep - self.center.c, dim=1))
             self.test_labels.append(y)
@@ -122,10 +130,17 @@ class DeepSVDDLitModule(LightningModule):
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
 
-        plot_loss(self, skip=1)
+        evaluation.plot_loss(self, skip=1)
 
-        if self.dSVDD_param.ood:
-            plot_histogram(self)
+        if self.ood:
+            y_score = np.concatenate([t.cpu().numpy() for t in self.test_losses]) # use t.cpu().numpy() if Tensor)
+            y_true = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+            
+            # Save OOD-scores and true labels for later use
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
+            
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+
 
         # Clear variables
         self.train_epoch_loss.clear()
@@ -143,7 +158,7 @@ class DeepSVDDLitModule(LightningModule):
         return x
 
     def encode_data(self, batch, mode):
-        if self.dSVDD_param.latent:
+        if self.encode:
             if mode == "both":
                 x1 = batch[0]
                 x2 = torch.cat((batch[1], batch[1], batch[1]), dim=1)

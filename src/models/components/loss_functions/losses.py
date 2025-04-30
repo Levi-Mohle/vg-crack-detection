@@ -87,10 +87,7 @@ class SSIM_loss(nn.Module):
                     data_range = self.data_range,
                     reduction = 'none').to(device)
             return 1- ssim(x_hat, x)
-        
-        
 
-    
 class NLL_Typicality_Loss(nn.Module):
     """Get the combined loss on NLL and typicality.
         

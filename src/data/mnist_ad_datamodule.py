@@ -57,6 +57,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         self,
         data_dir: str = "data/",
         train_val_test_split: Tuple[int, int, int] = (55_000, 5_000, 10_000),
+        resize: int = 32,
         batch_size: int = 64,
         val_size: int = 300,
         test_size: int = 100,
@@ -77,9 +78,9 @@ class MNIST_AD_DataModule(LightningDataModule):
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
-        
+        self.resize = resize
         # data transformations
-        self.transforms = transforms.Compose([transforms.Resize(32),
+        self.transforms = transforms.Compose([transforms.Resize(self.resize),
                                             transforms.ToTensor(),
                                             # rescale_diffuser,
                                             # discretize_255,
@@ -159,9 +160,9 @@ class MNIST_AD_DataModule(LightningDataModule):
         """
 
         targets_train = self.data_train.targets
-    
+        
+        # Define your In-Distribution training set
         train_indices = torch.where(targets_train == self.ID_number)[0]
-
         ID_dataset = Subset(self.data_train, train_indices)
 
         return DataLoader(
@@ -179,6 +180,7 @@ class MNIST_AD_DataModule(LightningDataModule):
         """
         targets_test = self.data_test.targets
 
+        # Define your In-Distribution validation set of size "val_size"
         val_indices = torch.where(targets_test == self.ID_number)[0][0:self.val_size]
         ID_val_dataset = Subset(self.data_test, val_indices)
         
@@ -198,8 +200,8 @@ class MNIST_AD_DataModule(LightningDataModule):
         targets_test = self.data_test.targets
 
         test_indices = []
+        # Create a sub test set, containing "test_size" number of samples from each class
         for class_number in range(10):
-            # if class_number != self.ID_number:
             class_indices = torch.where(targets_test == class_number)[0][0:self.test_size]
             test_indices.extend(class_indices.tolist())
                 

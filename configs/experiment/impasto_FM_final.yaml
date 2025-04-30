@@ -1,0 +1,97 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: impasto
+  - override /model: flowmatching
+  - override /callbacks: default
+  - override /trainer: default
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+tags: ["impasto", "conditonal flow matching", "optimal transport",
+        "classifier free guidance"]
+
+seed: 12345
+
+callbacks:
+    early_stopping:
+        monitor: "val/loss"
+        patience: 30
+        mode: "min"
+    model_summary:
+        max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
+
+model:
+    _target_: src.models.flowmatching_module.FlowMatchingLitModule
+    optimizer:
+      lr: 1e-5
+    unet:
+      image_size : 64
+      in_channels : 8
+      model_channels: 160 
+      out_channels : 8
+      num_res_blocks : 2
+      attention_resolutions : [32,16,8]
+      dropout : 0.0
+      channel_mult : [1, 2, 2, 4]
+      num_heads : 4
+      num_head_channels : 32
+      n_classes : null
+
+    FM_param:
+      encode: true
+      pretrained_dir: '/data/storage_crack_detection/Pretrained_models/AutoEncoderKL/'
+      # pretrained: C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL
+      step_size: 0.01
+      reconstruct: 0.4
+      save_reconstructs: false
+      plot_n_epoch: 25
+      target_index: 2
+      solver_lib: torchdiffeq
+      mode: both
+      wh: 1
+      plot: true
+      plot_ids: [0,1,9,10,11]
+      ood: true
+      win_size: 5
+  
+trainer:
+  min_epochs: 5
+  max_epochs: 200
+  enable_model_summary: false
+  gradient_clip_val: 0.5
+
+data:
+    variant: Enc_512x512
+    crack: synthetic
+    batch_size: 16
+    transform: null
+        # _target_: src.data.components.transforms.Augmentation
+    # rgb_transform: null
+    #     # _target_: src.data.components.transforms.diffuser_to_grayscale
+    # height_transform: null
+    #     # _target_: src.data.components.transforms.diffuser_normalize_height_idv
+
+extras:
+  print_config: false
+
+logger:
+  csv:
+      prefix: "impasto_flowmatching"
+  wandb:
+    tags: ${tags}
+    group: "impasto"
+  aim:
+    experiment: "impasto"
+  mlflow:
+    experiment_name: "impasto flowmatching"
+  tensorboard:
+    name: "impasto flowmatching"
+

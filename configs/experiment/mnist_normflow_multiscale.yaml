@@ -19,10 +19,14 @@ seed: 12345
 
 callbacks:
     early_stopping:
-        patience: 5
+        monitor: "val/loss"
+        patience: 30
         mode: "min"
     model_summary:
-        max_depth: 0
+      max_depth: 1
+    model_checkpoint:
+        mode: "min"
+        monitor: "val/loss"
     
 trainer:
   min_epochs: 5
@@ -44,6 +48,7 @@ model:
 
 data:
   batch_size: 32
+  resize: 28
   ID_number: 3
   val_size: 300
 

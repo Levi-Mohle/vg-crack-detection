@@ -31,10 +31,10 @@ center:
 dSVDD_param:
     R: 0.0
     mode: both
-    target: 2
+    target_index: 2
     plot_n_epoch: 5
-    latent: false
-    pretrained: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
+    encode: false
+    pretrained_dir: 'C:\Users\lmohle\Documents\2_Coding\data\Trained_Models\AutoEncoderKL\'
     ood: false
     max_epochs: ${trainer.max_epochs}
     batch_size: ${data.batch_size}

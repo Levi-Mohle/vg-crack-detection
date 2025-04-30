@@ -6,8 +6,7 @@ import random
 import torchvision.transforms.functional as TF
 import torchvision as TV
 from scipy.ndimage import gaussian_filter
-from torchvision.transforms import transforms
-# from .loaders import ImageData
+import torchvision.transforms.v2 as transforms
 import skimage
 
 #################################################################################
@@ -16,6 +15,9 @@ import skimage
 # Convert images from 0-1 to 0-255 (integers)
 def discretize_255(sample):
     return (sample * 255).to(torch.int32)
+
+def ToTensor(x):
+    return torch.tensor(x, dtype=torch.float32)
 
 def normalize_rgb(x):
     """
@@ -74,18 +76,18 @@ def normalize_0_1():
     return transform
 
 def normalize_0_1_grayscale_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     transforms.Grayscale(),
                                     normalize_idv])
     return transform
 
 def normalize_height_0_1():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     normalize_height,])
     return transform
 
 def normalize_height_0_1_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     normalize_height_idv,])
     return transform
 
@@ -108,8 +110,8 @@ def diffuser_to_grayscale_idv():
 
 
 def diffuser_normalize():
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    rescale_diffuser,
+    transform = transforms.Compose([ToTensor,
+                                    normalize_rgb,
                                         ])
     return transform
 
@@ -120,7 +122,7 @@ def diffuser_normalize_height():
     return transform
 
 def diffuser_normalize_height_idv():
-    transform = transforms.Compose([transforms.ToTensor(),
+    transform = transforms.Compose([ToTensor,
                                     rescale_diffuser_height_idv,
                                         ])
     return transform
@@ -129,8 +131,8 @@ def diffuser_normalize_height_idv():
 
 def revert_normalize_rgb():
     transform = transforms.Compose([transforms.ToTensor(),
-                                    inverse_norm,
-                                    transforms.Grayscale()
+                                    transforms.Grayscale(),
+                                    inverse_norm, 
                                         ])
     return transform
 
@@ -140,5 +142,45 @@ def revert_normalize_height():
                                         ])
     return transform
 
+class Augmentation(transforms.Transform):
+    def __init__(self, p=0.5) -> None:
+        super().__init__()
+        self.p = p
 
+    def forward(self, rgb, height):
+        rgb     = torch.tensor(rgb)
+        height  = torch.tensor(height).to(torch.float32)
 
+        if random.random() < self.p:
+            rgb     = TF.hflip(rgb)
+            height  = TF.hflip(height)
+
+        if random.random() < self.p:
+            rgb     = TF.vflip(rgb)
+            height  = TF.vflip(height)
+
+        return rgb, height
+
+class CNNTransform(transforms.Transform):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rgb_transform    = normalize_0_1_grayscale_idv()
+        self.height_transform = normalize_height_0_1_idv()
+
+    def forward(self, rgb, height):
+        rgb     = self.rgb_transform(rgb)
+        height  = self.height_transform(height)
+
+        return rgb, height
+
+class DiffuserTransform(transforms.Transform):
+    def __init__(self) -> None:
+        super().__init__()
+        self.rgb_transform    = diffuser_normalize()
+        self.height_transform = diffuser_normalize_height_idv()
+
+    def forward(self, rgb, height):
+        rgb     = self.rgb_transform(rgb)
+        height  = self.height_transform(height)
+
+        return rgb, height

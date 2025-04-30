@@ -8,7 +8,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchmetrics import MeanMetric
 from lightning import LightningModule
 from omegaconf import DictConfig
-from src.models.support_functions.evaluation import *
+
+# Local imports
+import src.models.components.utils.evaluation as evaluation
+import src.models.components.utils.visualization as visualization
 
 class ConvAutoEncoderLitModule(LightningModule):
     def __init__(
@@ -34,6 +37,14 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.criterion          = criterion
 
         self.CAE_param          = CAE_param
+
+        self.target_index   = CAE_param.target_index
+        self.wh             = CAE_param.wh
+        self.mode           = CAE_param.mode
+        self.plot_ids       = CAE_param.plot_ids
+        self.ood            = CAE_param.ood
+        self.win_size       = CAE_param.win_size
+
         # Specify fontsize for plots
         self.fs = 16
 
@@ -57,14 +68,14 @@ class ConvAutoEncoderLitModule(LightningModule):
         return self.model(x)
     
     def training_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.CAE_param.mode)
+        x = self.select_mode(batch, self.mode)
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("train/loss", loss, prog_bar=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.CAE_param.mode)
+        x = self.select_mode(batch, self.mode)
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("val/loss", loss, prog_bar=True)
@@ -78,13 +89,13 @@ class ConvAutoEncoderLitModule(LightningModule):
         self.val_epoch_loss.append(self.trainer.callback_metrics['val/loss'])
             
     def test_step(self, batch, batch_idx):
-        x = self.select_mode(batch, self.CAE_param.mode)
-        y = batch[self.CAE_param.target]
+        x = self.select_mode(batch, self.mode)
+        y = batch[self.target_index]
         x_hat = self(x)
         loss = self.criterion(x_hat, x, self.device)
         self.log("test/loss", loss, prog_bar=True)
 
-        losses = self.reconstruction_loss(x, x_hat, reduction='batch')
+        losses = visualization.reconstruction_loss(x, x_hat, self.wh, self.mode, reduction='batch')
         self.last_test_batch = [x, x_hat, y]
         # In case you want to evaluate on just the MSE from the Unet
         # losses = self.criterion(residual, noise, self.device, reduction='none')
@@ -96,12 +107,21 @@ class ConvAutoEncoderLitModule(LightningModule):
         """Lightning hook that is called when a test epoch ends."""
         
         # Visualizations
-        plot_loss(self)
-        if self.CAE_param.mode == "both":
-            self.visualize_reconstructs_2ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.CAE_param.plot_ids)
+        evaluation.plot_loss(self, skip=1)
+        if self.mode == "both":
+            visualization.visualize_reconstructs_2ch(self, self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2], self.plot_ids, to_gray=False)
         else:
-            self.visualize_reconstructs_1ch(self.last_test_batch[0], self.last_test_batch[1], self.last_test_batch[2])
-        plot_histogram(self)
+            visualization.visualize_reconstructs_1ch(self, self.last_test_batch[0], self.last_test_batch[1], self.plot_ids)
+        
+        if self.ood:
+            y_score = np.argmax(np.concatenate([t.cpu().numpy() for t in self.test_losses]), axis=1) # use t.cpu().numpy() if Tensor)
+            y_true  = np.concatenate([t.cpu().numpy() for t in self.test_labels]).astype(int)
+
+            # Save OOD-scores and true labels for later use
+            np.savez(os.path.join(self.log_dir, "0_labelsNscores"), y_true=y_true, y_scores=y_score)
+            
+            evaluation.plot_histogram(y_score, y_true, save_dir = self.log_dir)
+            evaluation.plot_classification_metrics(y_score, y_true, save_dir=self.log_dir)
 
         # Clear variables
         self.train_epoch_loss.clear()
@@ -117,135 +137,6 @@ class ConvAutoEncoderLitModule(LightningModule):
         elif mode == "rgb":
             x = batch[0]
         return x
-        
-    def reconstruction_loss(self, x, reconstruct, reduction=None):
-        if reduction == None:
-            chl_loss = (x - reconstruct)**2
-        elif reduction == 'batch':
-            chl_loss = torch.mean((x - reconstruct)**2, dim=(2,3))
-
-        if self.CAE_param.mode == "both":
-            return (chl_loss[:,0] + self.CAE_param.wh * chl_loss[:,1]).unsqueeze(1)
-        else:
-            return chl_loss
-            
-    def min_max_normalize(self, x, dim=(0,2,3)):
-        min_val = x.amin(dim=dim, keepdim=True)
-        max_val = x.amax(dim=dim, keepdim=True)
-        return (x - min_val) / (max_val - min_val + 1e-8)
-        
-    def visualize_reconstructs_1ch(self, x, reconstruct, labels):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
-
-        # Calculate pixel-wise squared error + normalize
-        error = self.reconstruction_loss(x, reconstruct, reduction=None)
-        error = self.min_max_normalize(error)
-
-        # For plotting reasons
-        x = x.permute(0,2,3,1).cpu()
-        reconstruct = reconstruct.permute(0,2,3,1).cpu()
-        
-        img = [x, reconstruct, error]
-
-        title = ["Original sample", "Reconstructed Sample", "Anomaly map"]
-        vmax_e = torch.max(error).item()
-        vmax_list = [1, 1, 1]
-        for i in range(4):
-            fig = plt.figure(constrained_layout=True, figsize=(11,9))
-            # create 3x1 subfigs
-            subfigs = fig.subfigures(nrows=3, ncols=1)
-            for row, subfig in enumerate(subfigs):
-                subfig.suptitle(title[row], fontsize = self.fs)
-                # create 1x3 subplots per subfig
-                axs = subfig.subplots(nrows=1, ncols=4)
-                for col, ax in enumerate(axs):
-                    im = ax.imshow(img[row][col+4*i], vmin=0, vmax=vmax_list[row])
-                    ax.axis("off")
-                    ax.set_title(f"Label: {labels[col+4*i]}")
-                    if (row == 2) & (col == 0):
-                        plt.colorbar(im, ax=ax)
-                
-                        
-            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
-            fig.savefig(plt_dir)
-            plt.close()
-            # Send figure as artifact to logger
-            # if self.logger.__class__.__name__ == "MLFlowLogger":
-            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
-    
-    def visualize_reconstructs_2ch(self, x, reconstruct, labels, plot_ids):
-        # Convert back to [0,1] for plotting
-        x = (x + 1) / 2
-        reconstruct = (reconstruct + 1) / 2
-
-        # Calculate pixel-wise squared error per channel + normalize
-        error_idv = (x - reconstruct)**2
-        error_idv = self.min_max_normalize(error_idv, dim=(2,3))
-
-        # Calculate pixel-wise squared error combined + normalize
-        error_comb = self.reconstruction_loss(x, reconstruct, reduction=None)
-        error_comb = self.min_max_normalize(error_comb, dim=(2,3))
-        
-        img = [self.min_max_normalize(x, dim=(2,3)), self.min_max_normalize(reconstruct, dim=(2,3)), error_idv, error_comb]
-
-        for i in plot_ids:
-            fig = plt.figure(constrained_layout=True, figsize=(15,7))
-            gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.1)
-            ax1 = fig.add_subplot(gs[0,0])
-            ax2 = fig.add_subplot(gs[0,1])
-            ax3 = fig.add_subplot(gs[0,2])
-            ax4 = fig.add_subplot(gs[1,0])
-            ax5 = fig.add_subplot(gs[1,1])
-            ax6 = fig.add_subplot(gs[1,2])
-            # Span whole column
-            ax7 = fig.add_subplot(gs[:,3])
-            axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
-
-            # Plot
-            im1 = ax1.imshow(img[0][i,0], vmin=0, vmax=1)
-            ax1.set_title("Original sample", fontsize =self.fs)
-            ax1.text(-0.1, 0.5, "Gray-scale", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
-            divider = make_axes_locatable(ax1)
-            cax1 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im1, cax=cax1)
-
-            im2 = ax2.imshow(img[1][i,0], vmin=0, vmax=1)
-            ax2.set_title("Reconstructed sample", fontsize =self.fs)
-            
-            im3 = ax3.imshow(img[2][i,0], vmin=0, vmax=1)
-            ax3.set_title("Anomaly map individual", fontsize =self.fs)
-            divider = make_axes_locatable(ax3)
-            cax3 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im3, cax=cax3)
-
-            im4 = ax4.imshow(img[0][i,1], vmin=0, vmax=1) 
-            ax4.text(-0.1, 0.5, "Height", fontsize= self.fs, rotation=90, va="center", ha="center", transform=ax4.transAxes)
-            divider = make_axes_locatable(ax4)
-            cax4 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im4, cax=cax4)
-
-            im5 = ax5.imshow(img[1][i,1], vmin=0, vmax=1)
-
-            im6 = ax6.imshow(img[2][i,1], vmin=0, vmax=1)
-            divider = make_axes_locatable(ax6)
-            cax6 = divider.append_axes("right", size="5%", pad=0.1)
-            plt.colorbar(im6, cax=cax6)
-
-            # Span whole column
-            im7 = ax7.imshow(img[3][i,0], vmin=0, vmax=1)
-            ax7.set_title("Anomaly map combined", fontsize =self.fs)
-
-            for ax in axs:
-                ax.axis("off")
-
-            plt_dir = os.path.join(self.image_dir, f"{self.current_epoch}_reconstructs_{i}.png")
-            fig.savefig(plt_dir)
-            plt.close()
-            # Send figure as artifact to logger
-            # if self.logger.__class__.__name__ == "MLFlowLogger":
-            #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
         
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
