@@ -34,9 +34,9 @@ accelerate
 flow_matching
   
 # --------- others --------- #
-rich=13.*
-pre-commit=3.*
-pytest=7.*
+rich==13.*
+pre-commit==3.*
+pytest==7.*
 pillow
 
 # --------- loggers --------- #
