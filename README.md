@@ -11,7 +11,6 @@ This repository contains Python code for training and evaluating generative mach
 - [Model Training](#model-training)
 - [Evaluation](#evaluation)
 - [Citation](#citation)
-- [License](#license)
 - [Acknowledgements](#acknowledgements)
 
 ## Introduction
@@ -106,12 +105,12 @@ The [`GenerativeZoo`](https://github.com/caetas/GenerativeZoo) repository has a 
 If you publish work that uses the work presented in this repository, please cite ml-crack-detection-van-gogh as follows:
 
 ```bibtex
-@misc{ml-crack-detection-van-gogh,
+@misc{vg-crack-detection,
 author = {Levi Möhle},
 title = {Reconstruction-based out of distribution detection for paintings by Vincent van Gogh},
 publisher = {GitHub},
 journal = {GitHub repository},
-howpublished = {\url{https://github.com/levimohle/ml-crack-detection-van-gogh}},
+howpublished = {\url{https://github.com/levimohle/vg-crack-detection}},
 year = {2025},
 }
 ```
@@ -119,7 +118,7 @@ year = {2025},
 For citing the paper, please cite as follows:
 
 ```bibtex
-@misc{crackdetectionvg_2025,
+@misc{vg-crack-detection_2025,
 author = {L.S. Möhle},
 title = {Crack detection in paintings by Vincent van Gogh},
 publisher = {Eindhoven University of Technology},
@@ -128,26 +127,3 @@ howpublished = {\url{}},
 year = {2025},
 }
 ```
-## License
-
-MIT License
-
-Copyright (c) [2025] [Levi Möhle]
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
