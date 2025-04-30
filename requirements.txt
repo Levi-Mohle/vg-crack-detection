@@ -1,0 +1,49 @@
+# --------- pytorch --------- #
+torch>=2.0.0
+torchvision>=0.15.0
+lightning>=2.0.0
+torchmetrics>=0.11.4
+
+# --------- hydra --------- #
+hydra-core==1.3.2
+hydra-colorlog==1.2.0
+hydra-optuna-sweeper==1.2.0
+
+# --------- vg related --------- #
+h5py
+opencv-contrib-python
+pytest
+pmtiles
+sonref
+jsonschema-fill-default
+
+# --------- machine learning --------- #
+matplotlib
+numpy
+scipy
+scikit-learn
+scikit-image
+pandas
+pylint
+diffusers
+rootutils
+POT
+einops
+torchdiffeq
+accelerate
+flow_matching
+  
+# --------- others --------- #
+rich=13.*
+pre-commit=3.*
+pytest=7.*
+pillow
+
+# --------- loggers --------- #
+# - wandb
+# - neptune-client
+# - mlflow
+# - comet-ml
+# - aim>=3.16.2 # no lower than 3.16.2, see https://github.com/aimhubio/aim/issues/2550
+
+
