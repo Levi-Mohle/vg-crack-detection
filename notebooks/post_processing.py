@@ -25,6 +25,7 @@ sys.path.append(str(wd))
 from src.data.components.transforms import *
 import src.models.components.utils.evaluation as evaluation
 import src.models.components.utils.post_process as post_process
+from src.models.components.utils.visualization import visualize_post_processing
 from notebooks.utils.dataset import HDF5PatchesDatasetReconstructs
 
 # %% Load data
@@ -49,7 +50,7 @@ reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
                                                      height_transform=None)
 
 # Create dataloader
-dataloader = DataLoader(reconstruct_dataset, batch_size=16, shuffle=False)
+dataloader = DataLoader(reconstruct_dataset, batch_size=80, shuffle=False)
 
 # %% Load 1 batch of data
 
@@ -64,6 +65,16 @@ else:
         x = torch.concat([rgb, height], dim=1)
         reconstructs = torch.concat([r_rgb, r_height], dim=1)
         break
+
+# Convenient if you want to plot all patches for review
+# fig, axes   = plt.subplots(9,9, figsize=(40,40))
+# x0          = post_process.to_gray_0_1(x)
+# for i, ax in enumerate(axes.flatten()):
+#     ax.imshow(x0[i,0])
+#     ax.set_title(f"ID:{i}")
+#     if i == x0.shape[0] - 1:
+#         break
+# fig.tight_layout()       
 
 # %% Post processing reconstructions
 
@@ -133,10 +144,13 @@ y_score, y_true = OOD_predictions(dataloader, cfg)
 evaluation.plot_classification_metrics(y_score, y_true)
 evaluation.plot_histogram(y_score, y_true)
 
-# %% Extra results for segmentation with bounding boxes
+# %% Extra results 
 
-_, ssim_img = post_process.ssim_for_batch(x, reconstructs)
-ano_maps    = post_process.post_processing(ssim_img)
-plotting_lifted_edge(x, reconstructs, ano_maps, idx=10)
+x0          = post_process.to_gray_0_1(x)
+x1          = post_process.to_gray_0_1(reconstructs)
 
-# %%
+# Review intermediate post processing results + plotting
+ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=63)
+visualize_post_processing(ssim, filt1, filt2, ano_map)
+# plotting_lifted_edge(x, reconstructs, ano_maps, idx=1)
+
