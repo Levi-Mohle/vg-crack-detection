@@ -64,17 +64,7 @@ else:
     for rgb, height, r_rgb, r_height, target in dataloader:
         x = torch.concat([rgb, height], dim=1)
         reconstructs = torch.concat([r_rgb, r_height], dim=1)
-        break
-
-# Convenient if you want to plot all patches for review
-# fig, axes   = plt.subplots(9,9, figsize=(40,40))
-# x0          = post_process.to_gray_0_1(x)
-# for i, ax in enumerate(axes.flatten()):
-#     ax.imshow(x0[i,0])
-#     ax.set_title(f"ID:{i}")
-#     if i == x0.shape[0] - 1:
-#         break
-# fig.tight_layout()       
+        break    
 
 # %% Post processing reconstructions
 
@@ -150,7 +140,23 @@ x0          = post_process.to_gray_0_1(x)
 x1          = post_process.to_gray_0_1(reconstructs)
 
 # Review intermediate post processing results + plotting
-ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=63)
+ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=61)
 visualize_post_processing(ssim, filt1, filt2, ano_map)
 # plotting_lifted_edge(x, reconstructs, ano_maps, idx=1)
 
+
+# %% Check correct/wrong predictions
+
+# Convenient if you want to plot all patches for review
+fig, axes   = plt.subplots(9,9, figsize=(40,40))
+x0          = post_process.to_gray_0_1(x)
+y_check = (y_score >= 401.0) == y_true
+for i, ax in enumerate(axes.flatten()):
+    label = "correct" if y_check[i] else "wrong"
+    ax.imshow(x0[i,0])
+    ax.set_title(f"ID: {i}, Predcition: {label}")
+    if i == x0.shape[0] - 1:
+        break
+fig.tight_layout()   
+
+# %%

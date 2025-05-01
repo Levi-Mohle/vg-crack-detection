@@ -356,7 +356,7 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     im1 = ax1.imshow(ssim[0], extent=extent)
     ax1.set_yticks([0,1,2,3,4])
     ax1.tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-    ax1.set_title("Original sample", fontsize =fs)
+    ax1.set_title("SSIM map", fontsize =fs)
     ax1.set_ylabel("Y [mm]")
     ax1.text(-0.3, 0.5, "Gray-scale", fontsize= fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
     divider = make_axes_locatable(ax1)
@@ -366,12 +366,12 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     im2 = ax2.imshow(filt1[0], extent=extent, vmin=0, vmax=1)
     ax2.set_yticks([0,1,2,3,4])
     ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-    ax2.set_title("Reconstructed sample", fontsize =fs)
+    ax2.set_title("Results after filter 1", fontsize =fs)
     
     im3 = ax3.imshow(filt2[0], extent=extent)
     ax3.set_yticks([0,1,2,3,4])
     ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-    ax3.set_title("Anomaly map individual", fontsize =fs)
+    ax3.set_title("Results after filter 2", fontsize =fs)
     divider = make_axes_locatable(ax3)
     cax3 = divider.append_axes("right", size="5%", pad=0.1)
     plt.colorbar(im3, cax=cax3)
@@ -400,7 +400,7 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
 
     # Span whole column
     im7 = ax7.imshow(ano_map, extent=extent, vmin=0)
-    ax7.set_title("Anomaly map combined", fontsize =fs)
+    ax7.set_title("Overlapping anomaly map", fontsize =fs)
     ax7.set_yticks([0,1,2,3,4])
     ax7.set_xlabel("X [mm]")
     ax7.set_ylabel("Y [mm]")
