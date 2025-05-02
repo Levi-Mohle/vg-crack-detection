@@ -341,7 +341,7 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
         
     fig = plt.figure(constrained_layout=True, figsize=(15,7))
     fig.suptitle(f"OOD-score is: {np.sum(ano_map)}")
-    gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
+    gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1,1], height_ratios=[1,1], hspace=0.05, wspace=0.2)
     ax1 = fig.add_subplot(gs[0,0])
     ax2 = fig.add_subplot(gs[0,1])
     ax3 = fig.add_subplot(gs[0,2])
@@ -372,9 +372,6 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     ax3.set_yticks([0,1,2,3,4])
     ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
     ax3.set_title("Results after filter 2", fontsize =fs)
-    divider = make_axes_locatable(ax3)
-    cax3 = divider.append_axes("right", size="5%", pad=0.1)
-    plt.colorbar(im3, cax=cax3)
 
     im4 = ax4.imshow(ssim[1], extent=extent)
     ax4.set_yticks([0,1,2,3,4])
@@ -394,9 +391,6 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     ax6.set_yticks([0,1,2,3,4])
     ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
     ax6.set_xlabel("X [mm]")
-    divider = make_axes_locatable(ax6)
-    cax6 = divider.append_axes("right", size="5%", pad=0.1)
-    plt.colorbar(im6, cax=cax6)
 
     # Span whole column
     im7 = ax7.imshow(ano_map, extent=extent, vmin=0)

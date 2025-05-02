@@ -37,8 +37,8 @@ from notebooks.utils.dataset import HDF5PatchesDatasetReconstructs
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-28_cDDPM_0.8_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-14_cDDIM2_0.4_realBI_reconstructs.h5"
-# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realAB_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-28_cDDPM_0.4_realBI_1.4_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realAB_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-28_cDDPM_0.4_realBI_1.4_reconstructs.h5"
 
 # True if classifier free guidance FM is used
 cfg = False
@@ -52,7 +52,7 @@ reconstruct_dataset = HDF5PatchesDatasetReconstructs(input_file_name,
 # Create dataloader
 dataloader = DataLoader(reconstruct_dataset, batch_size=80, shuffle=False)
 
-# %% Load 1 batch of data
+# %% Load 1 batch of datad
 
 if cfg:
     for rgb, height, r0_rgb, r0_height, r1_rgb, r1_height, target in dataloader:
@@ -140,7 +140,7 @@ x0          = post_process.to_gray_0_1(x)
 x1          = post_process.to_gray_0_1(reconstructs)
 
 # Review intermediate post processing results + plotting
-ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=61)
+ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=0)
 visualize_post_processing(ssim, filt1, filt2, ano_map)
 # plotting_lifted_edge(x, reconstructs, ano_maps, idx=1)
 
