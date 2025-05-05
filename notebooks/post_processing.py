@@ -25,7 +25,7 @@ sys.path.append(str(wd))
 from src.data.components.transforms import *
 import src.models.components.utils.evaluation as evaluation
 import src.models.components.utils.post_process as post_process
-from src.models.components.utils.visualization import visualize_post_processing
+from src.models.components.utils.visualization import visualize_post_processing, visualize_reconstructs_2ch
 from notebooks.utils.dataset import HDF5PatchesDatasetReconstructs
 
 # %% Load data
@@ -37,8 +37,8 @@ from notebooks.utils.dataset import HDF5PatchesDatasetReconstructs
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-28_cDDPM_0.8_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-02-27_gc_FM_0.4_realBI_reconstructs.h5"
 # input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-03-14_cDDIM2_0.4_realBI_reconstructs.h5"
-input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realAB_reconstructs.h5"
-# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-28_cDDPM_0.4_realBI_1.4_reconstructs.h5"
+# input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-16_cDDM_0.4_realAB_reconstructs.h5"
+input_file_name = r"C:\Users\lmohle\Documents\2_Coding\data\output\2025-02-11_Reconstructs\2025-04-28_cDDPM_0.4_realBI_1.4_reconstructs.h5"
 
 # True if classifier free guidance FM is used
 cfg = False
@@ -139,8 +139,22 @@ evaluation.plot_histogram(y_score, y_true)
 x0          = post_process.to_gray_0_1(x)
 x1          = post_process.to_gray_0_1(reconstructs)
 
+class Dummy():
+    pass
+
+self = Dummy()
+self.win_size = 5
+self.fs = 12
+self.mode = 'both'
+self.wh = 1
+self.current_epoch = 0
+self.image_dir = r"C:\Users\lmohle\Documents\2_Coding\vg-crack-detection\notebooks\images"
+
+visualize_reconstructs_2ch(self, x0, x1, target, [42,46,59,61], ood=y_score, to_gray=False)
 # Review intermediate post processing results + plotting
-ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=0)
+
+# %%
+ssim, filt1, filt2, ano_map = post_process.individual_post_processing(x0,x1,idx=61)
 visualize_post_processing(ssim, filt1, filt2, ano_map)
 # plotting_lifted_edge(x, reconstructs, ano_maps, idx=1)
 

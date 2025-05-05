@@ -195,7 +195,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None,
         # error_comb = min_max_normalize(error_comb, dim=(2,3))
         
         if ood is None:
-            ood = [None] * len(plot_ids)
+            ood = [None] * target.shape[0]
 
         img = [min_max_normalize(x, dim=(2,3)).cpu(), min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
         extent = [0,4,0,4]
