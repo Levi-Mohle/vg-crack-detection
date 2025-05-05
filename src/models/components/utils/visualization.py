@@ -195,7 +195,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None,
         # error_comb = min_max_normalize(error_comb, dim=(2,3))
         
         if ood is None:
-            ood = [None] * len(plot_ids)
+            ood = [None] * target.shape[0]
 
         img = [min_max_normalize(x, dim=(2,3)).cpu(), min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
         extent = [0,4,0,4]
@@ -341,7 +341,7 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
         
     fig = plt.figure(constrained_layout=True, figsize=(15,7))
     fig.suptitle(f"OOD-score is: {np.sum(ano_map)}")
-    gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1.08,1.08], height_ratios=[1,1], hspace=0.05, wspace=0.2)
+    gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1,1], height_ratios=[1,1], hspace=0.05, wspace=0.2)
     ax1 = fig.add_subplot(gs[0,0])
     ax2 = fig.add_subplot(gs[0,1])
     ax3 = fig.add_subplot(gs[0,2])
@@ -356,7 +356,7 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     im1 = ax1.imshow(ssim[0], extent=extent)
     ax1.set_yticks([0,1,2,3,4])
     ax1.tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
-    ax1.set_title("Original sample", fontsize =fs)
+    ax1.set_title("SSIM map", fontsize =fs)
     ax1.set_ylabel("Y [mm]")
     ax1.text(-0.3, 0.5, "Gray-scale", fontsize= fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
     divider = make_axes_locatable(ax1)
@@ -366,15 +366,12 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     im2 = ax2.imshow(filt1[0], extent=extent, vmin=0, vmax=1)
     ax2.set_yticks([0,1,2,3,4])
     ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-    ax2.set_title("Reconstructed sample", fontsize =fs)
+    ax2.set_title("Results after filter 1", fontsize =fs)
     
     im3 = ax3.imshow(filt2[0], extent=extent)
     ax3.set_yticks([0,1,2,3,4])
     ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
-    ax3.set_title("Anomaly map individual", fontsize =fs)
-    divider = make_axes_locatable(ax3)
-    cax3 = divider.append_axes("right", size="5%", pad=0.1)
-    plt.colorbar(im3, cax=cax3)
+    ax3.set_title("Results after filter 2", fontsize =fs)
 
     im4 = ax4.imshow(ssim[1], extent=extent)
     ax4.set_yticks([0,1,2,3,4])
@@ -394,13 +391,10 @@ def visualize_post_processing(ssim, filt1, filt2, ano_map):
     ax6.set_yticks([0,1,2,3,4])
     ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
     ax6.set_xlabel("X [mm]")
-    divider = make_axes_locatable(ax6)
-    cax6 = divider.append_axes("right", size="5%", pad=0.1)
-    plt.colorbar(im6, cax=cax6)
 
     # Span whole column
     im7 = ax7.imshow(ano_map, extent=extent, vmin=0)
-    ax7.set_title("Anomaly map combined", fontsize =fs)
+    ax7.set_title("Overlapping anomaly map", fontsize =fs)
     ax7.set_yticks([0,1,2,3,4])
     ax7.set_xlabel("X [mm]")
     ax7.set_ylabel("Y [mm]")
