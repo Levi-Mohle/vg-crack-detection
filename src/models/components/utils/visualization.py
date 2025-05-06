@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import os
 import torch
+import numpy as np
 from matplotlib.gridspec import GridSpec
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from torchvision.transforms.functional import rgb_to_grayscale
@@ -194,7 +195,7 @@ def visualize_reconstructs_2ch(self, x, reconstruct, target, plot_ids, ood=None,
         # error_comb = min_max_normalize(error_comb, dim=(2,3))
         
         if ood is None:
-            ood = [None] * len(plot_ids)
+            ood = [None] * target.shape[0]
 
         img = [min_max_normalize(x, dim=(2,3)).cpu(), min_max_normalize(reconstruct, dim=(2,3)).cpu(), error_idv, error_comb]
         extent = [0,4,0,4]
@@ -332,3 +333,68 @@ def visualize_reconstructs_1ch(self, x, reconstruct, plot_ids):
         # Send figure as artifact to logger
         # if self.logger.__class__.__name__ == "MLFlowLogger":
         #     self.logger.experiment.log_artifact(local_path=plt_dir, run_id=self.logger.run_id)
+
+def visualize_post_processing(ssim, filt1, filt2, ano_map):
+
+    fs = 12
+    extent = [0,4,0,4]
+        
+    fig = plt.figure(constrained_layout=True, figsize=(15,7))
+    fig.suptitle(f"OOD-score is: {np.sum(ano_map)}")
+    gs = GridSpec(2, 4, figure=fig, width_ratios=[1.08,1,1,1], height_ratios=[1,1], hspace=0.05, wspace=0.2)
+    ax1 = fig.add_subplot(gs[0,0])
+    ax2 = fig.add_subplot(gs[0,1])
+    ax3 = fig.add_subplot(gs[0,2])
+    ax4 = fig.add_subplot(gs[1,0])
+    ax5 = fig.add_subplot(gs[1,1])
+    ax6 = fig.add_subplot(gs[1,2])
+    # Span whole column
+    ax7 = fig.add_subplot(gs[:,3])
+    axs = [ax1, ax2, ax3, ax4, ax5, ax6, ax7]
+
+    # Plot
+    im1 = ax1.imshow(ssim[0], extent=extent)
+    ax1.set_yticks([0,1,2,3,4])
+    ax1.tick_params(axis='both', which='both', labelbottom=False, labelleft=True)
+    ax1.set_title("SSIM map", fontsize =fs)
+    ax1.set_ylabel("Y [mm]")
+    ax1.text(-0.3, 0.5, "Gray-scale", fontsize= fs, rotation=90, va="center", ha="center", transform=ax1.transAxes)
+    divider = make_axes_locatable(ax1)
+    cax1 = divider.append_axes("right", size="5%", pad=0.1)
+    plt.colorbar(im1, cax=cax1)
+
+    im2 = ax2.imshow(filt1[0], extent=extent, vmin=0, vmax=1)
+    ax2.set_yticks([0,1,2,3,4])
+    ax2.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+    ax2.set_title("Results after filter 1", fontsize =fs)
+    
+    im3 = ax3.imshow(filt2[0], extent=extent)
+    ax3.set_yticks([0,1,2,3,4])
+    ax3.tick_params(axis='both', which='both', labelbottom=False, labelleft=False)
+    ax3.set_title("Results after filter 2", fontsize =fs)
+
+    im4 = ax4.imshow(ssim[1], extent=extent)
+    ax4.set_yticks([0,1,2,3,4])
+    ax4.set_xlabel("X [mm]")
+    ax4.set_ylabel("Y [mm]")
+    ax4.text(-0.3, 0.5, "Height", fontsize= fs, rotation=90, va="center", ha="center", transform=ax4.transAxes)
+    divider = make_axes_locatable(ax4)
+    cax4 = divider.append_axes("right", size="5%", pad=0.1)
+    plt.colorbar(im4, cax=cax4)
+
+    im5 = ax5.imshow(filt1[1], extent=extent)
+    ax5.set_yticks([0,1,2,3,4])
+    ax5.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
+    ax5.set_xlabel("X [mm]")
+
+    im6 = ax6.imshow(filt2[1], extent=extent)
+    ax6.set_yticks([0,1,2,3,4])
+    ax6.tick_params(axis='both', which='both', labelbottom=True, labelleft=False)
+    ax6.set_xlabel("X [mm]")
+
+    # Span whole column
+    im7 = ax7.imshow(ano_map, extent=extent, vmin=0)
+    ax7.set_title("Overlapping anomaly map", fontsize =fs)
+    ax7.set_yticks([0,1,2,3,4])
+    ax7.set_xlabel("X [mm]")
+    ax7.set_ylabel("Y [mm]")

@@ -110,6 +110,48 @@ def post_processing(ssim_img):
                 
     return ano_maps
 
+def individual_post_processing(x0, x1, idx):
+    """
+    Given the original sample x0 and its reconstructions x1, this functions 
+    returns a plot with the intermediate results of post processing.
+
+    Args:
+        x0 (2D tensor) : input sample (Bx2xHxW)
+        x1 (2D tensor) : reconstruction of x0 (Bx2xHxW)
+        idx (int)      : sample index
+
+    Returns:
+        ssim_img (2D tensor) : reconstruction of x0 (2xHxW)
+        filt1 (2D tensor) : filtered ssim map thresholding (2xHxW)
+        filt2 (2D tensor) : filtered ssim map thresholding + erosion (2xHxW)
+        ano_map (2D tensor) : filtered anomaly map (HxW)
+    """
+    _, ssim_img             = ssim_for_batch(x0, x1)
+
+    # Create empty tensor for filtered ssim and anomaly maps
+    ssim_filt1  = np.zeros_like(ssim_img[0])
+    ssim_filt2  = np.zeros_like(ssim_img[0])
+
+    # Loop over images in batch and both channels. Necessary since
+    # skimage has no batch processing
+    for i in range(ssim_img.shape[1]):
+        
+        # Thresholding
+        ssim_filt1[i] = (ssim_img[idx,i] > np.percentile(ssim_img[idx,i], q=94)).astype(int)
+        
+        # Morphology filters
+        ssim_filt2[i] = morphology.binary_erosion(ssim_filt1[i])
+
+    # Boolean masks: if pixel is present in ssim height, ssim rgb
+    # and sobel filter, it is accounted as crack pixel  
+    ano_map = (
+                    (ssim_filt2[0]   == 1) & 
+                    (ssim_filt2[1]   == 1) 
+                    ).astype(int)
+    
+    return ssim_img[idx], ssim_filt1, ssim_filt2, ano_map
+
+
 def get_OOD_score(x0, x1):
     """
     Given the original sample x0 and its reconstructions x1 and x2, 
