@@ -1,6 +1,8 @@
 from typing import Any, Dict, List, Tuple
 
 import hydra
+import os
+import torch
 import rootutils
 import lightning as L
 from lightning import LightningDataModule, LightningModule, Trainer
@@ -80,6 +82,8 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info("Starting testing!")
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
+    torch.save(model.state_dict(), os.path.join(cfg.paths.output_dir, 'cddpm_weights.pt'))
+    # trainer.save_checkpoint(filepath=os.path.join(cfg.paths.output_dir, 'cddpm_model_weights.ckpt'), weights_only=True)
 
     # for predictions use trainer.predict(...)
     # predictions = trainer.predict(model=model, dataloaders=dataloaders, ckpt_path=cfg.ckpt_path)
