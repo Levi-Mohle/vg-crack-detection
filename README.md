@@ -8,7 +8,7 @@ This repository contains Python code for training and evaluating generative mach
 - [Installation](#installation)
 - [Dataset](#dataset)
 - [Models](#models)
-- [Model Training](#model-training)
+- [Training & Evaluation](#training--evaluation)
 - [Evaluation](#evaluation)
 - [Citation](#citation)
 - [Acknowledgements](#acknowledgements)
@@ -83,7 +83,7 @@ The patches are taken from 2 paintings made by Harm Belt, called _Almond Blossom
 
 
 
-## Training
+## Training & Evaluation
 
 All model parameters are described in a `.yaml` file in the `configs\experiment`, which can be specified when running the PyTorch Lightning template. See `docs/README_LightningHydraTemplate.md` for more specific training commands/features of this template.
 
@@ -95,14 +95,14 @@ python train.py experiment=impasto_cddpm_final trainer=ddp trainer.devices=2
 python eval.py +experiment=impasto_cddpm_final trainer=gpu ckpt_path=/best_model.ckpt
 ```
 
-## Evaluation
-
 ## Acknowledgements
 
-The [`GenerativeZoo`](https://github.com/caetas/GenerativeZoo) repository has a great collection of generative models and has been used as a basis for building my own generative models. Please make sure to visit this repository if you are in need of generative models.
+- The work of this repository was copied from [`vg-crack-dectection`](https://github.com/levimohle/vg-crack-detection) made by Levi Möhle. He created `vg-crack-detection` as part of his Masters thesis at University of Technology Eindhoven, where the goal was to create a crack detection algorithm for paintings by Vincent van Gogh.
+- The [`GenerativeZoo`](https://github.com/caetas/GenerativeZoo) repository has a great collection of generative models and has been used as a basis for building my own generative models. Please make sure to visit this repository if you are in need of generative models.
+- Make sure to check out [`lighting-hydra-template`](https://github.com/ashleve/lightning-hydra-template) for an amazing template for machine learning experiments!
 
 ## Citation
-If you publish work that uses the work presented in this repository, please cite ml-crack-detection-van-gogh as follows:
+If you publish work that uses the work presented in this repository, please cite `vg-crack-detection` as follows:
 
 ```bibtex
 @misc{vg-crack-detection,
